@@ -1,0 +1,77 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Course {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  instructor  String   @db.ObjectId
+  category    String
+  level       String   // beginner, intermediate, advanced
+
+  // Core metadata
+  price       Float
+  rating      Float?
+  totalRatings Int @default(0)
+  enrolledCount Int @default(0)
+
+  // Content
+  duration    String? // e.g., "40 hours"
+  modules     Int     @default(0)
+  lessons     Int     @default(0)
+
+  // Status
+  isPublished Boolean @default(false)
+  isFeatured  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("courses")
+}
+
+model Lesson {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId  String   @db.ObjectId
+  title     String
+  description String?
+  videoUrl  String?
+  duration  Int? // in seconds
+  order     Int
+
+  // Resources
+  resources String[] // File URLs
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("lessons")
+}
+
+model Review {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId  String   @db.ObjectId
+  userId    String   @db.ObjectId
+  rating    Int // 1-5
+  comment   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("reviews")
+}
+
+model Category {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  name  String @unique
+  slug  String @unique
+  description String?
+
+  @@map("categories")
+}

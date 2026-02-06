@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model UserProgress {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @unique @db.ObjectId
+
+  coursesEnrolled   Int @default(0)
+  coursesCompleted  Int @default(0)
+  totalTimeSpentSeconds Int @default(0)
+
+  currentStreak  Int @default(0)
+  longestStreak  Int @default(0)
+  lastActivityAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_progress")
+}
+
+model CourseProgress {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  courseId      String   @db.ObjectId
+
+  lessonsCompleted  Int @default(0)
+  progressPercentage Float @default(0)
+  timeSpentSeconds  Int @default(0)
+
+  lastLessonAccessedAt DateTime?
+  completedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, courseId])
+  @@map("course_progress")
+}
+
+model LessonProgress {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  courseId      String   @db.ObjectId
+  lessonId      String   @db.ObjectId
+
+  completed     Boolean  @default(false)
+  completedAt   DateTime?
+  timeSpentSeconds Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, lessonId])
+  @@map("lesson_progress")
+}
+
+model Certificate {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  courseId      String   @db.ObjectId
+
+  certificateUrl String
+  verificationUrl String?
+
+  issuedAt DateTime @default(now())
+  expiresAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, courseId])
+  @@map("certificates")
+}
+
+model Badge {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  badgeName     String
+
+  description   String?
+  awardedAt     DateTime @default(now())
+
+  @@unique([userId, badgeName])
+  @@map("badges")
+}
+
+model ActivityLog {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId        String   @db.ObjectId
+  courseId      String? @db.ObjectId
+  lessonId      String? @db.ObjectId
+
+  action        String // 'view', 'submit', 'complete', etc.
+  durationSeconds Int?
+  metadata      String? // JSON string
+
+  createdAt DateTime @default(now())
+
+  @@map("activity_logs")
+}

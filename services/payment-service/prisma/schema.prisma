@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Payment {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId       String   @db.ObjectId
+  userId        String   @db.ObjectId
+
+  amount        Float
+  currency      String   @default("usd")
+  status        String   @default("pending") // pending, succeeded, canceled, refunded
+
+  // Stripe integration
+  stripePaymentIntentId String? @unique
+  paymentMethodId       String?
+
+  // Metadata
+  description   String?
+  metadata      String? // JSON string for additional data
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("payments")
+}
+
+model Refund {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  paymentId     String   @db.ObjectId
+  orderId       String   @db.ObjectId
+
+  amount        Float
+  reason        String
+  status        String   @default("pending") // pending, succeeded, failed
+
+  stripeRefundId String? @unique
+
+  createdAt DateTime @default(now())
+  processedAt   DateTime?
+
+  @@map("refunds")
+}
+
+model StripeEvent {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  stripeEventId String   @unique
+
+  type          String
+  data          String // JSON string
+
+  processed     Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@map("stripe_events")
+}

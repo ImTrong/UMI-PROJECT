@@ -1,0 +1,277 @@
+services:
+  # ============================================
+  # MongoDB - Container Database dùng chung
+  # Mỗi service kết nối đến database logic riêng
+  # ============================================
+  mongodb:
+    image: mongo:7.0-jammy # Đã thay đổi từ mongo:7.0-alpine (không tồn tại)
+    container_name: elearning-mongo
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: securepassword123
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - elearning-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Cổng API Nginx (Port 8080)
+  # Reverse proxy cho tất cả microservices
+  # ============================================
+  nginx-gateway:
+    image: nginx:alpine
+    container_name: elearning-nginx
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - auth-service
+      - user-service
+      - course-service
+      - order-service
+      - payment-service
+      - learning-service
+    networks:
+      - elearning-network
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--tries=1",
+          "--spider",
+          "http://localhost/health",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Microservice 1: Authentication Service
+  # Port: 3001
+  # Database: auth_db
+  # ============================================
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: elearning-auth-service
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      NODE_ENV: development
+      DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/auth_db?authSource=admin"
+      JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
+      JWT_EXPIRY: "7d"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - elearning-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/api/auth/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Microservice 2: User Service
+  # Port: 3002
+  # Database: user_db
+  # ============================================
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: elearning-user-service
+    ports:
+      - "3002:3002"
+    environment:
+      PORT: 3002
+      NODE_ENV: development
+      DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/user_db?authSource=admin"
+      AUTH_SERVICE_URL: "http://auth-service:3001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - elearning-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3002/api/users/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Microservice 3: Course Service
+  # Port: 3003
+  # Database: course_db
+  # ============================================
+  course-service:
+    build:
+      context: ./services/course-service
+      dockerfile: Dockerfile
+    container_name: elearning-course-service
+    ports:
+      - "3003:3003"
+    environment:
+      PORT: 3003
+      NODE_ENV: development
+      DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/course_db?authSource=admin"
+      AUTH_SERVICE_URL: "http://auth-service:3001"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - elearning-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/api/courses/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Microservice 4: Order Service
+  # Port: 3004
+  # Database: order_db
+  # ============================================
+  order-service:
+    build:
+      context: ./services/order-service
+      dockerfile: Dockerfile
+    container_name: elearning-order-service
+    ports:
+      - "3004:3004"
+    environment:
+      PORT: 3004
+      NODE_ENV: development
+      DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/order_db?authSource=admin"
+      AUTH_SERVICE_URL: "http://auth-service:3001"
+      COURSE_SERVICE_URL: "http://course-service:3003"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - elearning-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3004/api/orders/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Microservice 5: Payment Service
+  # Port: 3005
+  # Database: payment_db
+  # ============================================
+  payment-service:
+    build:
+      context: ./services/payment-service
+      dockerfile: Dockerfile
+    container_name: elearning-payment-service
+    ports:
+      - "3005:3005"
+    environment:
+      PORT: 3005
+      NODE_ENV: development
+      DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/payment_db?authSource=admin"
+      STRIPE_SECRET_KEY: "sk_test_fake_key_for_development"
+      AUTH_SERVICE_URL: "http://auth-service:3001"
+      ORDER_SERVICE_URL: "http://order-service:3004"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - elearning-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3005/api/payments/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Microservice 6: Learning Service
+  # Port: 3006
+  # Database: learning_db
+  # ============================================
+  learning-service:
+    build:
+      context: ./services/learning-service
+      dockerfile: Dockerfile
+    container_name: elearning-learning-service
+    ports:
+      - "3006:3006"
+    environment:
+      PORT: 3006
+      NODE_ENV: development
+      DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/learning_db?authSource=admin"
+      AUTH_SERVICE_URL: "http://auth-service:3001"
+      COURSE_SERVICE_URL: "http://course-service:3003"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - elearning-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3006/api/learning/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Frontend - React + Vite
+  # Port: 3000
+  # ============================================
+  admin-frontend:
+    build:
+      context: ./frontend/admin-app
+      dockerfile: Dockerfile
+    container_name: elearning-admin-frontend
+    ports:
+      - "3000:5173"
+    networks:
+      - elearning-network
+
+  customer-frontend:
+    build:
+      context: ./frontend/customer-app
+      dockerfile: Dockerfile
+    container_name: elearning-customer-frontend
+    ports:
+      - "3007:5173"
+    networks:
+      - elearning-network
+
+  instructor-frontend:
+    build:
+      context: ./frontend/instructor-app
+      dockerfile: Dockerfile
+    container_name: elearning-instructor-frontend
+    ports:
+      - "3008:5173"
+    networks:
+      - elearning-network
+
+# ============================================
+# Networks
+# ============================================
+networks:
+  elearning-network:
+    driver: bridge
+
+# ============================================
+# Volumes
+# ============================================
+volumes:
+  mongo-data:
+    driver: local

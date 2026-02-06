@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+*.npm
+*.lock
+pnpm-lock.yaml
+yarn.lock
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Build output
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Docker
+.docker
+
+# Database
+.mongodb/
+mongo-data/
+
+# OS
+Thumbs.db

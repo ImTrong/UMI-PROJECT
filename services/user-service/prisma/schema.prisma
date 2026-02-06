@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model UserProfile {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique
+  email     String   @unique
+  fullName  String
+  avatar    String?
+  bio       String?
+  role      String   @default("student") // student, instructor, admin
+
+  // Contact Information
+  phone     String?
+  location  String?
+
+  // Performance metrics
+  totalCoursesEnrolled  Int     @default(0)
+  totalCoursesCompleted Int     @default(0)
+  averageRating         Float?
+  badges                String[]
+
+  // Preferences
+  language              String  @default("en")
+  emailNotifications    Boolean @default(true)
+  pushNotifications     Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("user_profiles")
+}
+
+model EducationBackground {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userProfileId String   @db.ObjectId
+  institution   String
+  degree        String
+  fieldOfStudy  String
+  startYear     Int
+  endYear       Int?
+  description   String?
+
+  createdAt DateTime @default(now())
+
+  @@map("education_backgrounds")
+}
+
+model WorkExperience {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  userProfileId String   @db.ObjectId
+  company       String
+  position      String
+  startDate     DateTime
+  endDate       DateTime?
+  description   String?
+
+  createdAt DateTime @default(now())
+
+  @@map("work_experiences")
+}
