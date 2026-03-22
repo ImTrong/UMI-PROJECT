@@ -1,0 +1,305 @@
+{
+  "info": {
+    "name": "User Service API",
+    "description": "Postman Collection for E-Learning Platform - User Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3002/api/users",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "YOUR_JWT_TOKEN_HERE",
+      "type": "string",
+      "description": "JWT token generated from auth-service with appropriate roles (e.g. ADMIN or STUDENT)"
+    },
+    {
+      "key": "userId",
+      "value": "user_123",
+      "type": "string",
+      "description": "User ID for path parameters"
+    },
+    {
+      "key": "educationId",
+      "value": "edu_123",
+      "type": "string"
+    },
+    {
+      "key": "workId",
+      "value": "work_123",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Public",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Checks if the service and database are up and running."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" }
+              ]
+            },
+            "description": "Get a paginated list of all users. Requires ADMIN role."
+          }
+        },
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user_123\",\n  \"email\": \"student@example.com\",\n  \"fullName\": \"Nguyen Van A\",\n  \"role\": \"STUDENT\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}",
+              "host": ["{{baseUrl}}"]
+            },
+            "description": "Creates a new user profile. Requires ADMIN role."
+          }
+        },
+        {
+          "name": "Get User By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{userId}}"]
+            },
+            "description": "Get a specific user's profile. Requires matching userId or ADMIN role."
+          }
+        },
+        {
+          "name": "Update User",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Nguyen Van A Updated\",\n  \"bio\": \"This is my brief bio\",\n  \"phoneNumber\": \"+84123456789\",\n  \"city\": \"Ho Chi Minh\",\n  \"country\": \"Vietnam\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{userId}}"]
+            },
+            "description": "Update existing user profile. Requires matching userId or ADMIN role."
+          }
+        },
+        {
+          "name": "Delete User",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{userId}}"]
+            },
+            "description": "Delete a user completely. Requires ADMIN role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Education",
+      "item": [
+        {
+          "name": "Add Education",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institution\": \"University of Science\",\n  \"degree\": \"Bachelor's\",\n  \"fieldOfStudy\": \"Computer Science\",\n  \"startDate\": \"2019-09-01T00:00:00.000Z\",\n  \"endDate\": \"2023-09-01T00:00:00.000Z\",\n  \"grade\": \"A\",\n  \"description\": \"Graduated with honors.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/{{userId}}/education",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{userId}}", "education"]
+            },
+            "description": "Add new education background for a user. Requires matching userId or ADMIN role."
+          }
+        },
+        {
+          "name": "Update Education",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"degree\": \"Master's\",\n  \"grade\": \"A+\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/education/{{educationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["education", "{{educationId}}"]
+            },
+            "description": "Update specific education record. Requires matching userId or ADMIN role."
+          }
+        },
+        {
+          "name": "Delete Education",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/education/{{educationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["education", "{{educationId}}"]
+            },
+            "description": "Delete specific education record. Requires matching userId or ADMIN role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Work Experience",
+      "item": [
+        {
+          "name": "Add Work Experience",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company\": \"Tech Corp\",\n  \"position\": \"Software Engineer\",\n  \"startDate\": \"2023-10-01T00:00:00.000Z\",\n  \"current\": true,\n  \"description\": \"Working on backend services.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/{{userId}}/work",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{userId}}", "work"]
+            },
+            "description": "Add new work experience. Requires matching userId or ADMIN role."
+          }
+        },
+        {
+          "name": "Update Work Experience",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"position\": \"Senior Software Engineer\",\n  \"current\": false,\n  \"endDate\": \"2025-01-01T00:00:00.000Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/work/{{workId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["work", "{{workId}}"]
+            },
+            "description": "Update specific work experience record. Requires matching userId or ADMIN role."
+          }
+        },
+        {
+          "name": "Delete Work Experience",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/work/{{workId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["work", "{{workId}}"]
+            },
+            "description": "Delete specific work experience record. Requires matching userId or ADMIN role."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Extras (Preferences & Badges)",
+      "item": [
+        {
+          "name": "Update Preferences",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"language\": \"vi\",\n  \"theme\": \"dark\",\n  \"emailNotifications\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/{{userId}}/preferences",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{userId}}", "preferences"]
+            },
+            "description": "Update or initialize user preferences. Requires matching userId or ADMIN role."
+          }
+        },
+        {
+          "name": "Add Badge",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Early Adopter\",\n  \"description\": \"Joined the platform during beta testing\",\n  \"icon\": \"beta-icon.png\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/{{userId}}/badges",
+              "host": ["{{baseUrl}}"],
+              "path": ["{{userId}}", "badges"]
+            },
+            "description": "Award a badge to a user. Requires ADMIN role."
+          }
+        }
+      ]
+    }
+  ]
+}

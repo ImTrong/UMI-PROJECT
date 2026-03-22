@@ -1,19 +1,48 @@
+import dotenv from 'dotenv';
 import app from './app';
+
+dotenv.config();
 
 const PORT = process.env.PORT || 3002;
 
-app.listen(PORT, () => {
-  console.log(`[USER-SERVICE] Server running on http://localhost:${PORT}`);
-  console.log(`[USER-SERVICE] Environment: ${process.env.NODE_ENV}`);
-  console.log(`[USER-SERVICE] Health check: http://localhost:${PORT}/api/users/health`);
+const server = app.listen(PORT, () => {
+  console.log(`
+    🚀 User Service is running!
+    📡 Listening on port ${PORT}
+    🔗 Health check: http://localhost:${PORT}/api/users/health
+    📝 API Base URL: http://localhost:${PORT}/api/users
+    ⏰ Started at: ${new Date().toISOString()}
+  `);
 });
 
-process.on('SIGTERM', () => {
-  console.log('[USER-SERVICE] SIGTERM signal received: closing HTTP server');
-  process.exit(0);
+// Graceful shutdown
+const shutdown = async () => {
+  console.log('Received shutdown signal, closing server...');
+  
+  server.close(() => {
+    console.log('Server closed successfully');
+    process.exit(0);
+  });
+
+  // Force close after 10 seconds
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+};
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  shutdown();
 });
 
-process.on('SIGINT', () => {
-  console.log('[USER-SERVICE] SIGINT signal received: closing HTTP server');
-  process.exit(0);
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  shutdown();
 });
+
+export default server;

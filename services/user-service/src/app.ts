@@ -1,59 +1,67 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express from 'express';
 import cors from 'cors';
-import userRoutes from './routes';
-import { errorHandler } from './middlewares/errorHandler';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import userRoutes from './routes/userRoutes';
+import { errorHandler } from './middleware/errorHandler';
 
-const app: Express = express();
+const app = express();
 
+// Security middleware
+app.use(helmet());
+
+// CORS configuration
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? ['https://yourdomain.com']
-    : '*',
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: process.env.NODE_ENV === 'production' 
+    ? ['https://yourdomain.com'] 
+    : ['http://localhost:3000', 'http://localhost:5173'],
+  credentials: true
 }));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(`[USER-SERVICE] ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
-  });
+app.use(limiter);
+
+// Body parser
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Request logging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
   next();
 });
 
+// Routes
 app.use('/api/users', userRoutes);
 
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
+// Root endpoint
+app.get('/', (req, res) => {
+  res.json({
     service: 'user-service',
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
+    version: '1.0.0',
+    status: 'running',
+    timestamp: new Date().toISOString()
   });
 });
 
-app.get('/api/users/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    service: 'user-service',
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
-});
-
-app.use((req: Request, res: Response) => {
+// 404 handler
+app.use((req, res) => {
   res.status(404).json({
-    error: 'Not Found',
-    path: req.path,
-    message: `Route not found: ${req.method} ${req.path}`,
+    success: false,
+    error: 'Route not found',
+    timestamp: new Date().toISOString()
   });
 });
 
+// Error handler
 app.use(errorHandler);
 
 export default app;
