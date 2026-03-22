@@ -1,0 +1,279 @@
+{
+	"info": {
+		"_postman_id": "eb6071ea-27a3-4b66-a36c-d54d9241b711",
+		"name": "User Service API Tests",
+		"description": "Collection run automation tests for User Service.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "1. Health Check",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Service is active\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.service).to.eql(\"user-service\");",
+							"    pm.expect(jsonData.status).to.eql(\"active\");",
+							"    pm.expect(jsonData.database).to.eql(\"connected\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{USER_SERVICE_URL}}/health",
+					"host": [
+						"{{USER_SERVICE_URL}}"
+					],
+					"path": [
+						"health"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "2. Get My Profile",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Response has user profile fields\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('userId');",
+							"    pm.expect(jsonData).to.have.property('email');",
+							"    pm.expect(jsonData).to.have.property('fullName');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{USER_SERVICE_URL}}/me",
+					"host": [
+						"{{USER_SERVICE_URL}}"
+					],
+					"path": [
+						"me"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "3. Update My Profile",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"FullName is updated correctly\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.fullName).to.eql(\"Test User Name Update\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"fullName\": \"Test User Name Update\",\n    \"bio\": \"Test profile update bio\",\n    \"phoneNumber\": \"1234567890\"\n}"
+				},
+				"url": {
+					"raw": "{{USER_SERVICE_URL}}/me",
+					"host": [
+						"{{USER_SERVICE_URL}}"
+					],
+					"path": [
+						"me"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "4. Get User Stats",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200\", function () {",
+							"    pm.response.to.have.status(200);",
+							"});",
+							"pm.test(\"Stats contain expected structure\", function () {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData).to.have.property('totalEducation');",
+							"    pm.expect(jsonData).to.have.property('totalWorkExperience');",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "{{USER_SERVICE_URL}}/me/stats",
+					"host": [
+						"{{USER_SERVICE_URL}}"
+					],
+					"path": [
+						"me",
+						"stats"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "5. Add Education",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 or 201\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+							"});",
+							"pm.test(\"Response should have degree info\", function() {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.degree).to.eql(\"Cử nhân Test\");",
+							"});",
+							"// Save education ID for update/delete later",
+							"if(pm.response.code === 200 || pm.response.code === 201) {",
+							"    var data = pm.response.json();",
+							"    pm.environment.set(\"EDUCATION_ID\", data.id);",
+							"}"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"institution\": \"Đại học Test\",\n    \"degree\": \"Cử nhân Test\",\n    \"fieldOfStudy\": \"Khoa học máy tính\",\n    \"startDate\": \"2019-09-01T00:00:00.000Z\",\n    \"endDate\": \"2023-09-01T00:00:00.000Z\",\n    \"grade\": \"Giỏi\",\n    \"description\": \"Kiểm tra tạo Education\"\n}"
+				},
+				"url": {
+					"raw": "{{USER_SERVICE_URL}}/me/education",
+					"host": [
+						"{{USER_SERVICE_URL}}"
+					],
+					"path": [
+						"me",
+						"education"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "6. Add Work Experience",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code is 200 or 201\", function () {",
+							"    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+							"});",
+							"pm.test(\"Response should have work info\", function() {",
+							"    var jsonData = pm.response.json();",
+							"    pm.expect(jsonData.position).to.eql(\"Backend Dev Test\");",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"company\": \"Company Test\",\n    \"position\": \"Backend Dev Test\",\n    \"location\": \"TPHCM\",\n    \"startDate\": \"2023-10-01T00:00:00.000Z\",\n    \"current\": true,\n    \"description\": \"Test description work\"\n}"
+				},
+				"url": {
+					"raw": "{{USER_SERVICE_URL}}/me/work",
+					"host": [
+						"{{USER_SERVICE_URL}}"
+					],
+					"path": [
+						"me",
+						"work"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{
+				"key": "token",
+				"value": "{{AUTH_TOKEN}}",
+				"type": "string"
+			}
+		]
+	},
+	"variable": [
+		{
+			"key": "USER_SERVICE_URL",
+			"value": "http://localhost:3002/api/users",
+			"type": "string"
+		},
+		{
+			"key": "AUTH_TOKEN",
+			"value": "Điền_JWT_Token_Của_Bạn_Vào_Đây",
+			"type": "string"
+		}
+	]
+}

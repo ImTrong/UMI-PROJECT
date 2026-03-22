@@ -1,19 +1,23 @@
+import dotenv from 'dotenv';
 import app from './app';
+import logger from './utils/logger';
+
+// Load environment variables
+dotenv.config();
 
 const PORT = process.env.PORT || 3002;
 
-app.listen(PORT, () => {
-  console.log(`[USER-SERVICE] Server running on http://localhost:${PORT}`);
-  console.log(`[USER-SERVICE] Environment: ${process.env.NODE_ENV}`);
-  console.log(`[USER-SERVICE] Health check: http://localhost:${PORT}/api/users/health`);
-});
+const startServer = async () => {
+  try {
+    app.listen(PORT, () => {
+      logger.info(`User service running on port ${PORT}`);
+      logger.info(`Environment: ${process.env.NODE_ENV}`);
+      logger.info(`Auth service URL: ${process.env.AUTH_SERVICE_URL}`);
+    });
+  } catch (error) {
+    logger.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
 
-process.on('SIGTERM', () => {
-  console.log('[USER-SERVICE] SIGTERM signal received: closing HTTP server');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('[USER-SERVICE] SIGINT signal received: closing HTTP server');
-  process.exit(0);
-});
+startServer();

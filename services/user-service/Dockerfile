@@ -3,29 +3,44 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
+
+# Install dependencies
 RUN npm ci
 
+# Copy source code
 COPY . .
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Build TypeScript
 RUN npm run build
 
-# Runtime stage
+# Production stage
 FROM node:18-alpine
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci --only=production && npm install -g prisma
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma/
 
+# Install production dependencies only
+RUN npm ci --only=production
+
+# Copy built files from builder
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
-RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
+# Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
 USER nodejs
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:${PORT:-3002}/api/users/health', (r) => {if (r.statusCode !== 200) throw new Error('Health check failed')})"
-
-EXPOSE ${PORT:-3002}
+EXPOSE 3002
 
 CMD ["node", "dist/index.js"]
