@@ -7,61 +7,82 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// User Profile - Main user information
 model UserProfile {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @unique
-  email     String   @unique
-  fullName  String
-  avatar    String?
-  bio       String?
-  role      String   @default("student") // student, instructor, admin
+  id                String               @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String               @unique @db.String
+  email             String               @unique
+  fullName          String
+  bio               String?
+  avatar            String?
+  role              Role                 @default(STUDENT)
+  phoneNumber       String?
+  dateOfBirth       DateTime?
+  address           String?
+  city              String?
+  country           String?
+  badges            Badge[]
+  preferences       Preferences?         @relation(fields: [preferencesId], references: [id])
+  education         EducationBackground[]
+  workExperience    WorkExperience[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
-  // Contact Information
-  phone     String?
-  location  String?
-
-  // Performance metrics
-  totalCoursesEnrolled  Int     @default(0)
-  totalCoursesCompleted Int     @default(0)
-  averageRating         Float?
-  badges                String[]
-
-  // Preferences
-  language              String  @default("en")
-  emailNotifications    Boolean @default(true)
-  pushNotifications     Boolean @default(true)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("user_profiles")
+  preferencesId     String?              @unique @db.ObjectId
 }
 
+// Education Background
 model EducationBackground {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userProfileId String   @db.ObjectId
-  institution   String
-  degree        String
-  fieldOfStudy  String
-  startYear     Int
-  endYear       Int?
-  description   String?
+  id                String               @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String               @db.ObjectId
+  institution       String
+  degree            String
+  fieldOfStudy      String
+  startDate         DateTime
+  endDate           DateTime?
+  grade             String?
+  description       String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
-  createdAt DateTime @default(now())
-
-  @@map("education_backgrounds")
+  user              UserProfile          @relation(fields: [userId], references: [id])
 }
 
+// Work Experience
 model WorkExperience {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userProfileId String   @db.ObjectId
-  company       String
-  position      String
-  startDate     DateTime
-  endDate       DateTime?
-  description   String?
+  id                String               @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String               @db.ObjectId
+  company           String
+  position          String
+  startDate         DateTime
+  endDate           DateTime?
+  current           Boolean              @default(false)
+  description       String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
 
-  createdAt DateTime @default(now())
+  user              UserProfile          @relation(fields: [userId], references: [id])
+}
 
-  @@map("work_experiences")
+// User Preferences
+model Preferences {
+  id                String               @id @default(auto()) @map("_id") @db.ObjectId
+  emailNotifications Boolean             @default(true)
+  language          String               @default("en")
+  theme             String               @default("light")
+  userId            UserProfile?
+}
+
+// Badge (Embedded in UserProfile)
+type Badge {
+  name              String
+  description       String?
+  awardedAt         DateTime             @default(now())
+  icon              String?
+}
+
+enum Role {
+  STUDENT
+  INSTRUCTOR
+  ADMIN
 }
