@@ -1,74 +1,73 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express from 'express';
 import cors from 'cors';
-import authRoutes from './routes';
-import { errorHandler } from './middlewares/errorHandler';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { AuthController } from './controllers/auth.controller';
+import { authenticateToken } from './middleware/auth.middleware';
+import { validateRegister, validateLogin, handleValidationErrors } from './middleware/validation.middleware';
+import logger from './utils/logger';
 
-const app: Express = express();
+const app = express();
 
-// ============================================
-// Middleware Setup
-// ============================================
+// Security middleware
+app.use(helmet());
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? ['https://yourdomain.com']
-    : '*',
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+  optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
 
-// Body parser middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// Body parser
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Request logging middleware
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(`[AUTH-SERVICE] ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
-  });
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+  message: { error: 'Too many requests, please try again later.' },
+});
+app.use('/api/auth', limiter);
+
+// Request logging
+app.use((req, res, next) => {
+  logger.debug(`${req.method} ${req.path}`);
   next();
 });
 
-// ============================================
 // Routes
-// ============================================
-app.use('/api/auth', authRoutes);
+app.get('/api/auth/health', AuthController.healthCheck);
 
-// Health check endpoints
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    service: 'auth-service',
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
-});
+app.post(
+  '/api/auth/register',
+  validateRegister,
+  handleValidationErrors,
+  AuthController.register
+);
 
-app.get('/api/auth/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    service: 'auth-service',
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
-});
+app.post(
+  '/api/auth/login',
+  validateLogin,
+  handleValidationErrors,
+  AuthController.login
+);
+
+app.post('/api/auth/refresh-token', AuthController.refreshToken);
+app.post('/api/auth/logout', authenticateToken, AuthController.logout);
+app.post('/api/auth/verify-token', AuthController.verifyToken);
 
 // 404 handler
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    error: 'Not Found',
-    path: req.path,
-    message: `Route not found: ${req.method} ${req.path}`,
-  });
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
 });
 
-// ============================================
-// Error Handler (Must be last)
-// ============================================
-app.use(errorHandler);
+// Error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
+});
 
 export default app;
