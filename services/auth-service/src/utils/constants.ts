@@ -17,8 +17,9 @@ export const ERROR_MESSAGES = {
   TOKEN_INVALID: 'Invalid token',
   TOKEN_MISSING: 'Authentication token missing',
   ACCOUNT_DISABLED: 'Account has been disabled',
-  EMAIL_NOT_VERIFIED: 'Email not verified',
   RATE_LIMIT_EXCEEDED: 'Too many requests, please try again later',
+  INVALID_CURRENT_PASSWORD: 'Mật khẩu hiện tại không chính xác',
+  UNAUTHORIZED: 'Unauthorized access',
 } as const;
 
 export const SUCCESS_MESSAGES = {
@@ -27,4 +28,7 @@ export const SUCCESS_MESSAGES = {
   LOGOUT_SUCCESS: 'Logout successful',
   TOKEN_REFRESHED: 'Token refreshed successfully',
   TOKEN_VERIFIED: 'Token verified successfully',
+  PASSWORD_CHANGED: 'Mật khẩu đã được thay đổi',
+  EMAIL_VERIFIED: 'Xác thực email thành công',
+  PASSWORD_RESET_EMAIL_SENT: 'Email đặt lại mật khẩu đã được gửi',
 } as const;

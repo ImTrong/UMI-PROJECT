@@ -3,11 +3,12 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { AuthController } from './controllers/auth.controller';
-import { authenticateToken } from './middleware/auth.middleware';
-import { validateRegister, validateLogin, handleValidationErrors } from './middleware/validation.middleware';
+import { authenticateToken, optionalAuth } from './middleware/auth.middleware';
+import { validateRegister, validateLogin, validateChangePassword, validateForgotPassword, validateResetPassword, handleValidationErrors } from './middleware/validation.middleware';
 import logger from './utils/logger';
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet());
@@ -56,8 +57,32 @@ app.post(
 );
 
 app.post('/api/auth/refresh-token', AuthController.refreshToken);
-app.post('/api/auth/logout', authenticateToken, AuthController.logout);
+app.post('/api/auth/logout', optionalAuth, AuthController.logout);
 app.post('/api/auth/verify-token', AuthController.verifyToken);
+
+app.post(
+  '/api/auth/change-password',
+  authenticateToken,
+  validateChangePassword,
+  handleValidationErrors,
+  AuthController.changePassword
+);
+
+app.post(
+  '/api/auth/forgot-password',
+  validateForgotPassword,
+  handleValidationErrors,
+  AuthController.forgotPassword
+);
+
+app.post(
+  '/api/auth/reset-password',
+  validateResetPassword,
+  handleValidationErrors,
+  AuthController.resetPassword
+);
+
+app.post('/api/auth/verify-email', AuthController.verifyEmail);
 
 // 404 handler
 app.use((req, res) => {

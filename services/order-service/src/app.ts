@@ -1,59 +1,214 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express from 'express';
 import cors from 'cors';
-import orderRoutes from './routes';
-import { errorHandler } from './middlewares/errorHandler';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { OrderController } from './controllers/order.controller';
+import { CartController } from './controllers/cart.controller';
+import { authenticateToken, requireRole } from './middleware/auth.middleware';
+import {
+  validateAddToCart,
+  validateCreateOrder,
+  validateUpdateOrderStatus,
+  validateCancelOrder,
+  validateOrderId,
+  validatePagination,
+  handleValidationErrors,
+} from './middleware/validation.middleware';
+import logger from './utils/logger';
 
-const app: Express = express();
+const app = express();
+app.set('trust proxy', 1);
 
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? ['https://yourdomain.com']
-    : '*',
+// Security middleware
+app.use(helmet());
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+  optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// Body parser
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(`[ORDER-SERVICE] ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
-  });
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+  message: { error: 'Too many requests, please try again later.' },
+});
+app.use('/api/orders', limiter);
+app.use('/api/cart', limiter);
+
+// Request logging
+app.use((req, res, next) => {
+  logger.debug(`${req.method} ${req.path}`);
   next();
 });
 
-app.use('/api/orders', orderRoutes);
+// Health check (no authentication required)
+app.get('/api/orders/health', OrderController.healthCheck);
 
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    service: 'order-service',
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+// ==================== Cart Routes ====================
+
+app.get(
+  '/api/cart',
+  authenticateToken,
+  CartController.getCart
+);
+
+app.post(
+  '/api/cart',
+  authenticateToken,
+  validateAddToCart,
+  handleValidationErrors,
+  CartController.addToCart
+);
+
+app.delete(
+  '/api/cart/:courseId',
+  authenticateToken,
+  CartController.removeFromCart
+);
+
+app.delete(
+  '/api/cart',
+  authenticateToken,
+  CartController.clearCart
+);
+
+app.get(
+  '/api/cart/total',
+  authenticateToken,
+  CartController.getCartTotal
+);
+
+// ==================== Order Routes ====================
+
+// User routes
+app.get(
+  '/api/orders/me',
+  authenticateToken,
+  validatePagination,
+  handleValidationErrors,
+  OrderController.getUserOrders
+);
+
+app.get(
+  '/api/orders/me/:orderId',
+  authenticateToken,
+  validateOrderId,
+  handleValidationErrors,
+  OrderController.getOrderById
+);
+
+app.get(
+  '/api/orders/me/number/:orderNumber',
+  authenticateToken,
+  OrderController.getOrderByNumber
+);
+
+app.post(
+  '/api/orders',
+  authenticateToken,
+  validateCreateOrder,
+  handleValidationErrors,
+  OrderController.createOrder
+);
+
+// Order routes with payment
+app.post(
+  '/api/orders/with-payment',
+  authenticateToken,
+  validateCreateOrder,
+  handleValidationErrors,
+  OrderController.createOrderWithPayment
+);
+
+app.post(
+  '/api/orders/:orderId/payment',
+  authenticateToken,
+  validateOrderId,
+  handleValidationErrors,
+  OrderController.processPayment
+);
+
+app.get(
+  '/api/orders/:orderId/payment-status',
+  authenticateToken,
+  validateOrderId,
+  handleValidationErrors,
+  OrderController.getPaymentStatus
+);
+
+app.post(
+  '/api/orders/:orderId/cancel',
+  authenticateToken,
+  validateCancelOrder,
+  handleValidationErrors,
+  OrderController.cancelOrder
+);
+
+// Admin routes
+app.get(
+  '/api/orders',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  validatePagination,
+  handleValidationErrors,
+  OrderController.getAllOrders
+);
+
+app.get(
+  '/api/orders/analytics',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  OrderController.getAnalytics
+);
+
+app.get(
+  '/api/orders/stats',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  OrderController.getOrderStats
+);
+
+app.put(
+  '/api/orders/:orderId/status',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  validateUpdateOrderStatus,
+  handleValidationErrors,
+  OrderController.updateOrderStatus
+);
+
+app.get(
+  '/api/orders/:orderId',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  validateOrderId,
+  handleValidationErrors,
+  OrderController.getOrderById
+);
+
+// Internal webhook endpoint (service-to-service, no user auth)
+app.post(
+  '/api/orders/webhook/payment',
+  OrderController.handlePaymentWebhook
+);
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
 });
 
-app.get('/api/orders/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    service: 'order-service',
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+// Error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
-
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    error: 'Not Found',
-    path: req.path,
-    message: `Route not found: ${req.method} ${req.path}`,
-  });
-});
-
-app.use(errorHandler);
 
 export default app;

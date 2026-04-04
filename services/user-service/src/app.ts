@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { UserController } from './controllers/user.controller';
+import { NotificationController } from './controllers/notification.controller';
 import { authenticateToken, requireRole } from './middleware/auth.middleware';
 import {
   validateCreateUser,
@@ -18,6 +19,7 @@ import { UserService } from './services/user.service';
 import { ERROR_MESSAGES } from './utils/constants';
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Security middleware
 app.use(helmet());
@@ -158,6 +160,47 @@ app.delete(
   UserController.deleteWorkExperience
 );
 
+// ==================== Notification Routes ====================
+
+app.get(
+  '/api/users/me/notifications',
+  authenticateToken,
+  NotificationController.getUserNotifications
+);
+
+app.put(
+  '/api/users/me/notifications/read-all',
+  authenticateToken,
+  NotificationController.markAllAsRead
+);
+
+app.put(
+  '/api/users/me/notifications/:notificationId/read',
+  authenticateToken,
+  NotificationController.markAsRead
+);
+
+app.delete(
+  '/api/users/me/notifications/:notificationId',
+  authenticateToken,
+  NotificationController.deleteNotification
+);
+
+app.post(
+  '/api/users/internal/notifications',
+  // In a real microservices setup, you'd protect this with a special internal network token
+  NotificationController.createInternalNotification
+);
+
+// ==================== Analytics Route ====================
+
+app.get(
+  '/api/users/analytics',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  UserController.getAnalytics
+);
+
 // ==================== Admin Routes for Managing Users ====================
 
 app.put(
@@ -207,6 +250,9 @@ app.delete(
     }
   }
 );
+
+app.post('/api/users/become-instructor', authenticateToken, UserController.becomeInstructor);
+app.post('/api/users/become-instructor/confirm', UserController.confirmInstructor);
 
 // 404 handler
 app.use((req, res) => {

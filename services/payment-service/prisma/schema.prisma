@@ -8,55 +8,87 @@ datasource db {
 }
 
 model Payment {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  orderId       String   @db.ObjectId
-  userId        String   @db.ObjectId
-
-  amount        Float
-  currency      String   @default("usd")
-  status        String   @default("pending") // pending, succeeded, canceled, refunded
-
-  // Stripe integration
-  stripePaymentIntentId String? @unique
+  id                    String          @id @default(auto()) @map("_id") @db.ObjectId
+  orderId               String?         @db.ObjectId
+  orderNumber           String?
+  userId                String          @db.ObjectId
+  amount                Float
+  currency              String          @default("usd")
+  status                PaymentStatus   @default(PENDING)
+  type                  PaymentType     @default(COURSE_PURCHASE)
+  stripePaymentIntentId String?         @unique
+  stripeCustomerId      String?
   paymentMethodId       String?
-
-  // Metadata
-  description   String?
-  metadata      String? // JSON string for additional data
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  clientSecret          String?
+  errorMessage          String?
+  metadata              Json            @default("{}")
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+  completedAt           DateTime?
+  
+  refunds               Refund[]
+  
+  @@index([orderId])
+  @@index([userId])
+  @@index([status])
+  @@index([type])
   @@map("payments")
 }
 
 model Refund {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  paymentId     String   @db.ObjectId
-  orderId       String   @db.ObjectId
-
-  amount        Float
-  reason        String
-  status        String   @default("pending") // pending, succeeded, failed
-
-  stripeRefundId String? @unique
-
-  createdAt DateTime @default(now())
-  processedAt   DateTime?
-
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  paymentId   String       @db.ObjectId
+  orderId     String?      @db.ObjectId
+  orderNumber String?
+  userId      String       @db.ObjectId
+  amount      Float
+  currency    String       @default("usd")
+  reason      String?
+  status      RefundStatus @default(PENDING)
+  stripeRefundId String?
+  errorMessage String?
+  createdAt   DateTime     @default(now())
+  completedAt DateTime?
+  
+  payment     Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  
+  @@index([paymentId])
+  @@index([orderId])
+  @@index([status])
   @@map("refunds")
 }
 
 model StripeEvent {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
   stripeEventId String   @unique
-
   type          String
-  data          String // JSON string
-
+  data          Json
   processed     Boolean  @default(false)
-
-  createdAt DateTime @default(now())
-
+  processedAt   DateTime?
+  error         String?
+  createdAt     DateTime @default(now())
+  
+  @@index([type])
+  @@index([processed])
   @@map("stripe_events")
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELLED
+}
+
+enum RefundStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+}
+
+enum PaymentType {
+  COURSE_PURCHASE
+  INSTRUCTOR_REGISTRATION
 }

@@ -1,59 +1,309 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express from 'express';
 import cors from 'cors';
-import courseRoutes from './routes';
-import { errorHandler } from './middlewares/errorHandler';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { CourseController } from './controllers/course.controller';
+import { LessonController } from './controllers/lesson.controller';
+import { ReviewController } from './controllers/review.controller';
+import { CategoryController } from './controllers/category.controller';
+import { authenticateToken, requireRole, requireInstructorOrAdmin, authenticateOptional } from './middleware/auth.middleware';
+import {
+  validateCreateCourse,
+  validateUpdateCourse,
+  validateCreateLesson,
+  validateCreateReview,
+  validateCreateCategory,
+  validateCourseId,
+  validateLessonId,
+  validateReviewId,
+  validateCategoryId,
+  validatePagination,
+  handleValidationErrors,
+} from './middleware/validation.middleware';
+import logger from './utils/logger';
 
-const app: Express = express();
+const app = express();
+app.set('trust proxy', 1);
 
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? ['https://yourdomain.com']
-    : '*',
+// Security middleware
+app.use(helmet());
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+  optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// Body parser
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(`[COURSE-SERVICE] ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
-  });
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+  message: { error: 'Too many requests, please try again later.' },
+});
+app.use('/api/courses', limiter);
+
+// Request logging
+app.use((req, res, next) => {
+  logger.debug(`${req.method} ${req.path}`);
   next();
 });
 
-app.use('/api/courses', courseRoutes);
+// Health check (no authentication required)
+app.get('/api/courses/health', CourseController.healthCheck);
 
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    service: 'course-service',
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+// ==================== Category Routes ====================
+
+app.get('/api/categories', CategoryController.getAllCategories);
+app.get('/api/categories/stats', CategoryController.getCategoryStats);
+app.get('/api/categories/:categoryId', validateCategoryId, handleValidationErrors, CategoryController.getCategoryById);
+app.get('/api/categories/slug/:slug', CategoryController.getCategoryBySlug);
+
+app.post(
+  '/api/categories',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  validateCreateCategory,
+  handleValidationErrors,
+  CategoryController.createCategory
+);
+
+app.put(
+  '/api/categories/:categoryId',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  validateCategoryId,
+  validateCreateCategory,
+  handleValidationErrors,
+  CategoryController.updateCategory
+);
+
+app.delete(
+  '/api/categories/:categoryId',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  validateCategoryId,
+  handleValidationErrors,
+  CategoryController.deleteCategory
+);
+
+// ==================== Course Routes ====================
+
+// Public routes (static paths MUST come before dynamic :courseId)
+app.get('/api/courses', validatePagination, handleValidationErrors, CourseController.getAllCourses);
+app.get('/api/courses/analytics', authenticateToken, requireRole(['ADMIN']), CourseController.getAnalytics);
+
+// Admin Approval routes
+app.get('/api/courses/admin/pending', authenticateToken, requireRole(['ADMIN']), CourseController.getPendingCourses);
+app.post('/api/courses/:courseId/approve', authenticateToken, requireRole(['ADMIN']), validateCourseId, handleValidationErrors, CourseController.approveCourse);
+app.post('/api/courses/:courseId/reject', authenticateToken, requireRole(['ADMIN']), validateCourseId, handleValidationErrors, CourseController.rejectCourse);
+
+// Instructor Dashboard routes
+app.get('/api/courses/instructor/dashboard', authenticateToken, requireInstructorOrAdmin, CourseController.getInstructorDashboard);
+app.get('/api/courses/instructor/:courseId/students', authenticateToken, requireInstructorOrAdmin, validateCourseId, handleValidationErrors, CourseController.getCourseStudents);
+
+app.get('/api/courses/slug/:slug', authenticateOptional, CourseController.getCourseBySlug);
+
+// Protected routes - Instructor/Admin only
+app.post(
+  '/api/courses',
+  authenticateToken,
+  requireInstructorOrAdmin,
+  validateCreateCourse,
+  handleValidationErrors,
+  CourseController.createCourse
+);
+
+app.get(
+  '/api/courses/me',
+  authenticateToken,
+  requireInstructorOrAdmin,
+  CourseController.getMyCourses
+);
+
+// Dynamic param route - MUST be after /slug/:slug and /me
+app.get('/api/courses/:courseId', authenticateOptional, validateCourseId, handleValidationErrors, CourseController.getCourseById);
+
+app.put(
+  '/api/courses/:courseId',
+  authenticateToken,
+  requireInstructorOrAdmin,
+  validateCourseId,
+  validateUpdateCourse,
+  handleValidationErrors,
+  CourseController.updateCourse
+);
+
+app.delete(
+  '/api/courses/:courseId',
+  authenticateToken,
+  requireInstructorOrAdmin,
+  validateCourseId,
+  handleValidationErrors,
+  CourseController.deleteCourse
+);
+
+app.post(
+  '/api/courses/:courseId/publish',
+  authenticateToken,
+  requireInstructorOrAdmin,
+  validateCourseId,
+  handleValidationErrors,
+  CourseController.publishCourse
+);
+
+// ==================== Lesson Routes ====================
+
+app.post(
+  '/api/courses/:courseId/upload-url',
+  authenticateToken,
+  requireInstructorOrAdmin,
+  handleValidationErrors,
+  LessonController.getUploadUrl
+);
+
+app.get(
+  '/api/courses/:courseId/lessons',
+  authenticateOptional,
+  validateCourseId,
+  handleValidationErrors,
+  LessonController.getCourseLessons
+);
+
+app.get(
+  '/api/courses/:courseId/lessons/:lessonId',
+  authenticateOptional,
+  validateCourseId,
+  validateLessonId,
+  handleValidationErrors,
+  LessonController.getLessonById
+);
+
+// Protected lesson routes - Instructor/Admin only
+app.post(
+  '/api/courses/:courseId/lessons',
+  authenticateToken,
+  requireInstructorOrAdmin,
+  validateCourseId,
+  validateCreateLesson,
+  handleValidationErrors,
+  LessonController.createLesson
+);
+
+app.put(
+  '/api/courses/:courseId/lessons/:lessonId',
+  authenticateToken,
+  requireInstructorOrAdmin,
+  validateCourseId,
+  validateLessonId,
+  validateCreateLesson,
+  handleValidationErrors,
+  LessonController.updateLesson
+);
+
+app.delete(
+  '/api/courses/:courseId/lessons/:lessonId',
+  authenticateToken,
+  requireInstructorOrAdmin,
+  validateCourseId,
+  validateLessonId,
+  handleValidationErrors,
+  LessonController.deleteLesson
+);
+
+app.post(
+  '/api/courses/:courseId/lessons/reorder',
+  authenticateToken,
+  requireInstructorOrAdmin,
+  validateCourseId,
+  handleValidationErrors,
+  LessonController.reorderLessons
+);
+
+// ==================== Review Routes ====================
+
+// Public routes - view reviews
+app.get(
+  '/api/courses/:courseId/reviews',
+  validateCourseId,
+  handleValidationErrors,
+  ReviewController.getCourseReviews
+);
+
+app.get(
+  '/api/courses/:courseId/reviews/distribution',
+  validateCourseId,
+  handleValidationErrors,
+  ReviewController.getRatingDistribution
+);
+
+// Protected review routes - Authenticated users
+app.post(
+  '/api/courses/:courseId/reviews',
+  authenticateToken,
+  validateCourseId,
+  validateCreateReview,
+  handleValidationErrors,
+  ReviewController.createReview
+);
+
+app.get(
+  '/api/courses/:courseId/reviews/me',
+  authenticateToken,
+  validateCourseId,
+  handleValidationErrors,
+  ReviewController.getUserReview
+);
+
+app.put(
+  '/api/reviews/:reviewId',
+  authenticateToken,
+  validateReviewId,
+  validateCreateReview,
+  handleValidationErrors,
+  ReviewController.updateReview
+);
+
+app.delete(
+  '/api/reviews/:reviewId',
+  authenticateToken,
+  validateReviewId,
+  handleValidationErrors,
+  ReviewController.deleteReview
+);
+
+// User's all reviews
+app.get(
+  '/api/users/me/reviews',
+  authenticateToken,
+  validatePagination,
+  handleValidationErrors,
+  ReviewController.getUserReviews
+);
+
+// ==================== Search Routes ====================
+
+app.get(
+  '/api/search/courses',
+  validatePagination,
+  handleValidationErrors,
+  CourseController.getAllCourses
+);
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
 });
 
-app.get('/api/courses/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    service: 'course-service',
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+// Error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
-
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    error: 'Not Found',
-    path: req.path,
-    message: `Route not found: ${req.method} ${req.path}`,
-  });
-});
-
-app.use(errorHandler);
 
 export default app;

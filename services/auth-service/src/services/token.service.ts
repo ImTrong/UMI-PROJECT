@@ -66,7 +66,7 @@ export class TokenService {
   }
 
   static async revokeRefreshToken(token: string) {
-    await prisma.refreshToken.update({
+    await prisma.refreshToken.updateMany({
       where: { token },
       data: { revoked: true },
     });
@@ -80,16 +80,26 @@ export class TokenService {
   }
 
   static async blacklistAccessToken(token: string) {
-    // Decode token to get expiration
-    const decoded = jwt.decode(token) as { exp: number };
-    const expiresAt = new Date(decoded.exp * 1000);
+    if (!token) return;
 
-    await prisma.blacklistedToken.create({
-      data: {
-        token,
-        expiresAt,
-      },
-    });
+    try {
+      // Decode token to get expiration
+      const decoded = jwt.decode(token) as { exp: number };
+      if (!decoded || !decoded.exp) return;
+
+      const expiresAt = new Date(decoded.exp * 1000);
+
+      await prisma.blacklistedToken.upsert({
+        where: { token },
+        update: { expiresAt },
+        create: {
+          token,
+          expiresAt,
+        },
+      });
+    } catch (error) {
+      logger.error('Failed to blacklist token:', error);
+    }
   }
 
   static async isTokenBlacklisted(token: string): Promise<boolean> {

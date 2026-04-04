@@ -1,59 +1,165 @@
-import express, { Express, Request, Response, NextFunction } from 'express';
+import express from 'express';
 import cors from 'cors';
-import paymentRoutes from './routes';
-import { errorHandler } from './middlewares/errorHandler';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import { PaymentController } from './controllers/payment.controller';
+import { StripeWebhook } from './webhooks/stripe.webhook';
+import { authenticateToken, requireRole } from './middleware/auth.middleware';
+import { verifyStripeWebhook } from './middleware/webhook.middleware';
+import {
+  validateCreatePaymentIntent,
+  validateConfirmPayment,
+  validateRefundPayment,
+  validatePaymentId,
+  handleValidationErrors,
+} from './middleware/validation.middleware';
+import logger from './utils/logger';
 
-const app: Express = express();
+const app = express();
+app.set('trust proxy', 1);
 
-app.use(cors({
-  origin: process.env.NODE_ENV === 'production'
-    ? ['https://yourdomain.com']
-    : '*',
+// Webhook endpoint needs raw body
+app.post(
+  '/api/payments/webhook',
+  express.raw({ type: 'application/json' }),
+  verifyStripeWebhook,
+  StripeWebhook.handleWebhook
+);
+
+// Security middleware for other routes
+app.use(helmet());
+
+// CORS configuration
+const corsOptions = {
+  origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
+  optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+// Body parser for non-webhook routes
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use((req: Request, res: Response, next: NextFunction) => {
-  const start = Date.now();
-  res.on('finish', () => {
-    const duration = Date.now() - start;
-    console.log(`[PAYMENT-SERVICE] ${req.method} ${req.path} - ${res.statusCode} - ${duration}ms`);
-  });
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+  message: { error: 'Too many requests, please try again later.' },
+});
+app.use('/api/payments', limiter);
+
+// Request logging
+app.use((req, res, next) => {
+  logger.debug(`${req.method} ${req.path}`);
   next();
 });
 
-app.use('/api/payments', paymentRoutes);
+// Health check
+app.get('/api/payments/health', PaymentController.healthCheck);
 
-app.get('/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    service: 'payment-service',
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+// ==================== Payment Routes ====================
+
+// Protected routes - require authentication
+app.post(
+  '/api/payments/intents',
+  authenticateToken,
+  validateCreatePaymentIntent,
+  handleValidationErrors,
+  PaymentController.createPaymentIntent
+);
+
+app.post(
+  '/api/payments/create-intent',
+  authenticateToken,
+  validateCreatePaymentIntent,
+  handleValidationErrors,
+  PaymentController.createPaymentIntent
+);
+
+app.post(
+  '/api/payments/confirm',
+  authenticateToken,
+  validateConfirmPayment,
+  handleValidationErrors,
+  PaymentController.confirmPayment
+);
+
+app.get(
+  '/api/payments/me',
+  authenticateToken,
+  PaymentController.getUserPayments
+);
+
+app.get(
+  '/api/payments/me/:paymentId',
+  authenticateToken,
+  validatePaymentId,
+  handleValidationErrors,
+  PaymentController.getPaymentById
+);
+
+app.post(
+  '/api/payments/:paymentId/refund',
+  authenticateToken,
+  validateRefundPayment,
+  handleValidationErrors,
+  PaymentController.refundPayment
+);
+
+app.post(
+  '/api/payments/:paymentId/cancel',
+  authenticateToken,
+  validatePaymentId,
+  handleValidationErrors,
+  PaymentController.cancelPayment
+);
+
+// Payment method management
+app.post(
+  '/api/payments/setup-intent',
+  authenticateToken,
+  PaymentController.createSetupIntent
+);
+
+app.post(
+  '/api/payments/save-method',
+  authenticateToken,
+  PaymentController.savePaymentMethod
+);
+
+app.get(
+  '/api/payments/methods',
+  authenticateToken,
+  PaymentController.getPaymentMethods
+);
+
+// Admin routes
+app.get(
+  '/api/payments/stats',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  PaymentController.getPaymentStats
+);
+
+app.get(
+  '/api/payments/:paymentId',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  validatePaymentId,
+  handleValidationErrors,
+  PaymentController.getPaymentById
+);
+
+// 404 handler
+app.use((req, res) => {
+  res.status(404).json({ error: 'Route not found' });
 });
 
-app.get('/api/payments/health', (req: Request, res: Response) => {
-  res.status(200).json({
-    service: 'payment-service',
-    status: 'active',
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-  });
+// Error handler
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error('Unhandled error:', err);
+  res.status(500).json({ error: 'Internal server error' });
 });
-
-app.use((req: Request, res: Response) => {
-  res.status(404).json({
-    error: 'Not Found',
-    path: req.path,
-    message: `Route not found: ${req.method} ${req.path}`,
-  });
-});
-
-app.use(errorHandler);
 
 export default app;

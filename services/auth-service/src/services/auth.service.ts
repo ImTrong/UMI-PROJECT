@@ -4,6 +4,8 @@ import { ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 import { TokenService } from './token.service';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { emailService } from './email.service';
 
 const prisma = new PrismaClient();
 
@@ -46,6 +48,22 @@ export class AuthService {
         password: hashedPassword,
         fullName,
       },
+    });
+
+    // Generate Verification Token
+    const verifyToken = crypto.randomBytes(32).toString('hex');
+    await prisma.verificationToken.create({
+      data: {
+        email: user.email,
+        token: verifyToken,
+        type: 'VERIFY_EMAIL',
+        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+      }
+    });
+    
+    // Send email asynchronously
+    emailService.sendVerificationEmail(user.email, verifyToken).catch((err: any) => {
+      logger.error('Failed to send verification email', err);
     });
 
     // Generate tokens
@@ -220,6 +238,121 @@ export class AuthService {
         userAgent,
       },
     });
+  }
+
+  static async verifyEmail(token: string) {
+    const verificationToken = await prisma.verificationToken.findFirst({
+      where: {
+        token,
+        type: 'VERIFY_EMAIL',
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    if (!verificationToken) {
+      throw new Error(ERROR_MESSAGES.TOKEN_INVALID);
+    }
+
+    await prisma.user.update({
+      where: { email: verificationToken.email },
+      data: { emailVerified: true }
+    });
+
+    await prisma.verificationToken.delete({
+      where: { id: verificationToken.id }
+    });
+
+    logger.info(`Email verified for: ${verificationToken.email}`);
+    return { success: true };
+  }
+
+  static async forgotPassword(email: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      // Return success anyway to prevent email enumeration
+      return { success: true };
+    }
+
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    
+    // Delete existing reset tokens for this user to avoid clutter
+    await prisma.verificationToken.deleteMany({
+      where: { email, type: 'RESET_PASSWORD' }
+    });
+
+    await prisma.verificationToken.create({
+      data: {
+        email,
+        token: resetToken,
+        type: 'RESET_PASSWORD',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+      }
+    });
+
+    emailService.sendPasswordResetEmail(email, resetToken).catch((err: any) => {
+      logger.error('Failed to send reset email', err);
+    });
+
+    return { success: true };
+  }
+
+  static async resetPassword(token: string, newPassword: string) {
+    const verificationToken = await prisma.verificationToken.findFirst({
+      where: {
+        token,
+        type: 'RESET_PASSWORD',
+        expiresAt: { gt: new Date() }
+      }
+    });
+
+    if (!verificationToken) {
+      throw new Error(ERROR_MESSAGES.TOKEN_INVALID);
+    }
+
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      parseInt(process.env.BCRYPT_ROUNDS || '10')
+    );
+
+    await prisma.user.update({
+      where: { email: verificationToken.email },
+      data: { password: hashedPassword }
+    });
+
+    await prisma.verificationToken.delete({
+      where: { id: verificationToken.id }
+    });
+
+    logger.info(`Password reset via token for: ${verificationToken.email}`);
+    return { success: true };
+  }
+
+  static async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    const isValidPassword = await bcrypt.compare(currentPassword, user.password);
+    if (!isValidPassword) {
+      throw new Error(ERROR_MESSAGES.INVALID_CURRENT_PASSWORD);
+    }
+
+    const hashedPassword = await bcrypt.hash(
+      newPassword,
+      parseInt(process.env.BCRYPT_ROUNDS || '10')
+    );
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword }
+    });
+
+    logger.info(`Password changed for user: ${userId}`);
+    return { success: true };
   }
 
   static async healthCheck() {

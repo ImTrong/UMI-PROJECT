@@ -1,0 +1,7 @@
+node_modules
+dist
+dist-seed
+.env
+npm-debug.log
+prisma/dev.db
+prisma/migrations

@@ -26,6 +26,7 @@ model UserProfile {
   
   education   EducationBackground[]
   work        WorkExperience[]
+  notifications Notification[]
   
   @@map("user_profiles")
 }
@@ -70,4 +71,27 @@ enum Role {
   STUDENT
   INSTRUCTOR
   ADMIN
+}
+
+model Notification {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  title     String
+  message   String
+  type      NotificationType @default(INFO)
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
 }

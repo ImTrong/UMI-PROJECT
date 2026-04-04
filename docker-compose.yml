@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   # ============================================
@@ -38,41 +37,45 @@ services:
   # ============================================
   nginx-gateway:
     image: nginx:alpine
-    container_name: elearning-nginx
+    container_name: elearning-nginx-gateway
     ports:
-      - "8080:80"
+      - "8080:8080"
+      - "8443:443"  # HTTPS port (optional)
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro  # SSL certificates (optional)
     depends_on:
-      mongodb:
-        condition: service_healthy
-      auth-service:
-        condition: service_started
-      user-service:
-        condition: service_started
-      course-service:
-        condition: service_started
-      order-service:
-        condition: service_started
-      payment-service:
-        condition: service_started
-      learning-service:
-        condition: service_started
+      - auth-service
+      - user-service
+      - course-service
+      - order-service
+      - payment-service
+      - learning-service
+      - frontend
     networks:
       - elearning-network
+    restart: unless-stopped
     healthcheck:
-      test:
-        [
-          "CMD",
-          "wget",
-          "--quiet",
-          "--tries=1",
-          "--spider",
-          "http://localhost/health",
-        ]
-      interval: 10s
-      timeout: 5s
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
       retries: 3
+
+  # ============================================
+  # Frontend Service (Placeholder)
+  # Port: 3000
+  # ============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: elearning-frontend
+    ports:
+      - "3000:80"
+    networks:
+      - elearning-network
+    # Note: Ensure you have a Dockerfile in ./frontend
 
   # ============================================
   # Microservice 1: Authentication Service
@@ -81,8 +84,8 @@ services:
   # ============================================
   auth-service:
     build:
-      context: ./services/auth-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/auth-service/Dockerfile
     container_name: elearning-auth-service
     ports:
       - "3001:3001"
@@ -91,12 +94,18 @@ services:
       NODE_ENV: development
       DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/auth_db?authSource=admin"
       JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
-      JWT_EXPIRY: "7d"
+      JWT_REFRESH_SECRET: "your-super-secret-refresh-token-key-change-in-production"
+      JWT_EXPIRES_IN: "1h"
+      JWT_REFRESH_EXPIRES_IN: "7d"
+      ADMIN_EMAIL: "admin@elearning.local"
+      ADMIN_PASSWORD: "Admin123456"
+      AUTO_SEED_ADMIN: "true"
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
       - elearning-network
+    command: sh -c "npx prisma db push && node dist-seed/prisma/seed.js && node dist/src/index.js"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/auth/health"]
       interval: 10s
@@ -110,8 +119,8 @@ services:
   # ============================================
   user-service:
     build:
-      context: ./services/user-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/user-service/Dockerfile
     container_name: elearning-user-service
     ports:
       - "3002:3002"
@@ -119,12 +128,17 @@ services:
       PORT: 3002
       NODE_ENV: development
       DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/user_db?authSource=admin"
+      JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
       AUTH_SERVICE_URL: "http://auth-service:3001"
+      AUTO_SEED: "true"
     depends_on:
       mongodb:
         condition: service_healthy
+      auth-service:
+        condition: service_started
     networks:
       - elearning-network
+    command: sh -c "sleep 5 && npx prisma db push && node dist-seed/prisma/seed.js && node dist/src/index.js"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3002/api/users/health"]
       interval: 10s
@@ -138,8 +152,8 @@ services:
   # ============================================
   course-service:
     build:
-      context: ./services/course-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/course-service/Dockerfile
     container_name: elearning-course-service
     ports:
       - "3003:3003"
@@ -148,6 +162,7 @@ services:
       NODE_ENV: development
       DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/course_db?authSource=admin"
       AUTH_SERVICE_URL: "http://auth-service:3001"
+      USER_SERVICE_URL: "http://user-service:3002"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -166,8 +181,8 @@ services:
   # ============================================
   order-service:
     build:
-      context: ./services/order-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/order-service/Dockerfile
     container_name: elearning-order-service
     ports:
       - "3004:3004"
@@ -176,6 +191,7 @@ services:
       NODE_ENV: development
       DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/order_db?authSource=admin"
       AUTH_SERVICE_URL: "http://auth-service:3001"
+      USER_SERVICE_URL: "http://user-service:3002"
       COURSE_SERVICE_URL: "http://course-service:3003"
     depends_on:
       mongodb:
@@ -195,8 +211,8 @@ services:
   # ============================================
   payment-service:
     build:
-      context: ./services/payment-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/payment-service/Dockerfile
     container_name: elearning-payment-service
     ports:
       - "3005:3005"
@@ -206,12 +222,14 @@ services:
       DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/payment_db?authSource=admin"
       STRIPE_SECRET_KEY: "sk_test_fake_key_for_development"
       AUTH_SERVICE_URL: "http://auth-service:3001"
+      USER_SERVICE_URL: "http://user-service:3002"
       ORDER_SERVICE_URL: "http://order-service:3004"
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
       - elearning-network
+    command: sh -c "npx prisma db push && node dist/index.js"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3005/api/payments/health"]
       interval: 10s
@@ -225,8 +243,8 @@ services:
   # ============================================
   learning-service:
     build:
-      context: ./services/learning-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./services/learning-service/Dockerfile
     container_name: elearning-learning-service
     ports:
       - "3006:3006"
@@ -235,6 +253,7 @@ services:
       NODE_ENV: development
       DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/learning_db?authSource=admin"
       AUTH_SERVICE_URL: "http://auth-service:3001"
+      USER_SERVICE_URL: "http://user-service:3002"
       COURSE_SERVICE_URL: "http://course-service:3003"
     depends_on:
       mongodb:
@@ -246,6 +265,55 @@ services:
       interval: 10s
       timeout: 5s
       retries: 3
+
+  # ============================================
+  # MinIO File Storage Service
+  # ============================================
+  minio:
+    image: minio/minio:latest
+    container_name: elearning-minio
+    ports:
+      - "9000:9000"   # S3 API port
+      - "9001:9001"   # Web Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+      MINIO_DEFAULT_BUCKETS: assignments:public,quiz-attachments:public
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - elearning-network
+    restart: unless-stopped
+
+  # ============================================
+  # MinIO Client - Initialize buckets
+  # ============================================
+  minio-init:
+    image: minio/mc:latest
+    container_name: elearning-minio-init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      mc alias set myminio http://minio:9000 minioadmin minioadmin123;
+      mc mb myminio/assignments --ignore-existing;
+      mc mb myminio/quiz-attachments --ignore-existing;
+      mc mb myminio/courses --ignore-existing;
+      mc anonymous set download myminio/assignments;
+      mc anonymous set download myminio/quiz-attachments;
+      mc anonymous set download myminio/courses;
+      echo 'MinIO buckets initialized';
+      exit 0;
+      "
+    networks:
+      - elearning-network
 
 # ============================================
 # Networks
@@ -259,4 +327,6 @@ networks:
 # ============================================
 volumes:
   mongo-data:
+    driver: local
+  minio-data:
     driver: local

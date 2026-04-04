@@ -8,99 +8,238 @@ datasource db {
 }
 
 model UserProgress {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String   @unique @db.ObjectId
-
-  coursesEnrolled   Int @default(0)
-  coursesCompleted  Int @default(0)
-  totalTimeSpentSeconds Int @default(0)
-
-  currentStreak  Int @default(0)
-  longestStreak  Int @default(0)
-  lastActivityAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String   @unique @db.ObjectId
+  totalCoursesEnrolled Int   @default(0)
+  totalCoursesCompleted Int  @default(0)
+  totalLessonsCompleted Int  @default(0)
+  totalStudyTime     Int     @default(0)
+  streakDays         Int     @default(0)
+  lastActivityDate   DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  
+  courses           CourseProgress[]
+  certificates      Certificate[]
+  badges            Badge[]
+  activities        ActivityLog[]
+  
   @@map("user_progress")
 }
 
 model CourseProgress {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String   @db.ObjectId
-  courseId      String   @db.ObjectId
-
-  lessonsCompleted  Int @default(0)
-  progressPercentage Float @default(0)
-  timeSpentSeconds  Int @default(0)
-
-  lastLessonAccessedAt DateTime?
-  completedAt DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id                  String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String   @db.ObjectId
+  courseId            String   @db.ObjectId
+  courseTitle         String
+  enrolledAt          DateTime @default(now())
+  completedAt         DateTime?
+  progressPercentage  Float    @default(0)
+  totalLessons        Int      @default(0)
+  completedLessons    Int      @default(0)
+  timeSpentSeconds    Int      @default(0)
+  lastAccessedAt      DateTime @default(now())
+  
+  lessons             LessonProgress[]
+  userProgress        UserProgress @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
   @@map("course_progress")
 }
 
 model LessonProgress {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String   @db.ObjectId
-  courseId      String   @db.ObjectId
-  lessonId      String   @db.ObjectId
-
-  completed     Boolean  @default(false)
-  completedAt   DateTime?
-  timeSpentSeconds Int @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@unique([userId, lessonId])
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId           String   @db.ObjectId
+  courseId         String   @db.ObjectId
+  lessonId         String   @db.ObjectId
+  lessonTitle      String
+  completed        Boolean  @default(false)
+  completedAt      DateTime?
+  timeSpentSeconds Int      @default(0)
+  lastWatchedAt    DateTime @default(now())
+  watchCount       Int      @default(0)
+  
+  courseProgress   CourseProgress @relation(fields: [userId, courseId], references: [userId, courseId])
+  
+  @@unique([userId, courseId, lessonId])
+  @@index([userId])
+  @@index([courseId])
+  @@index([completed])
   @@map("lesson_progress")
 }
 
 model Certificate {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String   @db.ObjectId
-  courseId      String   @db.ObjectId
-
-  certificateUrl String
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  certificateNumber String @unique
+  userId          String   @db.ObjectId
+  courseId        String   @db.ObjectId
+  courseTitle     String
+  userName        String
+  issueDate       DateTime @default(now())
+  expiresAt       DateTime?
+  certificateUrl  String?
   verificationUrl String?
-
-  issuedAt DateTime @default(now())
-  expiresAt DateTime?
-
-  createdAt DateTime @default(now())
-
+  isVerified      Boolean  @default(true)
+  metadata        Json     @default("{}")
+  createdAt       DateTime @default(now())
+  
+  userProgress    UserProgress @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
   @@map("certificates")
 }
 
 model Badge {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String   @db.ObjectId
-  badgeName     String
-
-  description   String?
-  awardedAt     DateTime @default(now())
-
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @db.ObjectId
+  badgeName   String
+  badgeType   String
+  description String?
+  iconUrl     String?
+  earnedAt    DateTime @default(now())
+  metadata    Json     @default("{}")
+  
+  userProgress UserProgress @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
   @@unique([userId, badgeName])
+  @@index([userId])
+  @@index([badgeType])
   @@map("badges")
 }
 
 model ActivityLog {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String   @db.ObjectId
-  courseId      String? @db.ObjectId
-  lessonId      String? @db.ObjectId
-
-  action        String // 'view', 'submit', 'complete', etc.
-  durationSeconds Int?
-  metadata      String? // JSON string
-
-  createdAt DateTime @default(now())
-
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @db.ObjectId
+  courseId        String?  @db.ObjectId
+  lessonId        String?  @db.ObjectId
+  action          String
+  durationSeconds Int      @default(0)
+  metadata        Json     @default("{}")
+  createdAt       DateTime @default(now())
+  
+  userProgress    UserProgress @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([courseId])
+  @@index([action])
+  @@index([createdAt])
   @@map("activity_logs")
 }
+
+// ==================== Quiz System ====================
+
+model Quiz {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  courseId       String       @db.ObjectId
+  lessonId      String       @db.ObjectId
+  title         String
+  description   String?
+  questions     Json         // Array of QuizQuestion objects
+  passingScore  Float        @default(70)
+  timeLimitMinutes Int?      // null = no time limit
+  maxAttempts   Int          @default(3)
+  shuffleQuestions Boolean   @default(false)
+  createdBy     String       @db.ObjectId
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  attempts      QuizAttempt[]
+
+  @@unique([lessonId])
+  @@index([courseId])
+  @@index([createdBy])
+  @@map("quizzes")
+}
+
+model QuizAttempt {
+  id            String           @id @default(auto()) @map("_id") @db.ObjectId
+  quizId        String           @db.ObjectId
+  userId        String           @db.ObjectId
+  courseId       String           @db.ObjectId
+  answers       Json             // User's answers
+  score         Float            @default(0)
+  totalQuestions Int             @default(0)
+  correctAnswers Int             @default(0)
+  passed        Boolean          @default(false)
+  status        QuizAttemptStatus @default(IN_PROGRESS)
+  startedAt     DateTime         @default(now())
+  submittedAt   DateTime?
+  timeTakenSeconds Int?
+
+  quiz          Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+  @@index([userId])
+  @@index([userId, quizId])
+  @@map("quiz_attempts")
+}
+
+enum QuizAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+  TIMED_OUT
+}
+
+// ==================== Assignment System ====================
+
+model Assignment {
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  courseId       String       @db.ObjectId
+  lessonId      String       @db.ObjectId
+  title         String
+  description   String
+  instructions  String?
+  maxScore      Float        @default(100)
+  dueDate       DateTime?
+  allowLateSubmission Boolean @default(false)
+  allowedFileTypes String[]  @default(["pdf", "doc", "docx", "zip", "png", "jpg"])
+  maxFileSizeMB Int          @default(10)
+  createdBy     String       @db.ObjectId
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  submissions   AssignmentSubmission[]
+
+  @@unique([lessonId])
+  @@index([courseId])
+  @@index([createdBy])
+  @@map("assignments")
+}
+
+model AssignmentSubmission {
+  id            String              @id @default(auto()) @map("_id") @db.ObjectId
+  assignmentId  String              @db.ObjectId
+  userId        String              @db.ObjectId
+  courseId       String              @db.ObjectId
+  content       String?             // Text content
+  fileUrl       String?             // MinIO file URL
+  fileKey       String?             // MinIO file key
+  fileName      String?
+  status        SubmissionStatus    @default(SUBMITTED)
+  score         Float?
+  feedback      String?
+  gradedBy      String?             @db.ObjectId
+  gradedAt      DateTime?
+  submittedAt   DateTime            @default(now())
+  isLate        Boolean             @default(false)
+
+  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, userId])
+  @@index([assignmentId])
+  @@index([userId])
+  @@index([status])
+  @@map("assignment_submissions")
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  GRADING
+  GRADED
+  RETURNED
+}
+

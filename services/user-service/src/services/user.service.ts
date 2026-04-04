@@ -170,10 +170,16 @@ export class UserService {
       throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
+    // Convert date strings to Date objects if necessary
+    const updateData: any = { ...data };
+    if (typeof updateData.dateOfBirth === 'string') {
+      updateData.dateOfBirth = new Date(updateData.dateOfBirth);
+    }
+
     const updatedUser = await prisma.userProfile.update({
       where: { userId },
       data: {
-        ...data,
+        ...updateData,
         updatedAt: new Date(),
       },
       include: {
@@ -216,10 +222,19 @@ export class UserService {
       throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
+    // Convert date strings to Date objects if necessary
+    const educationData: any = { ...data };
+    if (typeof educationData.startDate === 'string') {
+      educationData.startDate = new Date(educationData.startDate);
+    }
+    if (typeof educationData.endDate === 'string') {
+      educationData.endDate = new Date(educationData.endDate);
+    }
+
     const education = await prisma.educationBackground.create({
       data: {
         userId: user.id,
-        ...data,
+        ...educationData,
       },
     });
 
@@ -240,10 +255,19 @@ export class UserService {
       throw new Error(ERROR_MESSAGES.EDUCATION_NOT_FOUND);
     }
 
+    // Convert date strings to Date objects if necessary
+    const updateData: any = { ...data };
+    if (typeof updateData.startDate === 'string') {
+      updateData.startDate = new Date(updateData.startDate);
+    }
+    if (typeof updateData.endDate === 'string') {
+      updateData.endDate = new Date(updateData.endDate);
+    }
+
     const updatedEducation = await prisma.educationBackground.update({
       where: { id: educationId },
       data: {
-        ...data,
+        ...updateData,
         updatedAt: new Date(),
       },
     });
@@ -292,10 +316,19 @@ export class UserService {
       });
     }
 
+    // Convert date strings to Date objects if necessary
+    const workData: any = { ...data };
+    if (typeof workData.startDate === 'string') {
+      workData.startDate = new Date(workData.startDate);
+    }
+    if (typeof workData.endDate === 'string') {
+      workData.endDate = new Date(workData.endDate);
+    }
+
     const work = await prisma.workExperience.create({
       data: {
         userId: user.id,
-        ...data,
+        ...workData,
       },
     });
 
@@ -324,10 +357,19 @@ export class UserService {
       });
     }
 
+    // Convert date strings to Date objects if necessary
+    const updateData: any = { ...data };
+    if (typeof updateData.startDate === 'string') {
+      updateData.startDate = new Date(updateData.startDate);
+    }
+    if (typeof updateData.endDate === 'string') {
+      updateData.endDate = new Date(updateData.endDate);
+    }
+
     const updatedWork = await prisma.workExperience.update({
       where: { id: workId },
       data: {
-        ...data,
+        ...updateData,
         updatedAt: new Date(),
       },
     });
@@ -379,6 +421,65 @@ export class UserService {
       role: user.role,
       createdAt: user.createdAt,
     };
+  }
+
+  static async getUserAnalytics() {
+    const monthAgo = new Date();
+    monthAgo.setMonth(monthAgo.getMonth() - 1);
+
+    const [total, students, instructors, admins, active, newThisMonth] = await Promise.all([
+      prisma.userProfile.count(),
+      prisma.userProfile.count({ where: { role: 'STUDENT' } }),
+      prisma.userProfile.count({ where: { role: 'INSTRUCTOR' } }),
+      prisma.userProfile.count({ where: { role: 'ADMIN' } }),
+      prisma.userProfile.count({ where: { isActive: true } }),
+      prisma.userProfile.count({ where: { createdAt: { gte: monthAgo } } }),
+    ]);
+
+    return {
+      total,
+      students,
+      instructors,
+      admins,
+      active,
+      newThisMonth,
+    };
+  }
+
+  static async updateToInstructor(userId: string) {
+    const user = await prisma.userProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!user) {
+      throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    const updatedUser = await prisma.userProfile.update({
+      where: { userId },
+      data: {
+        role: 'INSTRUCTOR',
+        updatedAt: new Date(),
+      },
+      include: {
+        education: true,
+        work: true,
+      },
+    });
+
+    // Create a notification for the user
+    await prisma.notification.create({
+      data: {
+        userId: updatedUser.id,
+        title: 'Chào mừng bạn gia nhập đội ngũ Giảng viên UMI!',
+        message: 'Đăng ký trở thành giảng viên thành công. Bạn có thể bắt đầu tạo khóa học ngay bây giờ.',
+        type: 'SUCCESS',
+        link: '/instructor/dashboard',
+      },
+    });
+
+    logger.info(`User ${userId} upgraded to INSTRUCTOR`);
+    return updatedUser;
   }
 
   static async healthCheck() {

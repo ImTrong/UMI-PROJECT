@@ -1,19 +1,18 @@
+import dotenv from 'dotenv';
 import app from './app';
+import logger from './utils/logger';
+import fs from 'fs';
+
+dotenv.config();
 
 const PORT = process.env.PORT || 3006;
+const certificatePath = process.env.CERTIFICATE_STORAGE_PATH || './certificates';
+
+if (!fs.existsSync(certificatePath)) {
+  fs.mkdirSync(certificatePath, { recursive: true });
+}
 
 app.listen(PORT, () => {
-  console.log(`[LEARNING-SERVICE] Server running on http://localhost:${PORT}`);
-  console.log(`[LEARNING-SERVICE] Environment: ${process.env.NODE_ENV}`);
-  console.log(`[LEARNING-SERVICE] Health check: http://localhost:${PORT}/api/learning/health`);
-});
-
-process.on('SIGTERM', () => {
-  console.log('[LEARNING-SERVICE] SIGTERM signal received: closing HTTP server');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('[LEARNING-SERVICE] SIGINT signal received: closing HTTP server');
-  process.exit(0);
+  logger.info(`Learning service running on port ${PORT}`);
+  logger.info(`Environment: ${process.env.NODE_ENV}`);
 });

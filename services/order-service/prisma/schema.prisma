@@ -7,46 +7,71 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Order {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String   @db.ObjectId
-  courseIds     String[] @db.ObjectId
-
-  totalPrice    Float
-  discountApplied Float @default(0)
-
-  status        String   @default("pending") // pending, completed, cancelled
-  paymentStatus String   @default("pending") // pending, paid, failed
-
-  createdAt DateTime @default(now())
-  completedAt DateTime?
-  updatedAt DateTime @updatedAt
-
-  @@map("orders")
-}
-
 model Cart {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId        String   @unique @db.ObjectId
-  courseIds     String[] @db.ObjectId
-
-  totalPrice    Float @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId     String   @unique @db.ObjectId
+  items      Json     @default("[]")
+  totalPrice Float    @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
   @@map("carts")
 }
 
+model Order {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  orderNumber   String      @unique
+  userId        String      @db.ObjectId
+  items         Json
+  subtotal      Float
+  discount      Float       @default(0)
+  totalPrice    Float
+  status        OrderStatus @default(PENDING)
+  paymentStatus PaymentStatus @default(UNPAID)
+  paymentId     String?     @db.ObjectId
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  completedAt   DateTime?
+  cancelledAt   DateTime?
+  cancelledReason String?
+  
+  orderItems    OrderItem[]
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
 model OrderItem {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  orderId       String   @db.ObjectId
-  courseId      String   @db.ObjectId
-
-  price         Float
-  discount      Int @default(0) // percentage
-
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId   String   @db.ObjectId
+  courseId  String   @db.ObjectId
+  courseTitle String
+  price     Float
+  discount  Float    @default(0)
+  finalPrice Float
   createdAt DateTime @default(now())
-
+  
+  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  @@index([orderId])
+  @@index([courseId])
   @@map("order_items")
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+  FAILED
 }

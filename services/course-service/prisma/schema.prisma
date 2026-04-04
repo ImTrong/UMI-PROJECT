@@ -8,49 +8,59 @@ datasource db {
 }
 
 model Course {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  description String
-  instructor  String   @db.ObjectId
-  category    String
-  level       String   // beginner, intermediate, advanced
-
-  // Core metadata
-  price       Float
-  rating      Float?
-  totalRatings Int @default(0)
-  enrolledCount Int @default(0)
-
-  // Content
-  duration    String? // e.g., "40 hours"
-  modules     Int     @default(0)
-  lessons     Int     @default(0)
-
-  // Status
-  isPublished Boolean @default(false)
-  isFeatured  Boolean @default(false)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id                String            @id @default(auto()) @map("_id") @db.ObjectId
+  title             String
+  slug              String            @unique
+  description       String
+  instructorId      String            @db.ObjectId
+  price             Float
+  thumbnail         String?
+  categoryId        String?           @db.ObjectId
+  level             Level             @default(BEGINNER)
+  language          String            @default("Vietnamese")
+  whatYouWillLearn  String?
+  requirements      String[]          @default([])
+  targetAudience    String[]          @default([])
+  published         Boolean           @default(false)
+  approvalStatus    ApprovalStatus    @default(DRAFT)
+  rejectionReason   String?
+  approvedAt        DateTime?
+  approvedBy        String?           @db.ObjectId
+  rating            Float             @default(0)
+  totalReviews      Int               @default(0)
+  enrolledCount     Int               @default(0)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  
+  lessons           Lesson[]
+  reviews           Review[]
+  category          Category?         @relation(fields: [categoryId], references: [id])
+  
+  @@index([instructorId])
+  @@index([published])
+  @@index([categoryId])
+  @@index([approvalStatus])
   @@map("courses")
 }
 
 model Lesson {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  courseId  String   @db.ObjectId
-  title     String
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  courseId    String   @db.ObjectId
+  title       String
   description String?
-  videoUrl  String?
-  duration  Int? // in seconds
-  order     Int
-
-  // Resources
-  resources String[] // File URLs
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  videoUrl    String
+  duration    Int      // seconds
+  order       Int
+  isPreview   Boolean  @default(false)
+  resources   Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  course      Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@index([courseId])
+  @@index([order])
+  @@unique([courseId, order])
   @@map("lessons")
 }
 
@@ -58,20 +68,42 @@ model Review {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   courseId  String   @db.ObjectId
   userId    String   @db.ObjectId
-  rating    Int // 1-5
+  rating    Int
   comment   String?
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
+  
+  course    Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  
+  @@unique([courseId, userId])
+  @@index([courseId])
+  @@index([userId])
   @@map("reviews")
 }
 
 model Category {
-  id    String @id @default(auto()) @map("_id") @db.ObjectId
-  name  String @unique
-  slug  String @unique
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   @unique
+  slug        String   @unique
   description String?
-
+  icon        String?
+  createdAt   DateTime @default(now())
+  
+  courses     Course[]
+  
   @@map("categories")
 }
+
+enum Level {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum ApprovalStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+

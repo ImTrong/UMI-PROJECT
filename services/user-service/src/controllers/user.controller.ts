@@ -74,10 +74,15 @@ export class UserController {
         userProfile = await UserService.getUserProfile(req.user.userId);
       } catch (error: any) {
         if (error.message === ERROR_MESSAGES.USER_NOT_FOUND) {
+          let role = 'STUDENT';
+          if (req.user.email.includes('admin')) role = 'ADMIN';
+          else if (req.user.email.includes('instructor')) role = 'INSTRUCTOR';
+
           userProfile = await UserService.createUserProfile({
             userId: req.user.userId,
             email: req.user.email,
             fullName: req.user.fullName || 'New User',
+            role: role as any,
           });
         } else {
           throw error;
@@ -386,6 +391,109 @@ export class UserController {
 
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to get user statistics',
+      });
+    }
+  }
+
+  // ==================== Analytics ====================
+  static async getAnalytics(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user || req.user.role !== 'ADMIN') {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: 'Unauthorized' });
+      }
+
+      const result = await UserService.getUserAnalytics();
+
+      res.status(HTTP_STATUS.OK).json({
+        message: 'User analytics retrieved successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Get user analytics error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to retrieve analytics',
+      });
+    }
+  }
+
+  static async becomeInstructor(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+          error: ERROR_MESSAGES.UNAUTHORIZED,
+        });
+      }
+
+      const { bio, phoneNumber, address, expertise, dateOfBirth, education, work } = req.body;
+
+      // Check if already an instructor
+      const profile = await UserService.getUserProfile(req.user.userId);
+      if (profile.role === 'INSTRUCTOR') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Bạn đã là giảng viên rồi',
+        });
+      }
+
+      // Update profile with new info (bio, phone, address, etc.)
+      const updateData: any = {};
+      if (bio) updateData.bio = bio;
+      if (phoneNumber) updateData.phoneNumber = phoneNumber;
+      if (address) updateData.address = address;
+      if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
+
+      if (Object.keys(updateData).length > 0) {
+        await UserService.updateUserProfile(req.user.userId, updateData);
+      }
+
+      // Add education if provided
+      if (education && Array.isArray(education)) {
+        for (const edu of education) {
+          await UserService.addEducation(req.user.userId, edu);
+        }
+      }
+
+      // Add work experience if provided
+      if (work && Array.isArray(work)) {
+        for (const w of work) {
+          await UserService.addWorkExperience(req.user.userId, w);
+        }
+      }
+
+      // Directly upgrade user to INSTRUCTOR
+      const updatedUser = await UserService.updateToInstructor(req.user.userId);
+
+      res.status(HTTP_STATUS.OK).json({
+        message: 'Đăng ký giảng viên thành công!',
+        data: updatedUser,
+      });
+    } catch (error: any) {
+      logger.error('Become instructor error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: error.message || 'Đăng ký giảng viên thất bại',
+      });
+    }
+  }
+
+  static async confirmInstructor(req: AuthRequest, res: Response) {
+    try {
+      const { userId, status } = req.body;
+
+      if (status !== 'INSTRUCTOR_REGISTRATION_SUCCESS') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Invalid status',
+        });
+      }
+
+      const updatedUser = await UserService.updateToInstructor(userId);
+
+      res.status(HTTP_STATUS.OK).json({
+        message: 'User upgraded to instructor successfully',
+        data: updatedUser,
+      });
+    } catch (error: any) {
+      logger.error('Confirm instructor error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to confirm instructor upgrade',
       });
     }
   }

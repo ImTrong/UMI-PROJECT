@@ -1,46 +1,47 @@
-# Build stage
+# Stage 1: Build shared module and service
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy package files
+# Copy root package files (if workspace)
 COPY package*.json ./
-COPY prisma ./prisma/
 
-# Install dependencies
-RUN npm ci
+# Copy shared module
+COPY shared/file-storage ./shared/file-storage
 
-# Copy source code
-COPY . .
+# Build shared module
+WORKDIR /app/shared/file-storage
+RUN npm install && npm run build
 
-# Generate Prisma client
+# Copy service code
+WORKDIR /app
+COPY services/user-service ./services/user-service
+
+# Install service dependencies
+WORKDIR /app/services/user-service
+RUN apk add --no-cache openssl libc6-compat
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 RUN npx prisma generate
 
-# Build TypeScript
+# Build service (creates both dist/ and dist-seed/)
 RUN npm run build
 
-# Production stage
+# Stage 2: Production
 FROM node:18-alpine
 
 WORKDIR /app
+RUN apk add --no-cache openssl libc6-compat
 
-# Copy package files
-COPY package*.json ./
-COPY prisma ./prisma/
+# Copy shared module built
+COPY --from=builder /app/shared/file-storage ./shared/file-storage
+COPY --from=builder /app/services/user-service/package*.json ./services/user-service/
+COPY --from=builder /app/services/user-service/node_modules ./services/user-service/node_modules
+COPY --from=builder /app/services/user-service/dist ./services/user-service/dist
+COPY --from=builder /app/services/user-service/dist-seed ./services/user-service/dist-seed
+COPY --from=builder /app/services/user-service/prisma ./services/user-service/prisma
 
-# Install production dependencies only
-RUN npm ci --only=production
-
-# Copy built files from builder
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-
-# Create non-root user
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
-
-USER nodejs
+WORKDIR /app/services/user-service
 
 EXPOSE 3002
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "dist/src/index.js"]

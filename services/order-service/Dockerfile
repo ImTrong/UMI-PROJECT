@@ -1,31 +1,46 @@
-# Build stage
+# Stage 1: Build shared module and service
 FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm ci
+# Copy root package files (if workspace)
+COPY package*.json ./
 
-COPY . .
+# Copy shared module
+COPY shared/file-storage ./shared/file-storage
+
+# Build shared module
+WORKDIR /app/shared/file-storage
+RUN npm install && npm run build
+
+# Copy service code
+WORKDIR /app
+COPY services/order-service ./services/order-service
+
+# Install service dependencies
+WORKDIR /app/services/order-service
+RUN apk add --no-cache openssl libc6-compat
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+RUN npx prisma generate
+
+# Build service
 RUN npm run build
 
-# Runtime stage
+# Stage 2: Production
 FROM node:18-alpine
 
 WORKDIR /app
+RUN apk add --no-cache openssl libc6-compat
 
-COPY package.json package-lock.json* ./
-RUN npm ci --only=production && npm install -g prisma
+# Copy shared module built
+COPY --from=builder /app/shared/file-storage ./shared/file-storage
+COPY --from=builder /app/services/order-service/package*.json ./services/order-service/
+COPY --from=builder /app/services/order-service/node_modules ./services/order-service/node_modules
+COPY --from=builder /app/services/order-service/dist ./services/order-service/dist
+COPY --from=builder /app/services/order-service/prisma ./services/order-service/prisma
 
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/prisma ./prisma
+WORKDIR /app/services/order-service
 
-RUN addgroup -g 1001 -S nodejs && adduser -S nodejs -u 1001
-USER nodejs
-
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD node -e "require('http').get('http://localhost:${PORT:-3004}/api/orders/health', (r) => {if (r.statusCode !== 200) throw new Error('Health check failed')})"
-
-EXPOSE ${PORT:-3004}
+EXPOSE 3004
 
 CMD ["node", "dist/index.js"]
