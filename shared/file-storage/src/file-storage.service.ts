@@ -45,7 +45,19 @@ export class FileStorageService {
     const fileKey = `${timestamp}-${uniqueId}.${extension}`;
     
     // Generate presigned URL (15 minutes expiry)
-    const uploadUrl = await this.client.presignedPutObject(
+    // Create a temporary client pointing to the public URL so the S3 signature
+    // correctly embeds the public Host header, avoiding SignatureDoesNotMatch errors.
+    const publicUrlObj = new URL(minioConfig.publicUrl || 'http://localhost:9000');
+    const publicClient = new Minio.Client({
+      endPoint: publicUrlObj.hostname,
+      port: parseInt(publicUrlObj.port || (publicUrlObj.protocol === 'https:' ? '443' : '80')),
+      useSSL: publicUrlObj.protocol === 'https:',
+      accessKey: minioConfig.accessKey,
+      secretKey: minioConfig.secretKey,
+      region: 'us-east-1' // Prevents internal bucket location network check
+    });
+
+    const uploadUrl = await publicClient.presignedPutObject(
       bucket,
       fileKey,
       15 * 60 // 15 minutes

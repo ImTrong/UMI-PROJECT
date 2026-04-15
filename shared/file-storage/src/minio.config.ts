@@ -7,6 +7,7 @@ export const minioConfig = {
   publicUrl: process.env.MINIO_PUBLIC_URL || 'http://localhost:9000',
   buckets: {
     assignments: 'assignments',
-    quizAttachments: 'quiz-attachments'
+    quizAttachments: 'quiz-attachments',
+    courses: 'courses'
   }
 };

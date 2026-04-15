@@ -371,35 +371,47 @@ export class CourseService {
       throw new Error(ERROR_MESSAGES.FORBIDDEN);
     }
 
-    // Check if course has at least one lesson
-    if (course.lessons.length === 0) {
-      throw new Error('Course must have at least one lesson before publishing');
-    }
-    
-    // Check description length
-    if (!course.description || course.description.length < 50) {
-      throw new Error('Course description must be at least 50 characters');
-    }
-    
-    // Check thumbnail
-    if (!course.thumbnail) {
-      throw new Error('Course thumbnail is required');
-    }
-    
-    // Check category
-    if (!course.categoryId) {
-      throw new Error('Course category is required');
-    }
-    
-    // Check price (optional but recommended)
-    if (course.price < 0) {
-      throw new Error('Course price cannot be negative');
+    const isCurrentlyPublished = course.published;
+
+    if (isCurrentlyPublished) {
+      // Instructor wants to unpublish — allow directly
+      const updatedCourse = await prisma.course.update({
+        where: { id: courseId },
+        data: {
+          published: false,
+          approvalStatus: 'DRAFT',
+        },
+      });
+
+      logger.info(`Course unpublished: ${course.title}`);
+      return updatedCourse;
     }
 
-    // Submit for admin review instead of direct publish
+    // --- Instructor wants to publish: submit for admin review ---
+
+    // If already pending, don't re-submit
+    if (course.approvalStatus === 'PENDING_REVIEW') {
+      throw new Error('Khóa học đang chờ Admin duyệt. Vui lòng đợi kết quả.');
+    }
+
+    // Validation checks before submitting for review
+    if (course.lessons.length === 0) {
+      throw new Error('Khóa học phải có ít nhất một bài học trước khi gửi duyệt');
+    }
+
+    if (!course.description || course.description.trim().length === 0) {
+      throw new Error('Khóa học phải có mô tả trước khi gửi duyệt');
+    }
+
+    if (course.price < 0) {
+      throw new Error('Giá khóa học không được âm');
+    }
+
+    // Submit for admin review (NOT published yet)
     const updatedCourse = await prisma.course.update({
       where: { id: courseId },
       data: {
+        published: false,
         approvalStatus: 'PENDING_REVIEW',
       },
     });

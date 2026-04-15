@@ -80,6 +80,7 @@ export interface Question {
 
 export interface Quiz {
   id: string;
+  courseId: string;
   lessonId: string;
   title: string;
   description: string;
@@ -102,15 +103,16 @@ export interface QuizAttempt {
 
 export interface Assignment {
   id: string;
+  courseId: string;
   lessonId: string;
   title: string;
   description: string;
-  instructionUrl?: string;
+  instructions?: string;
   dueDate?: string;
   maxScore: number;
-  passingScore: number;
   allowLateSubmission: boolean;
   allowedFileTypes: string[];
+  maxFileSizeMB?: number;
 }
 
 export interface AssignmentSubmission {

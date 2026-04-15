@@ -249,15 +249,9 @@ export class CourseController {
         });
       }
 
-      // Handle specific business logic errors (like "Course must have at least one lesson")
-      if (error.message.includes('at least one lesson')) {
-        return res.status(HTTP_STATUS.BAD_REQUEST).json({
-          error: error.message,
-        });
-      }
-
-      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-        error: 'Failed to publish course',
+      // Handle all publish validation errors with 400 so the frontend shows the real message
+      res.status(HTTP_STATUS.BAD_REQUEST).json({
+        error: error.message,
       });
     }
   }

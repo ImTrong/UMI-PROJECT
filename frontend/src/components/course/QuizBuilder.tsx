@@ -1,14 +1,86 @@
 import { useState, useEffect } from 'react';
-import { learningService, Quiz, Question } from '../../services/learning.service';
-import { FiPlus, FiTrash2, FiSave, FiAlertCircle } from 'react-icons/fi';
+import { learningService, Quiz } from '../../services/learning.service';
+import { FiPlus, FiTrash2, FiSave, FiAlertCircle, FiChevronDown, FiChevronUp, FiMessageCircle, FiCheckCircle } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
+// ===== FRONTEND editing format =====
+interface FrontendOption {
+  id: string;
+  text: string;
+  isCorrect: boolean;
+}
+
+interface FrontendQuestion {
+  questionText: string;
+  questionType: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE';
+  options: FrontendOption[];
+  points: number;
+  explanation?: string;
+}
+
+// ===== BACKEND API format =====
+interface BackendQuestion {
+  id: string;
+  text: string;
+  type: 'MULTIPLE_CHOICE' | 'TRUE_FALSE' | 'MULTI_SELECT';
+  options: { id: string; text: string }[];
+  correctAnswerIds: string[];
+  points: number;
+  explanation?: string;
+}
+
+// ===== Transform helpers =====
+function frontendTypeToBackend(type: string): string {
+  switch (type) {
+    case 'SINGLE_CHOICE': return 'MULTIPLE_CHOICE';
+    case 'MULTIPLE_CHOICE': return 'MULTI_SELECT';
+    case 'TRUE_FALSE': return 'TRUE_FALSE';
+    default: return 'MULTIPLE_CHOICE';
+  }
+}
+
+function backendTypeToFrontend(type: string): 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE' {
+  switch (type) {
+    case 'MULTIPLE_CHOICE': return 'SINGLE_CHOICE';
+    case 'MULTI_SELECT': return 'MULTIPLE_CHOICE';
+    case 'TRUE_FALSE': return 'TRUE_FALSE';
+    default: return 'SINGLE_CHOICE';
+  }
+}
+
+function frontendToBackendQuestions(questions: FrontendQuestion[]): BackendQuestion[] {
+  return questions.map((q, index) => ({
+    id: `q-${Date.now()}-${index}`,
+    text: q.questionText,
+    type: frontendTypeToBackend(q.questionType) as BackendQuestion['type'],
+    options: q.options.map(opt => ({ id: opt.id, text: opt.text })),
+    correctAnswerIds: q.options.filter(opt => opt.isCorrect).map(opt => opt.id),
+    points: q.points,
+    explanation: q.explanation || '',
+  }));
+}
+
+function backendToFrontendQuestions(questions: any[]): FrontendQuestion[] {
+  return questions.map(q => ({
+    questionText: q.text || q.questionText || '',
+    questionType: backendTypeToFrontend(q.type || q.questionType || 'MULTIPLE_CHOICE'),
+    options: (q.options || []).map((opt: any) => ({
+      id: opt.id,
+      text: opt.text,
+      isCorrect: (q.correctAnswerIds || []).includes(opt.id),
+    })),
+    points: q.points || 10,
+    explanation: q.explanation || '',
+  }));
+}
+
 interface QuizBuilderProps {
+  courseId: string;
   lessonId: string;
   onClose: () => void;
 }
 
-export const QuizBuilder = ({ lessonId, onClose }: QuizBuilderProps) => {
+export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) => {
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -17,10 +89,13 @@ export const QuizBuilder = ({ lessonId, onClose }: QuizBuilderProps) => {
   // Form states
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [timeLimitMinutes, setTimeLimitMinutes] = useState(0);
+  const [timeLimitMinutes, setTimeLimitMinutes] = useState<number | ''>(0);
   const [passingScore, setPassingScore] = useState(80);
   const [maxAttempts, setMaxAttempts] = useState(3);
-  const [questions, setQuestions] = useState<Omit<Question, 'id' | 'quizId'>[]>([]);
+  const [questions, setQuestions] = useState<FrontendQuestion[]>([]);
+  
+  // Accordion state
+  const [expandedIndices, setExpandedIndices] = useState<Set<number>>(new Set([0]));
 
   useEffect(() => {
     loadQuiz();
@@ -33,12 +108,17 @@ export const QuizBuilder = ({ lessonId, onClose }: QuizBuilderProps) => {
       setQuiz(q);
       setTitle(q.title);
       setDescription(q.description || '');
-      setTimeLimitMinutes(q.timeLimitMinutes || 0);
+      setTimeLimitMinutes(q.timeLimitMinutes || '');
       setPassingScore(q.passingScore);
       setMaxAttempts(q.maxAttempts);
-      setQuestions(q.questions.map(qt => ({
-        ...qt,
-      })));
+      setQuestions(backendToFrontendQuestions(q.questions || []));
+      
+      // Mở sẵn tất cả câu hỏi nếu số lượng < 3, ngược lại chỉ gập hết
+      if (q.questions && q.questions.length < 3) {
+         setExpandedIndices(new Set(q.questions.map((_, i) => i)));
+      } else {
+         setExpandedIndices(new Set([]));
+      }
     } catch (err: any) {
       if (err.response?.status !== 404) {
         setError('Tải bài trắc nghiệm thất bại');
@@ -48,32 +128,70 @@ export const QuizBuilder = ({ lessonId, onClose }: QuizBuilderProps) => {
     }
   };
 
+  const toggleAccordion = (index: number) => {
+    const newSet = new Set(expandedIndices);
+    if (newSet.has(index)) {
+      newSet.delete(index);
+    } else {
+      newSet.add(index);
+    }
+    setExpandedIndices(newSet);
+  };
+
   const handleAddQuestion = () => {
+    const newIndex = questions.length;
     setQuestions([
       ...questions,
       {
         questionText: '',
         questionType: 'SINGLE_CHOICE',
-        options: [{ id: '1', text: '', isCorrect: true }, { id: '2', text: '', isCorrect: false }],
+        options: [
+          { id: `opt-${Date.now()}-1`, text: '', isCorrect: true },
+          { id: `opt-${Date.now()}-2`, text: '', isCorrect: false },
+        ],
         points: 10,
-        orderIndex: questions.length + 1,
-      } as any // Extending option type for builder
+        explanation: ''
+      },
     ]);
+    
+    // Auto-expand the newly created question
+    setExpandedIndices(prev => new Set(prev).add(newIndex));
   };
 
-  const handleUpdateQuestion = (index: number, updates: any) => {
+  const handleUpdateQuestion = (index: number, updates: Partial<FrontendQuestion>) => {
     const updated = [...questions];
     updated[index] = { ...updated[index], ...updates };
     setQuestions(updated);
   };
 
+  const handleQuestionTypeChange = (index: number, newType: any) => {
+    const updated = [...questions];
+    const q = updated[index];
+    q.questionType = newType;
+    
+    if (newType === 'TRUE_FALSE') {
+      q.options = [
+        { id: `opt-true-${Date.now()}`, text: 'Đúng', isCorrect: true },
+        { id: `opt-false-${Date.now()}`, text: 'Sai', isCorrect: false },
+      ];
+    } else if (q.options.length < 2 || (q.options[0].text === 'Đúng' && q.options[1].text === 'Sai')) {
+      q.options = [
+        { id: `opt-${Date.now()}-1`, text: '', isCorrect: true },
+        { id: `opt-${Date.now()}-2`, text: '', isCorrect: false },
+      ];
+    }
+    setQuestions(updated);
+  };
+
   const handleRemoveQuestion = (index: number) => {
-    if (window.confirm('Xóa câu hỏi này?')) {
+    if (window.confirm('Bạn có chắc chắn muốn xóa câu hỏi này?')) {
       const updated = [...questions];
       updated.splice(index, 1);
       setQuestions(updated);
     }
   };
+
+  const totalPoints = questions.reduce((sum, q) => sum + (Number(q.points) || 0), 0);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,29 +200,49 @@ export const QuizBuilder = ({ lessonId, onClose }: QuizBuilderProps) => {
       return;
     }
     
-    // Quick validation
+    // Validation
     for (let i = 0; i < questions.length; i++) {
       if (!questions[i].questionText.trim()) {
         setError(`Câu hỏi ${i + 1} đang trống nội dung.`);
+        setExpandedIndices(prev => new Set(prev).add(i));
         return;
       }
       if (questions[i].options.length < 2) {
         setError(`Câu hỏi ${i + 1} phải có ít nhất 2 lựa chọn.`);
+        setExpandedIndices(prev => new Set(prev).add(i));
         return;
+      }
+      
+      const hasCorrect = questions[i].options.some(opt => opt.isCorrect);
+      if (!hasCorrect) {
+        setError(`Câu hỏi ${i + 1} phải có ít nhất 1 đáp án đúng.`);
+        setExpandedIndices(prev => new Set(prev).add(i));
+        return;
+      }
+      
+      for (let j = 0; j < questions[i].options.length; j++) {
+        if (!questions[i].options[j].text.trim()) {
+          setError(`Lựa chọn ${j + 1} của câu hỏi ${i + 1} đang trống.`);
+          setExpandedIndices(prev => new Set(prev).add(i));
+          return;
+        }
       }
     }
 
     setSaving(true);
     setError('');
 
+    const backendQuestions = frontendToBackendQuestions(questions);
+
     const payload = {
+      courseId,
       lessonId,
       title,
       description,
-      timeLimitMinutes,
+      timeLimitMinutes: timeLimitMinutes ? Number(timeLimitMinutes) : null,
       passingScore,
       maxAttempts,
-      questions: questions.map((q, i) => ({ ...q, orderIndex: i + 1 })),
+      questions: backendQuestions,
     };
 
     try {
@@ -117,152 +255,264 @@ export const QuizBuilder = ({ lessonId, onClose }: QuizBuilderProps) => {
       }
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Lưu trắc nghiệm thất bại');
+      setError(err.response?.data?.error || 'Lưu trắc nghiệm thất bại. Vui lòng kiểm tra lại thông tin.');
     } finally {
       setSaving(false);
     }
   };
 
-  if (loading) return <div className="p-4 text-center">Đang tải dữ liệu trắc nghiệm...</div>;
+  if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Đang nạp bộ công cụ tạo trò chơi trắc nghiệm...</div>;
 
   return (
-    <div className="bg-white border rounded-xl overflow-hidden shadow-sm mt-4 mb-8 border-primary-200">
-      <div className="bg-primary-50 p-4 border-b border-primary-100 flex justify-between items-center">
-        <h3 className="text-lg font-bold text-primary-900">{quiz ? 'Sửa Trắc nghiệm' : 'Tạo Trắc nghiệm'}</h3>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-800 font-medium text-sm">Đóng</button>
+    <div className="bg-white border rounded-xl shadow-lg mt-4 mb-8 border-primary-200 overflow-hidden transform transition-all">
+      <div className="bg-gradient-to-r from-primary-600 to-indigo-600 p-5 flex justify-between items-center text-white">
+        <h3 className="text-xl font-bold flex items-center gap-2">
+           <FiCheckCircle size={22} className="opacity-90" />
+           {quiz ? 'Cấu trúc lại Trắc nghiệm' : 'Khởi tạo Trắc nghiệm Mới'}
+        </h3>
+        <button onClick={onClose} className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium">Đóng</button>
       </div>
 
-      <form onSubmit={handleSave} className="p-6">
+      <form onSubmit={handleSave} className="p-6 md:p-8">
         {error && (
-          <div className="mb-6 p-4 bg-red-50 text-red-700 rounded-lg flex items-center gap-2">
-            <FiAlertCircle /> {error}
+          <div className="mb-8 p-4 bg-red-50 text-red-700 border border-red-200 rounded-xl flex items-start gap-3">
+            <FiAlertCircle className="mt-0.5 flex-shrink-0" size={18} /> 
+            <span className="font-medium text-sm">{error}</span>
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề bài trắc nghiệm *</label>
-            <input required value={title} onChange={e => setTitle(e.target.value)} className="input-field" placeholder="VD: Kiểm tra kiến thức cuối phần" />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} className="input-field" rows={2} />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Thời gian giới hạn (Phút)</label>
-            <input type="number" min="0" value={timeLimitMinutes} onChange={e => setTimeLimitMinutes(Number(e.target.value))} className="input-field" placeholder="0 = Không giới hạn" />
-            <p className="text-xs text-gray-500 mt-1">Để 0 nếu không giới hạn thời gian.</p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Điểm đạt yêu cầu (%) *</label>
-            <input type="number" min="1" max="100" required value={passingScore} onChange={e => setPassingScore(Number(e.target.value))} className="input-field" />
-          </div>
-        </div>
-
-        <div className="mb-6 border-b pb-4 flex justify-between items-end">
-          <h4 className="text-lg font-bold text-gray-800">Câu hỏi ({questions.length})</h4>
-          <button type="button" onClick={handleAddQuestion} className="btn-secondary text-sm flex items-center gap-2 py-2">
-            <FiPlus /> Thêm câu hỏi
-          </button>
-        </div>
-
-        <div className="space-y-6">
-          {questions.map((q, qIndex) => (
-            <div key={qIndex} className="p-5 border border-gray-200 rounded-lg bg-gray-50 relative group">
-              <button type="button" onClick={() => handleRemoveQuestion(qIndex)} className="absolute top-4 right-4 text-gray-400 hover:text-red-600 transition-colors">
-                <FiTrash2 size={18} />
-              </button>
+        {/* =============== Cài Đặt Chung =============== */}
+        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6 mb-8">
+           <h4 className="font-semibold text-gray-800 mb-4 pb-2 border-b">1. Thiết lập chung</h4>
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Tiêu đề bài trắc nghiệm <span className="text-red-500">*</span></label>
+                <input required value={title} onChange={e => setTitle(e.target.value)} className="input-field shadow-sm" placeholder="VD: Kiểm tra kiến thức cuối phần 1" />
+              </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                <div className="md:col-span-3">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Câu hỏi {qIndex + 1} *</label>
-                  <input required value={q.questionText} onChange={e => handleUpdateQuestion(qIndex, { questionText: e.target.value })} className="input-field bg-white" placeholder="Như thế nào là..." />
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Mô tả (Tùy chọn)</label>
+                <textarea value={description} onChange={e => setDescription(e.target.value)} className="input-field shadow-sm" rows={2} placeholder="Nhập một số ghi chú hoặc lời khuyên..." />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Thời gian giới hạn (Phút)</label>
+                <div className="relative">
+                   <input type="number" min="0" value={timeLimitMinutes} onChange={e => setTimeLimitMinutes(e.target.value === '' ? '' : Number(e.target.value))} className="input-field shadow-sm pr-12" placeholder="VD: 30" />
+                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Phút</span>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Điểm *</label>
-                  <input type="number" min="1" required value={q.points} onChange={e => handleUpdateQuestion(qIndex, { points: Number(e.target.value) })} className="input-field bg-white" />
+                <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5 opacity-80"><FiAlertCircle size={12}/> Để trống hoặc 0 nếu không giới hạn.</p>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Điểm đậu (Passing Score %) <span className="text-red-500">*</span></label>
+                <div className="relative">
+                   <input type="number" min="1" max="100" required value={passingScore} onChange={e => setPassingScore(Number(e.target.value))} className="input-field shadow-sm pr-12 text-primary-700 font-semibold" />
+                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">%</span>
                 </div>
               </div>
+           </div>
+        </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Loại câu hỏi</label>
-                <select value={q.questionType} onChange={e => handleUpdateQuestion(qIndex, { questionType: e.target.value })} className="input-field bg-white w-full md:w-1/2">
-                  <option value="SINGLE_CHOICE">Một đáp án</option>
-                  <option value="MULTIPLE_CHOICE">Nhiều đáp án</option>
-                  <option value="TRUE_FALSE">Đúng / Sai</option>
-                </select>
-              </div>
+        {/* =============== Danh Sách Câu Hỏi =============== */}
+        <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-gray-200 pb-4">
+          <div>
+            <h4 className="text-xl font-bold text-gray-800">2. Bộ câu hỏi ({questions.length})</h4>
+            <p className="text-sm text-gray-500 mt-1">Tổng điểm: <strong className="text-primary-600">{totalPoints} điểm</strong></p>
+          </div>
+          <div className="flex items-center gap-3">
+             <button type="button" onClick={() => setExpandedIndices(new Set(questions.map((_, i) => i)))} className="text-sm text-gray-500 hover:text-primary-600 font-medium px-2">Mở tất cả</button>
+             <button type="button" onClick={() => setExpandedIndices(new Set())} className="text-sm text-gray-500 hover:text-primary-600 font-medium px-2 border-r border-gray-300 pr-4">Gập tất cả</button>
+             <button type="button" onClick={handleAddQuestion} className="btn-secondary text-sm flex items-center gap-2 py-2 px-4 shadow-sm border-primary-200 text-primary-700 bg-primary-50 hover:bg-primary-100">
+               <FiPlus strokeWidth={3} /> Thêm câu hỏi
+             </button>
+          </div>
+        </div>
 
-              <div className="space-y-3">
-                <label className="block text-sm font-medium text-gray-700">Lựa chọn *</label>
-                {(q.options as any[]).map((opt, optIndex) => (
-                  <div key={optIndex} className="flex gap-3 items-center">
-                    <input
-                      type={q.questionType === 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}
-                      name={`q-${qIndex}-correct`}
-                      checked={opt.isCorrect}
-                      onChange={(e) => {
-                        const newOpts = [...q.options as any[]];
-                        if (q.questionType !== 'MULTIPLE_CHOICE') {
-                          newOpts.forEach(o => o.isCorrect = false);
-                        }
-                        newOpts[optIndex].isCorrect = e.target.checked;
-                        handleUpdateQuestion(qIndex, { options: newOpts });
-                      }}
-                      className="w-4 h-4 text-primary-600 cursor-pointer"
-                    />
-                    <input
-                      required
-                      value={opt.text}
-                      onChange={(e) => {
-                        const newOpts = [...q.options as any[]];
-                        newOpts[optIndex].text = e.target.value;
-                        handleUpdateQuestion(qIndex, { options: newOpts });
-                      }}
-                      className="input-field py-2 bg-white flex-1"
-                      placeholder={`Lựa chọn ${optIndex + 1}`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (q.options.length <= 2) return;
-                        const newOpts = [...q.options as any[]];
-                        newOpts.splice(optIndex, 1);
-                        handleUpdateQuestion(qIndex, { options: newOpts });
-                      }}
-                      className="text-gray-400 hover:text-red-500 disabled:opacity-30"
-                      disabled={q.options.length <= 2} // Enforce min 2 options
-                    >
-                      <FiTrash2 />
-                    </button>
+        <div className="space-y-4">
+          {questions.map((q, qIndex) => {
+            const isExpanded = expandedIndices.has(qIndex);
+            
+            return (
+              <div key={qIndex} className={`border rounded-xl bg-white overflow-hidden transition-all duration-200 ${isExpanded ? 'border-primary-300 shadow-md ring-1 ring-primary-100' : 'border-gray-200 shadow-sm hover:border-gray-300'}`}>
+                {/* HEAD */}
+                <div 
+                   className={`flex justify-between items-center p-4 cursor-pointer select-none transition-colors ${isExpanded ? 'bg-primary-50/50' : 'bg-gray-50 hover:bg-gray-100/80'}`}
+                   onClick={() => toggleAccordion(qIndex)}
+                >
+                   <div className="flex items-center gap-3 flex-1 overflow-hidden">
+                      <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center font-bold text-sm text-gray-600">
+                         {qIndex + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                         <h5 className="font-semibold text-gray-800 truncate text-sm">
+                            {q.questionText || <span className="text-gray-400 italic">...Đang soạn thảo...</span>}
+                         </h5>
+                         <div className="text-xs text-gray-500 mt-0.5 flex gap-2 items-center">
+                            <span className="font-medium px-1.5 py-0.5 rounded bg-gray-100 border text-[10px] uppercase tracking-wider">{
+                               q.questionType === 'SINGLE_CHOICE' ? 'Một đáp án' : 
+                               q.questionType === 'MULTIPLE_CHOICE' ? 'Nhiều đáp án' : 
+                               'Đúng/Sai'
+                            }</span>
+                            <span>{q.points} Điểm</span>
+                         </div>
+                      </div>
+                   </div>
+                   
+                   <div className="flex items-center gap-2 ml-4">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); handleRemoveQuestion(qIndex); }} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors group" title="Xóa câu hỏi">
+                        <FiTrash2 size={16} className="group-hover:scale-110 transition-transform" />
+                      </button>
+                      <div className="w-px h-6 bg-gray-200 mx-1"></div>
+                      <div className="p-1 text-gray-400">
+                        {isExpanded ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
+                      </div>
+                   </div>
+                </div>
+
+                {/* BODY (COLLAPSIBLE) */}
+                {isExpanded && (
+                  <div className="p-6 border-t border-gray-100 bg-white">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+                      <div className="md:col-span-3">
+                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nội dung câu hỏi <span className="text-red-500">*</span></label>
+                        <textarea required value={q.questionText} onChange={e => handleUpdateQuestion(qIndex, { questionText: e.target.value })} className="input-field !py-3 min-h-[100px]" placeholder="Nhập nội dung đề bài (Hỗ trợ xuống dòng)..." />
+                      </div>
+                      <div className="flex flex-col gap-5">
+                        <div>
+                           <label className="block text-sm font-semibold text-gray-700 mb-1.5">Loại câu hỏi</label>
+                           <select value={q.questionType} onChange={e => handleQuestionTypeChange(qIndex, e.target.value)} className="input-field font-medium text-gray-800">
+                             <option value="SINGLE_CHOICE">Một đáp án</option>
+                             <option value="MULTIPLE_CHOICE">Nhiều đáp án (Multi-select)</option>
+                             <option value="TRUE_FALSE">Đúng / Sai</option>
+                           </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Điểm số <span className="text-red-500">*</span></label>
+                          <input type="number" min="0" required value={q.points} onChange={e => handleUpdateQuestion(qIndex, { points: Number(e.target.value) })} className="input-field text-primary-700 font-bold" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* OPTIONS SECTION */}
+                    <div className="space-y-4 mb-8 bg-slate-50 p-5 rounded-xl border border-slate-200/60">
+                      <div className="flex justify-between items-center mb-2">
+                         <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
+                           Lựa chọn Đáp án 
+                           <span className="text-xs font-normal text-gray-500 bg-gray-200 px-2 flex items-center rounded-full">Đánh dấu tích để chọn đáp án đúng</span>
+                         </label>
+                      </div>
+                      
+                      <div className="space-y-3">
+                        {q.options.map((opt, optIndex) => {
+                          const isOptCorrect = opt.isCorrect;
+                          return (
+                            <div key={opt.id} className={`flex gap-3 items-center group p-2 rounded-lg border transition-colors ${isOptCorrect ? 'bg-green-50/50 border-green-200' : 'bg-white border-transparent hover:border-gray-200 shadow-sm'}`}>
+                              <div className="flex items-center justify-center pl-2">
+                                <label className="relative flex items-center justify-center cursor-pointer">
+                                  <input
+                                    type={q.questionType === 'MULTIPLE_CHOICE' ? 'checkbox' : 'radio'}
+                                    name={`q-${qIndex}-correct`}
+                                    checked={isOptCorrect}
+                                    onChange={(e) => {
+                                      const newOpts = [...q.options];
+                                      if (q.questionType !== 'MULTIPLE_CHOICE') {
+                                        newOpts.forEach(o => o.isCorrect = false);
+                                      }
+                                      newOpts[optIndex] = { ...newOpts[optIndex], isCorrect: e.target.checked };
+                                      handleUpdateQuestion(qIndex, { options: newOpts });
+                                    }}
+                                    className={`w-5 h-5 cursor-pointer peer ${q.questionType === 'MULTIPLE_CHOICE' ? 'rounded text-green-600 focus:ring-green-500' : 'text-green-600 focus:ring-green-500'}`}
+                                  />
+                                </label>
+                              </div>
+                              <input
+                                required
+                                value={opt.text}
+                                disabled={q.questionType === 'TRUE_FALSE'}
+                                onChange={(e) => {
+                                  const newOpts = [...q.options];
+                                  newOpts[optIndex] = { ...newOpts[optIndex], text: e.target.value };
+                                  handleUpdateQuestion(qIndex, { options: newOpts });
+                                }}
+                                className={`input-field flex-1 ${q.questionType === 'TRUE_FALSE' ? 'bg-gray-100 text-gray-600 cursor-not-allowed font-medium' : 'bg-white'}`}
+                                placeholder={`Nội dung lựa chọn ${optIndex + 1}`}
+                              />
+                              
+                              {q.questionType !== 'TRUE_FALSE' && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (q.options.length <= 2) return;
+                                    const newOpts = [...q.options];
+                                    newOpts.splice(optIndex, 1);
+                                    handleUpdateQuestion(qIndex, { options: newOpts });
+                                  }}
+                                  className={`p-2 rounded-md transition-colors ${q.options.length <= 2 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100'}`}
+                                  disabled={q.options.length <= 2}
+                                  title="Xóa lựa chọn"
+                                >
+                                  <FiTrash2 size={16} />
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {q.questionType !== 'TRUE_FALSE' && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newOpts = [...q.options, { id: `opt-${Date.now()}`, text: '', isCorrect: false }];
+                            handleUpdateQuestion(qIndex, { options: newOpts });
+                          }}
+                          className="text-sm font-semibold text-primary-600 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 rounded-lg px-4 py-2 mt-4 transition-colors flex items-center gap-1.5 w-max shadow-sm border border-primary-100"
+                        >
+                          <FiPlus strokeWidth={3} /> Lựa chọn mới
+                        </button>
+                      )}
+                    </div>
+
+                    {/* EXPLANATION */}
+                    <div>
+                       <label className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                          <FiMessageCircle className="text-amber-500" />
+                          Giải thích đáp án <span className="font-normal text-gray-500 text-xs ml-1">(Tùy chọn)</span>
+                       </label>
+                       <textarea 
+                          value={q.explanation || ''} 
+                          onChange={e => handleUpdateQuestion(qIndex, { explanation: e.target.value })} 
+                          className="input-field bg-amber-50/30 border-amber-200 focus:border-amber-400 focus:ring-amber-400 placeholder:text-amber-900/30 text-amber-900" 
+                          rows={2} 
+                          placeholder="Học viên sẽ thấy giải thích này sau khi làm bài (giúp củng cố kiến thức)..." 
+                       />
+                    </div>
+                    
                   </div>
-                ))}
-                {q.questionType !== 'TRUE_FALSE' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newOpts = [...q.options as any[], { id: Date.now().toString(), text: '', isCorrect: false }];
-                      handleUpdateQuestion(qIndex, { options: newOpts });
-                    }}
-                    className="text-sm text-primary-600 font-medium hover:underline mt-2 inline-block"
-                  >
-                    + Thêm Lựa chọn
-                  </button>
                 )}
               </div>
-            </div>
-          ))}
+            );
+          })}
+          
           {questions.length === 0 && (
-            <div className="text-center py-8 bg-gray-50 border border-dashed rounded-lg text-gray-500">
-              Chưa có câu hỏi nào. Nhấn "Thêm câu hỏi" bên trên.
+            <div className="text-center py-16 px-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center group cursor-pointer transition-colors hover:bg-gray-100 hover:border-primary-300" onClick={handleAddQuestion}>
+              <div className="w-16 h-16 rounded-full bg-primary-50 text-primary-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                 <FiCheckCircle size={32} />
+              </div>
+              <h4 className="text-lg font-bold text-gray-700 mb-1">Chưa có câu hỏi nào</h4>
+              <p className="text-gray-500 text-sm max-w-sm">Tạo bộ câu hỏi để kiểm tra kiến thức học viên ở cuối mỗi chương.</p>
+              <button type="button" className="mt-5 btn-primary text-sm px-6">Bắt đầu tạo câu hỏi</button>
             </div>
           )}
         </div>
 
-        <div className="mt-8 flex justify-end gap-4 border-t pt-6">
-          <button type="button" onClick={onClose} className="btn-secondary">Hủy</button>
-          <button type="submit" disabled={saving} className="btn-primary flex items-center gap-2 px-8">
-            <FiSave /> {saving ? 'Đang lưu...' : 'Lưu Trắc nghiệm'}
+        {/* BOTTOM ACTIONS */}
+        <div className="mt-10 flex justify-end gap-3 pt-6 border-t border-gray-200 bg-white sticky bottom-0 z-10 pb-2">
+          <button type="button" onClick={onClose} className="px-6 py-2.5 font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors">Thoát</button>
+          <button type="submit" disabled={saving || questions.length === 0} className="btn-primary py-2.5 px-8 rounded-xl shadow-lg shadow-primary-500/30 disabled:opacity-50 disabled:shadow-none flex items-center gap-2">
+            <FiSave size={18} className={saving ? 'animate-pulse' : ''} />
+            {saving ? 'Đang mã hóa & lưu...' : 'Xuất bản Trắc nghiệm'}
           </button>
         </div>
       </form>

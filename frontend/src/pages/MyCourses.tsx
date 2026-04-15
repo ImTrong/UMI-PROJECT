@@ -47,13 +47,17 @@ export default function MyCourses() {
     }
   };
 
-  const handlePublish = async (courseId: string) => {
+  const handlePublish = async (courseId: string, isPublished: boolean) => {
     try {
       await courseService.publishCourse(courseId);
-      toast.success('Đã chuyển đổi trạng thái xuất bản khóa học');
+      if (isPublished) {
+        toast.success('Đã ngừng xuất bản khóa học');
+      } else {
+        toast.success('Đã gửi khóa học để Admin xét duyệt!');
+      }
       loadCourses(pagination.page);
-    } catch (error) {
-      toast.error('Không thể chuyển đổi trạng thái xuất bản');
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Thao tác thất bại');
     }
   };
 
@@ -95,17 +99,19 @@ export default function MyCourses() {
                   >
                     <FiEdit2 size={16} className="text-gray-600" />
                   </Link>
-                  <button
-                    onClick={() => handlePublish(course.id)}
-                    className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
-                    title={course.published ? "Ngừng xuất bản" : "Xuất bản"}
-                  >
-                    {course.published ? (
-                      <FiEyeOff size={16} className="text-gray-600" />
-                    ) : (
-                      <FiEye size={16} className="text-gray-600" />
-                    )}
-                  </button>
+                  {(course as any).approvalStatus !== 'PENDING_REVIEW' && (
+                    <button
+                      onClick={() => handlePublish(course.id, course.published)}
+                      className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
+                      title={course.published ? "Ngừng xuất bản" : "Gửi duyệt"}
+                    >
+                      {course.published ? (
+                        <FiEyeOff size={16} className="text-gray-600" />
+                      ) : (
+                        <FiEye size={16} className="text-gray-600" />
+                      )}
+                    </button>
+                  )}
                   <button
                     onClick={() => handleDelete(course.id, course.title)}
                     className="p-2 bg-white rounded-full shadow hover:bg-red-100"
