@@ -14,6 +14,7 @@ import {
   FiPlus,
   FiBarChart2
 } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 export default function InstructorDashboard() {
   const { user } = useAuth();
@@ -58,12 +59,17 @@ export default function InstructorDashboard() {
     }
   };
 
-  const handlePublish = async (courseId: string) => {
+  const handlePublish = async (courseId: string, isPublished: boolean) => {
     try {
       await courseService.publishCourse(courseId);
+      if (isPublished) {
+        toast.success('Đã ngừng xuất bản khóa học');
+      } else {
+        toast.success('Đã gửi khóa học để Admin xét duyệt!');
+      }
       loadDashboardData();
-    } catch (error) {
-      console.error('Failed to publish course:', error);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Thao tác thất bại');
     }
   };
 
@@ -183,9 +189,15 @@ export default function InstructorDashboard() {
                     </td>
                     <td className="py-3 px-4">
                       <span className={`text-xs px-2 py-1 rounded-full ${
-                        course.published ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                        course.published ? 'bg-green-100 text-green-700' :
+                        (course as any).approvalStatus === 'PENDING_REVIEW' ? 'bg-blue-100 text-blue-700' :
+                        (course as any).approvalStatus === 'REJECTED' ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
                       }`}>
-                        {course.published ? 'Đã xuất bản' : 'Bản nháp'}
+                        {course.published ? 'Đã xuất bản' :
+                         (course as any).approvalStatus === 'PENDING_REVIEW' ? 'Chờ duyệt' :
+                         (course as any).approvalStatus === 'REJECTED' ? 'Bị từ chối' :
+                         'Bản nháp'}
                       </span>
                     </td>
                     <td className="py-3 px-4">
@@ -204,13 +216,15 @@ export default function InstructorDashboard() {
                         >
                           <FiEye size={16} />
                         </Link>
-                        <button
-                          onClick={() => handlePublish(course.id)}
-                          className="p-1 text-gray-500 hover:text-green-600"
-                          title={course.published ? "Ngừng xuất bản" : "Xuất bản"}
-                        >
-                          {course.published ? <FiEyeOff size={16} /> : <FiEye size={16} />}
-                        </button>
+                        {(course as any).approvalStatus !== 'PENDING_REVIEW' && (
+                          <button
+                            onClick={() => handlePublish(course.id, course.published)}
+                            className="p-1 text-gray-500 hover:text-green-600"
+                            title={course.published ? "Ngừng xuất bản" : "Gửi duyệt"}
+                          >
+                            {course.published ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                          </button>
+                        )}
                         <button
                           onClick={() => handleDelete(course.id, course.title)}
                           className="p-1 text-gray-500 hover:text-red-600"

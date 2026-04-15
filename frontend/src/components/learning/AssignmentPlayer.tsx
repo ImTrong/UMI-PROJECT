@@ -146,7 +146,7 @@ export const AssignmentPlayer = ({
           )}
           <div className="flex items-center gap-1">
             <FiCheckCircle className="text-green-500" />
-            <span>Điểm tối đa: {assignment.maxScore} (Đạt: {assignment.passingScore})</span>
+            <span>Điểm tối đa: {assignment.maxScore}</span>
           </div>
         </div>
         
@@ -154,11 +154,10 @@ export const AssignmentPlayer = ({
           <p className="whitespace-pre-wrap">{assignment.description}</p>
         </div>
 
-        {assignment.instructionUrl && (
-          <div className="mt-4">
-            <a href={assignment.instructionUrl} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium bg-primary-50 inline-flex px-4 py-2 rounded-lg transition-colors">
-              <FiFileText /> Tải xuống Hướng dẫn/Tài nguyên
-            </a>
+        {assignment.instructions && (
+          <div className="mt-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
+            <p className="text-sm font-semibold text-blue-800 mb-1 flex items-center gap-1"><FiFileText /> Hướng dẫn chi tiết:</p>
+            <p className="text-sm text-blue-700 whitespace-pre-wrap">{assignment.instructions}</p>
           </div>
         )}
       </div>

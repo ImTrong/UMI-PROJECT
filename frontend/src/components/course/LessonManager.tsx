@@ -357,9 +357,9 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
               {activeBuilderLessonId === lesson.id && (
                 <div className="border-t bg-gray-50 p-4">
                   {builderType === 'QUIZ' ? (
-                    <QuizBuilder lessonId={lesson.id} onClose={() => setActiveBuilderLessonId(null)} />
+                    <QuizBuilder courseId={courseId} lessonId={lesson.id} onClose={() => setActiveBuilderLessonId(null)} />
                   ) : (
-                    <AssignmentBuilder lessonId={lesson.id} onClose={() => setActiveBuilderLessonId(null)} />
+                    <AssignmentBuilder courseId={courseId} lessonId={lesson.id} onClose={() => setActiveBuilderLessonId(null)} />
                   )}
                 </div>
               )}

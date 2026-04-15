@@ -39,6 +39,17 @@ export const authenticateToken = async (
       email: response.data.user.email,
     };
 
+    // Fetch role from user-service so controllers can check req.user.role
+    try {
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+      const userResponse = await axios.get(`${userServiceUrl}/api/users/${req.user.userId}`, {
+        headers: { Authorization: authHeader! },
+      });
+      req.user.role = userResponse.data.data?.role || userResponse.data.role;
+    } catch (roleErr: any) {
+      logger.warn('Could not fetch user role, proceeding without it. Status:', roleErr?.response?.status);
+    }
+
     next();
   } catch (error) {
     logger.error('Authentication error:', error);
@@ -55,8 +66,11 @@ export const requireRole = (roles: string[]) => {
 
     try {
       const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+      const authHeader = req.headers.authorization;
       const response: AxiosResponse<{ data: { role: string } }> = 
-        await axios.get(`${userServiceUrl}/api/users/${req.user.userId}`);
+        await axios.get(`${userServiceUrl}/api/users/${req.user.userId}`, {
+          headers: authHeader ? { Authorization: authHeader } : {},
+        });
       const userRole = response.data.data.role;
 
       if (!roles.includes(userRole)) {

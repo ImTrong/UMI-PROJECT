@@ -52,7 +52,7 @@ export default function Header() {
   ];
 
   const instructorMenu = [
-    { name: 'Khóa học của tôi', href: '/instructor/courses', icon: FiBookOpen },
+    { name: 'Khóa học của tôi', href: '/my-courses', icon: FiBookOpen },
     { name: 'Bảng điều khiển', href: '/dashboard', icon: FiGrid },
   ];
 

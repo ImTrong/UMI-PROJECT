@@ -15,6 +15,8 @@ export interface Course {
   requirements: string[];
   targetAudience: string[];
   published: boolean;
+  approvalStatus?: 'DRAFT' | 'PENDING_REVIEW' | 'APPROVED' | 'REJECTED';
+  rejectionReason?: string;
   rating: number;
   totalReviews: number;
   enrolledCount: number;

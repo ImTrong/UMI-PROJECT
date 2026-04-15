@@ -111,8 +111,16 @@ export default function EditCourse() {
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-gray-600 font-medium">Trạng thái</span>
-                <span className={`px-2 py-1 rounded text-sm font-bold ${course.published ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                  {course.published ? 'Đã xuất bản' : 'Bản nháp'}
+                <span className={`px-2 py-1 rounded text-sm font-bold ${
+                  course.published ? 'bg-green-100 text-green-700' :
+                  course.approvalStatus === 'PENDING_REVIEW' ? 'bg-blue-100 text-blue-700' :
+                  course.approvalStatus === 'REJECTED' ? 'bg-red-100 text-red-700' :
+                  'bg-yellow-100 text-yellow-700'
+                }`}>
+                  {course.published ? 'Đã xuất bản' :
+                   course.approvalStatus === 'PENDING_REVIEW' ? 'Đang chờ duyệt' :
+                   course.approvalStatus === 'REJECTED' ? 'Bị từ chối' :
+                   'Bản nháp'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -123,25 +131,59 @@ export default function EditCourse() {
                 <span className="text-gray-600 font-medium">Đánh giá</span>
                 <span className="font-bold">{course.rating.toFixed(1)} / 5.0</span>
               </div>
-              
-              {!course.published && (
+
+              {course.approvalStatus === 'REJECTED' && course.rejectionReason && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm font-semibold text-red-700 mb-1">Lý do từ chối:</p>
+                  <p className="text-sm text-red-600">{course.rejectionReason}</p>
+                </div>
+              )}
+
+              {course.approvalStatus === 'PENDING_REVIEW' && (
+                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-700">
+                    ⏳ Khóa học đang chờ Admin xét duyệt. Bạn sẽ được thông báo khi có kết quả.
+                  </p>
+                </div>
+              )}
+
+              {course.published && (
+                <div className="pt-4 border-t">
+                  <button
+                    onClick={async () => {
+                      try {
+                        await courseService.publishCourse(course.id);
+                        toast.success('Đã ngừng xuất bản khóa học');
+                        setCourse({ ...course, published: false, approvalStatus: 'DRAFT' });
+                      } catch (error: any) {
+                        toast.error(error.response?.data?.error || 'Thao tác thất bại');
+                      }
+                    }}
+                    className="w-full btn-primary bg-orange-500 hover:bg-orange-600"
+                  >
+                    Ngừng xuất bản
+                  </button>
+                </div>
+              )}
+
+              {!course.published && course.approvalStatus !== 'PENDING_REVIEW' && (
                 <div className="pt-4 border-t">
                   <p className="text-sm text-gray-500 mb-3">
-                    Khóa học của bạn phải có ít nhất một bài học trước khi xuất bản.
+                    Khóa học cần có ít nhất một bài học và mô tả đủ dài. Sau khi gửi, Admin sẽ xét duyệt.
                   </p>
                   <button
                     onClick={async () => {
                       try {
                         await courseService.publishCourse(course.id);
-                        toast.success('Đã xuất bản khóa học!');
-                        setCourse({ ...course, published: true });
+                        toast.success('Đã gửi khóa học để Admin xét duyệt!');
+                        setCourse({ ...course, approvalStatus: 'PENDING_REVIEW' });
                       } catch (error: any) {
-                        toast.error(error.response?.data?.error || 'Xuất bản thất bại');
+                        toast.error(error.response?.data?.error || 'Gửi duyệt thất bại');
                       }
                     }}
                     className="w-full btn-primary bg-green-600 hover:bg-green-700"
                   >
-                    Xuất bản Khóa học
+                    Gửi yêu cầu xuất bản
                   </button>
                 </div>
               )}
