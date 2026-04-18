@@ -70,6 +70,7 @@ export default function OrderDetail() {
       <OrderDetailComponent
         order={order}
         onCancel={order.status === 'PENDING' ? handleCancelOrder : undefined}
+        onPay={order.status === 'PENDING' ? () => navigate(`/checkout/${order.id}`) : undefined}
       />
     </div>
   );

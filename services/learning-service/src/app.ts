@@ -41,9 +41,13 @@ app.get('/api/learning/health', ProgressController.healthCheck);
 
 // Progress routes
 app.get('/api/learning/progress/me', authenticateToken, ProgressController.getUserProgress);
+app.get('/api/learning/courses/enrolled', authenticateToken, validatePagination, handleValidationErrors, ProgressController.getEnrolledCourses);
 app.get('/api/learning/progress/course/:courseId', authenticateToken, validateCourseId, handleValidationErrors, ProgressController.getCourseProgress);
 app.post('/api/learning/progress/:courseId/:lessonId/complete', authenticateToken, validateLessonComplete, handleValidationErrors, ProgressController.markLessonComplete);
 app.post('/api/learning/courses/:courseId/enroll', authenticateToken, validateCourseId, handleValidationErrors, ProgressController.enrollInCourse);
+
+// Internal routes (Service-to-service)
+app.post('/api/learning/internal/courses/:courseId/enroll', validateCourseId, handleValidationErrors, ProgressController.enrollInCourseInternal);
 
 // Certificate routes
 app.post('/api/learning/certificates/:courseId/generate', authenticateToken, validateCourseId, handleValidationErrors, CertificateController.generateCertificate);

@@ -198,6 +198,8 @@ services:
       AUTH_SERVICE_URL: "http://auth-service:3001"
       USER_SERVICE_URL: "http://user-service:3002"
       COURSE_SERVICE_URL: "http://course-service:3003"
+      PAYMENT_SERVICE_URL: "http://payment-service:3005"
+      LEARNING_SERVICE_URL: "http://learning-service:3006"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -225,7 +227,7 @@ services:
       PORT: 3005
       NODE_ENV: development
       DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/payment_db?authSource=admin"
-      STRIPE_SECRET_KEY: "sk_test_fake_key_for_development"
+      STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:-sk_test_your_stripe_secret_key_here}"
       AUTH_SERVICE_URL: "http://auth-service:3001"
       USER_SERVICE_URL: "http://user-service:3002"
       ORDER_SERVICE_URL: "http://order-service:3004"
