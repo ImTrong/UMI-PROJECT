@@ -43,7 +43,7 @@ export default function Cart() {
 
     setCheckoutLoading(true);
     try {
-      const order = await orderService.createOrder({
+      const result = await orderService.createOrder({
         items: items.map(item => ({
           courseId: item.courseId,
           courseTitle: item.title,
@@ -51,8 +51,8 @@ export default function Cart() {
         })),
         notes,
       });
-      toast.success('Đặt hàng thành công!');
-      navigate(`/orders/${order.id}`);
+      toast.success('Tạo đơn hàng thành công! Đang chuyển đến thanh toán...');
+      navigate(`/checkout/${result.order.id}`);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Không thể tạo đơn hàng');
     } finally {

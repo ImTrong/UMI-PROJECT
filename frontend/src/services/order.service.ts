@@ -74,6 +74,17 @@ export interface PaginatedOrders {
   };
 }
 
+export interface CreateOrderResponse {
+  order: Order;
+  paymentIntent?: {
+    id: string;
+    clientSecret: string;
+    amount: number;
+    currency: string;
+    status: string;
+  } | null;
+}
+
 export const orderService = {
   // Cart
   async getCart(): Promise<Cart> {
@@ -102,7 +113,7 @@ export const orderService = {
   },
 
   // Orders
-  async createOrder(data: CreateOrderData): Promise<Order> {
+  async createOrder(data: CreateOrderData): Promise<CreateOrderResponse> {
     const response = await orderApi.post('/api/orders', data);
     return response.data.data;
   },
@@ -129,6 +140,11 @@ export const orderService = {
   async cancelOrder(orderId: string, reason?: string): Promise<Order> {
     const response = await orderApi.post(`/api/orders/${orderId}/cancel`, { reason });
     return response.data.data;
+  },
+
+  async processPayment(orderId: string, paymentMethodId?: string): Promise<{ success: boolean; payment: any }> {
+    const response = await orderApi.post(`/api/orders/${orderId}/payment`, { paymentMethodId });
+    return response.data;
   },
 
   // Admin endpoints

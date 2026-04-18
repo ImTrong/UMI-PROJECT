@@ -141,7 +141,12 @@ export class LessonService {
     throw new Error('Access denied. You must purchase this course to view this lesson.');
   }
 
-  static async getCourseLessons(courseId: string, includeUnpublished: boolean = false) {
+  static async getCourseLessons(
+    courseId: string, 
+    includeUnpublished: boolean = false,
+    userId?: string,
+    authToken?: string
+  ) {
     const course = await prisma.course.findUnique({
       where: { id: courseId },
     });
@@ -150,13 +155,33 @@ export class LessonService {
       throw new Error(ERROR_MESSAGES.COURSE_NOT_FOUND);
     }
 
+    let isEnrolled = false;
+    if (userId && authToken && !includeUnpublished) {
+      try {
+        const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:3006';
+        const response = await axios.get(
+          `${learningServiceUrl}/api/learning/progress/course/${courseId}`,
+          { headers: { Authorization: `Bearer ${authToken}` } }
+        );
+        if (response.data && response.data.data) {
+          isEnrolled = true;
+        }
+      } catch (error: any) {
+        logger.warn(`Failed to check enrollment in getCourseLessons: ${error.message}`);
+      }
+    }
+
     const lessons = await prisma.lesson.findMany({
       where: {
         courseId,
-        ...(includeUnpublished ? {} : { isPreview: true }),
+        ...(includeUnpublished || isEnrolled ? {} : { isPreview: true }),
       },
       orderBy: { order: 'asc' },
     });
+
+    if (!includeUnpublished && !isEnrolled) {
+      return lessons.map(l => ({ ...l, videoUrl: '' }));
+    }
 
     return lessons;
   }

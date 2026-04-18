@@ -5,9 +5,10 @@ import { FiCheckCircle, FiClock, FiXCircle, FiPackage, FiCreditCard } from 'reac
 interface OrderDetailProps {
   order: Order;
   onCancel?: () => void;
+  onPay?: () => void;
 }
 
-export const OrderDetail = ({ order, onCancel }: OrderDetailProps) => {
+export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
   const getStatusIcon = (status: Order['status']) => {
     switch (status) {
       case 'COMPLETED':
@@ -138,14 +139,24 @@ export const OrderDetail = ({ order, onCancel }: OrderDetailProps) => {
         )}
 
         {/* Actions */}
-        {order.status === 'PENDING' && onCancel && (
-          <div className="border-t pt-4 mt-4">
-            <button
-              onClick={onCancel}
-              className="text-red-600 hover:text-red-700 font-medium"
-            >
-              Cancel Order
-            </button>
+        {order.status === 'PENDING' && (onCancel || onPay) && (
+          <div className="border-t pt-4 mt-4 flex justify-end space-x-4">
+            {onCancel && (
+              <button
+                onClick={onCancel}
+                className="btn-secondary text-red-600 hover:text-red-700"
+              >
+                Hủy đơn hàng
+              </button>
+            )}
+            {onPay && (
+              <button
+                onClick={onPay}
+                className="btn-primary"
+              >
+                Thanh toán ngay
+              </button>
+            )}
           </div>
         )}
       </div>

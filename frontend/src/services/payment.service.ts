@@ -96,6 +96,11 @@ export const paymentService = {
     return response.data.data;
   },
 
+  async getPaymentByOrder(orderId: string): Promise<PaymentIntent> {
+    const response = await paymentApi.get(`/api/payments/order/${orderId}`);
+    return response.data.data;
+  },
+
   async confirmPayment(data: ConfirmPaymentData): Promise<Payment> {
     const response = await paymentApi.post('/api/payments/confirm', data);
     return response.data.data;

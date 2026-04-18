@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { CourseService } from '../services/course.service';
 import { HTTP_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from '../utils/constants';
@@ -361,6 +361,35 @@ export class CourseController {
     } catch (error: any) {
       logger.error('Get course students error:', error);
       res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
+    }
+  }
+
+  static async getBatchCourses(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids)) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'ids array is required in the request body' });
+      }
+
+      const courses = await CourseService.getBatchCourses(ids);
+      res.status(HTTP_STATUS.OK).json({ data: courses });
+    } catch (error: any) {
+      logger.error('Get batch courses error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to fetch batch courses' });
+    }
+  }
+
+  static async incrementEnrollment(req: Request, res: Response) {
+    try {
+      const { courseId } = req.params;
+      await CourseService.incrementEnrollment(courseId);
+      res.status(HTTP_STATUS.OK).json({ message: 'Enrollment incremented' });
+    } catch (error: any) {
+      logger.error('Increment enrollment error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to increment enrollment' });
     }
   }
 

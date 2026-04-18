@@ -91,6 +91,13 @@ app.get(
   PaymentController.getUserPayments
 );
 
+// Get payment by orderId (must be before :paymentId routes)
+app.get(
+  '/api/payments/order/:orderId',
+  authenticateToken,
+  PaymentController.getPaymentByOrder
+);
+
 app.get(
   '/api/payments/me/:paymentId',
   authenticateToken,
@@ -149,6 +156,22 @@ app.get(
   validatePaymentId,
   handleValidationErrors,
   PaymentController.getPaymentById
+);
+// ==================== Internal Service-to-Service Routes ====================
+// These routes are called by other microservices (no user auth required)
+
+app.post(
+  '/api/payments/internal/create-intent',
+  validateCreatePaymentIntent,
+  handleValidationErrors,
+  PaymentController.createPaymentIntentInternal
+);
+
+app.post(
+  '/api/payments/internal/confirm',
+  validateConfirmPayment,
+  handleValidationErrors,
+  PaymentController.confirmPaymentInternal
 );
 
 // 404 handler

@@ -45,7 +45,8 @@ export default function Header() {
   ];
 
   const studentMenu = [
-    { name: 'Góc học tập', href: '/my-learning', icon: FiBookOpen },
+    { name: 'Khóa học đã mua', href: '/purchased-courses', icon: FiBookOpen },
+    { name: 'Góc học tập', href: '/my-learning', icon: FiActivity },
     { name: 'Chứng chỉ', href: '/certificates', icon: FiAward },
     { name: 'Huy chương', href: '/badges', icon: FiAward },
     { name: 'Hoạt động', href: '/activity', icon: FiActivity },
