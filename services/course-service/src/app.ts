@@ -126,6 +126,18 @@ app.get(
   CourseController.getMyCourses
 );
 
+app.post(
+  '/api/courses/batch',
+  authenticateToken,
+  CourseController.getBatchCourses
+);
+
+// Internal route for other services
+app.post(
+  '/api/courses/:courseId/increment-enrollment',
+  CourseController.incrementEnrollment
+);
+
 // Dynamic param route - MUST be after /slug/:slug and /me
 app.get('/api/courses/:courseId', authenticateOptional, validateCourseId, handleValidationErrors, CourseController.getCourseById);
 

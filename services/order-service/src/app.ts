@@ -97,6 +97,12 @@ app.get(
   OrderController.getUserOrders
 );
 
+// Internal webhook endpoint (service-to-service, no user auth)
+app.post(
+  '/api/orders/webhook/payment',
+  OrderController.handlePaymentWebhook
+);
+
 app.get(
   '/api/orders/me/:orderId',
   authenticateToken,
@@ -194,11 +200,7 @@ app.get(
   OrderController.getOrderById
 );
 
-// Internal webhook endpoint (service-to-service, no user auth)
-app.post(
-  '/api/orders/webhook/payment',
-  OrderController.handlePaymentWebhook
-);
+
 
 // 404 handler
 app.use((req, res) => {

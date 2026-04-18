@@ -20,6 +20,7 @@ import Cart from './pages/Cart'
 import Orders from './pages/Orders'
 import OrderDetail from './pages/OrderDetail'
 import Checkout from './pages/Checkout'
+import CheckoutSuccess from './pages/CheckoutSuccess'
 import BecomeInstructor from './pages/BecomeInstructor'
 import Payments from './pages/Payments'
 import AdminPayments from './pages/AdminPayments'
@@ -29,6 +30,7 @@ import AdminCourses from './pages/AdminCourses'
 import EditCourse from './pages/EditCourse'
 import Learning from './pages/Learning'
 import MyLearning from './pages/MyLearning'
+import PurchasedCourses from './pages/PurchasedCourses'
 import Certificates from './pages/Certificates'
 import Badges from './pages/Badges'
 import Activity from './pages/Activity'
@@ -118,6 +120,11 @@ function App() {
               <Checkout />
             </ProtectedRoute>
           } />
+          <Route path="/checkout/success/:orderId" element={
+            <ProtectedRoute>
+              <CheckoutSuccess />
+            </ProtectedRoute>
+          } />
           <Route path="/payments" element={
             <ProtectedRoute>
               <Payments />
@@ -158,6 +165,11 @@ function App() {
           <Route path="/my-learning" element={
             <ProtectedRoute>
               <MyLearning />
+            </ProtectedRoute>
+          } />
+          <Route path="/purchased-courses" element={
+            <ProtectedRoute>
+              <PurchasedCourses />
             </ProtectedRoute>
           } />
           <Route path="/certificates" element={

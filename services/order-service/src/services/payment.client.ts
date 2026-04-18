@@ -23,7 +23,7 @@ export class PaymentClient {
 
   static async createPaymentIntent(data: CreatePaymentIntentRequest): Promise<PaymentIntent> {
     try {
-      const response = await axios.post(`${this.baseUrl}/api/payments/intents`, {
+      const response = await axios.post(`${this.baseUrl}/api/payments/internal/create-intent`, {
         orderId: data.orderId,
         orderNumber: data.orderNumber,
         userId: data.userId,
@@ -42,7 +42,7 @@ export class PaymentClient {
 
   static async confirmPayment(paymentIntentId: string, paymentMethodId: string) {
     try {
-      const response = await axios.post(`${this.baseUrl}/api/payments/confirm`, {
+      const response = await axios.post(`${this.baseUrl}/api/payments/internal/confirm`, {
         paymentIntentId,
         paymentMethodId,
       });

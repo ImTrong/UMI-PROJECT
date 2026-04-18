@@ -91,16 +91,26 @@ export class PaymentService {
   static async confirmPayment(data: ConfirmPaymentData) {
     const { paymentIntentId, paymentMethodId } = data;
 
+    // Check if paymentIntentId is a MongoDB ObjectId (24 hex chars) or a Stripe ID (pi_...)
+    const isObjectId = /^[0-9a-fA-F]{24}$/.test(paymentIntentId);
+
     // Find payment in database
     const payment = await prisma.payment.findFirst({
-      where: { stripePaymentIntentId: paymentIntentId },
+      where: isObjectId 
+        ? { id: paymentIntentId } 
+        : { stripePaymentIntentId: paymentIntentId },
     });
 
     if (!payment) {
       throw new Error(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
     }
 
-    if (payment.status !== PaymentStatus.PENDING) {
+    // If already succeeded, return it directly
+    if (payment.status === PaymentStatus.SUCCEEDED) {
+      return payment;
+    }
+
+    if (payment.status !== PaymentStatus.PENDING && payment.status !== PaymentStatus.PROCESSING) {
       throw new Error(ERROR_MESSAGES.PAYMENT_ALREADY_PROCESSED);
     }
 
@@ -111,8 +121,13 @@ export class PaymentService {
     });
 
     try {
-      // Confirm with Stripe
-      const stripePayment = await StripeService.confirmPayment(paymentIntentId, paymentMethodId);
+      // Verify payment status from Stripe (frontend already confirmed via stripe.confirmCardPayment)
+      // Make sure we pass the Stripe ID, not the internal MongoDB ID
+      const stripePaymentId = payment.stripePaymentIntentId;
+      if (!stripePaymentId) {
+          throw new Error('Payment does not have a valid Stripe intent ID');
+      }
+      const stripePayment = await StripeService.getPaymentIntent(stripePaymentId);
 
       let newStatus: PaymentStatus;
       let completedAt = null;
@@ -129,6 +144,8 @@ export class PaymentService {
         }
       } else if (stripePayment.status === 'requires_payment_method') {
         newStatus = PaymentStatus.FAILED;
+      } else if (stripePayment.status === 'canceled') {
+        newStatus = PaymentStatus.CANCELLED;
       } else {
         newStatus = PaymentStatus.PENDING;
       }
@@ -163,6 +180,30 @@ export class PaymentService {
 
       throw error;
     }
+  }
+
+  static async getPaymentByOrder(orderId: string, userId: string) {
+    const payment = await prisma.payment.findFirst({
+      where: {
+        orderId,
+        userId,
+        status: { in: [PaymentStatus.PENDING, PaymentStatus.PROCESSING] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!payment) {
+      throw new Error(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
+    }
+
+    return {
+      id: payment.id,
+      stripePaymentIntentId: payment.stripePaymentIntentId,
+      clientSecret: payment.clientSecret,
+      amount: payment.amount,
+      currency: payment.currency,
+      status: payment.status,
+    };
   }
 
   static async getPaymentById(paymentId: string, userId: string, isAdmin: boolean = false) {

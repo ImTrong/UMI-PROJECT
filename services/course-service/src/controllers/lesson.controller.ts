@@ -89,7 +89,15 @@ export class LessonController {
       const { courseId } = req.params;
       const includeUnpublished = req.user?.role === 'INSTRUCTOR' || req.user?.role === 'ADMIN';
 
-      const lessons = await LessonService.getCourseLessons(courseId, includeUnpublished);
+      const authHeader = req.headers.authorization;
+      const token = authHeader && authHeader.split(' ')[1];
+
+      const lessons = await LessonService.getCourseLessons(
+        courseId, 
+        includeUnpublished,
+        req.user?.userId,
+        token
+      );
 
       res.status(HTTP_STATUS.OK).json({
         data: lessons,

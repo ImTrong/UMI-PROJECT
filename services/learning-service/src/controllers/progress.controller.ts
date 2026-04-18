@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Response, Request } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { ProgressService } from '../services/progress.service';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/constants';
@@ -32,6 +32,23 @@ export class ProgressController {
         return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
       }
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get course progress' });
+    }
+  }
+
+  static async getEnrolledCourses(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const filter = req.query.filter as string | undefined;
+
+      const result = await ProgressService.getEnrolledCourses(req.user.userId, page, limit, filter);
+      res.status(HTTP_STATUS.OK).json(result);
+    } catch (error: any) {
+      logger.error('Get enrolled courses error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get enrolled courses' });
     }
   }
 
@@ -75,6 +92,23 @@ export class ProgressController {
         return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
       }
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to enroll in course' });
+    }
+  }
+
+  static async enrollInCourseInternal(req: Request, res: Response) {
+    try {
+      const { courseId } = req.params;
+      const { userId } = req.body;
+      
+      if (!userId) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'userId is required' });
+      }
+
+      const enrollment = await ProgressService.enrollInCourse(userId, courseId);
+      res.status(HTTP_STATUS.CREATED).json({ message: 'Successfully enrolled in course internally', data: enrollment });
+    } catch (error: any) {
+      logger.error('Internal enroll in course error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to enroll in course internally' });
     }
   }
 

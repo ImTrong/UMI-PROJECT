@@ -175,6 +175,12 @@ export const courseService = {
     return response.data;
   },
 
+  async getBatchCourses(ids: string[]): Promise<Course[]> {
+    if (!ids || ids.length === 0) return [];
+    const response = await courseApi.post('/api/courses/batch', { ids });
+    return response.data.data;
+  },
+
   // Lessons
   async getCourseLessons(courseId: string): Promise<Lesson[]> {
     const response = await courseApi.get(`/api/courses/${courseId}/lessons`);

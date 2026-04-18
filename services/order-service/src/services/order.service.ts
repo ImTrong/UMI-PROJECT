@@ -140,8 +140,14 @@ export class OrderService {
 
     logger.info(`Order created: ${orderNumber} for user ${userId}`);
     
+    // Refetch order with orderItems included
+    const fullOrder = await prisma.order.findUnique({
+      where: { id: order.id },
+      include: { orderItems: true },
+    });
+
     return {
-      order,
+      order: fullOrder || order,
       paymentIntent,
     };
   }
@@ -414,12 +420,12 @@ export class OrderService {
   }
 
   private static async enrollUserInCourses(userId: string, items: any[]) {
-    // Call course service to enroll user
-    const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://localhost:3003';
+    // Call learning service to enroll user
+    const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://learning-service:3006';
     
     for (const item of items) {
       try {
-        await axios.post(`${courseServiceUrl}/api/courses/${item.courseId}/enroll`, {
+        await axios.post(`${learningServiceUrl}/api/learning/internal/courses/${item.courseId}/enroll`, {
           userId,
         });
         logger.info(`User ${userId} enrolled in course ${item.courseId}`);
@@ -508,13 +514,9 @@ export class OrderService {
           try {
             const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:3006';
             await axios.post(
-              `${learningServiceUrl}/api/learning/courses/${item.courseId}/enroll`,
-              {},
+              `${learningServiceUrl}/api/learning/internal/courses/${item.courseId}/enroll`,
               {
-                headers: {
-                  'x-user-id': order.userId,
-                  'x-user-role': 'STUDENT',
-                },
+                userId: order.userId,
               }
             );
 

@@ -578,6 +578,26 @@ export class CourseService {
     };
   }
 
+  static async getBatchCourses(ids: string[]) {
+    if (!ids || ids.length === 0) {
+      return [];
+    }
+    
+    const courses = await prisma.course.findMany({
+      where: {
+        id: { in: ids }
+      },
+      include: {
+        category: true,
+        _count: {
+          select: { lessons: true, reviews: true }
+        }
+      }
+    });
+    
+    return courses;
+  }
+
   static async healthCheck() {
     try {
       await prisma.$runCommandRaw({ ping: 1 });

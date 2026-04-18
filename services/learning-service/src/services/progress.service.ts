@@ -54,6 +54,39 @@ export class ProgressService {
     return courseProgress;
   }
 
+  static async getEnrolledCourses(userId: string, page: number = 1, limit: number = 10, filter?: string) {
+    const skip = (page - 1) * limit;
+
+    // Filter logic can be added here if needed in future (e.g., filter by 'completed' or 'in-progress')
+    const whereClause: any = { userId };
+    if (filter === 'completed') {
+      whereClause.completedAt = { not: null };
+    } else if (filter === 'in-progress') {
+      whereClause.completedAt = null;
+    }
+
+    const total = await prisma.courseProgress.count({
+      where: whereClause
+    });
+
+    const courses = await prisma.courseProgress.findMany({
+      where: whereClause,
+      skip,
+      take: limit,
+      orderBy: { lastAccessedAt: 'desc' }
+    });
+
+    return {
+      courses,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  }
+
   static async markLessonComplete(data: LessonCompleteData) {
     const { userId, courseId, lessonId, timeSpentSeconds = 0 } = data;
 

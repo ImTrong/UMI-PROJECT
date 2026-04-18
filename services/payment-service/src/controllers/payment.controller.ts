@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { PaymentService } from '../services/payment.service';
 import { HTTP_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from '../utils/constants';
@@ -44,6 +44,46 @@ export class PaymentController {
     }
   }
 
+  // Internal endpoint for service-to-service calls (no user auth, userId from body)
+  static async createPaymentIntentInternal(req: AuthRequest, res: Response) {
+    try {
+      const { orderId, orderNumber, userId, amount, currency, type, metadata } = req.body;
+
+      if (!userId) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'userId is required',
+        });
+      }
+
+      const paymentIntent = await PaymentService.createPaymentIntent({
+        orderId,
+        orderNumber,
+        userId,
+        amount,
+        currency,
+        type,
+        metadata,
+      });
+
+      res.status(HTTP_STATUS.CREATED).json({
+        message: SUCCESS_MESSAGES.PAYMENT_INTENT_CREATED,
+        data: paymentIntent,
+      });
+    } catch (error: any) {
+      logger.error('Internal create payment intent error:', error);
+
+      if (error.message === ERROR_MESSAGES.PAYMENT_ALREADY_PROCESSED) {
+        return res.status(HTTP_STATUS.CONFLICT).json({
+          error: error.message,
+        });
+      }
+
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to create payment intent',
+      });
+    }
+  }
+
   static async confirmPayment(req: AuthRequest, res: Response) {
     try {
       if (!req.user) {
@@ -67,6 +107,27 @@ export class PaymentController {
       logger.error('Confirm payment error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: error.message || 'Failed to confirm payment',
+      });
+    }
+  }
+
+  static async confirmPaymentInternal(req: Request, res: Response) {
+    try {
+      const { paymentIntentId, paymentMethodId } = req.body;
+
+      const payment = await PaymentService.confirmPayment({
+        paymentIntentId,
+        paymentMethodId,
+      });
+
+      res.status(HTTP_STATUS.OK).json({
+        message: SUCCESS_MESSAGES.PAYMENT_CONFIRMED,
+        data: payment,
+      });
+    } catch (error: any) {
+      logger.error('Internal confirm payment error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: error.message || 'Failed to confirm payment internally',
       });
     }
   }
@@ -103,6 +164,35 @@ export class PaymentController {
 
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to get payment',
+      });
+    }
+  }
+
+  static async getPaymentByOrder(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+          error: ERROR_MESSAGES.UNAUTHORIZED,
+        });
+      }
+
+      const { orderId } = req.params;
+      const payment = await PaymentService.getPaymentByOrder(orderId, req.user.userId);
+
+      res.status(HTTP_STATUS.OK).json({
+        data: payment,
+      });
+    } catch (error: any) {
+      logger.error('Get payment by order error:', error);
+
+      if (error.message === ERROR_MESSAGES.PAYMENT_NOT_FOUND) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({
+          error: error.message,
+        });
+      }
+
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to get payment for order',
       });
     }
   }
