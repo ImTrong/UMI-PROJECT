@@ -25,6 +25,36 @@ export interface UpdateLessonData {
 }
 
 export class LessonService {
+  static async getCourseLessonsInternal(courseId: string) {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+
+    if (!course) {
+      throw new Error(ERROR_MESSAGES.COURSE_NOT_FOUND);
+    }
+
+    return prisma.lesson.findMany({
+      where: { courseId },
+      orderBy: { order: 'asc' },
+    });
+  }
+
+  static async getLessonByIdInternal(courseId: string, lessonId: string) {
+    const lesson = await prisma.lesson.findFirst({
+      where: {
+        id: lessonId,
+        courseId,
+      },
+    });
+
+    if (!lesson) {
+      throw new Error(ERROR_MESSAGES.LESSON_NOT_FOUND);
+    }
+
+    return lesson;
+  }
+
   static async createLesson(data: CreateLessonData) {
     const { courseId, order } = data;
 
@@ -180,7 +210,10 @@ export class LessonService {
     });
 
     if (!includeUnpublished && !isEnrolled) {
-      return lessons.map(l => ({ ...l, videoUrl: '' }));
+      return lessons.map(l => ({ 
+        ...l, 
+        videoUrl: l.isPreview ? l.videoUrl : '' 
+      }));
     }
 
     return lessons;

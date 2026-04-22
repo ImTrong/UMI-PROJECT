@@ -15,6 +15,7 @@ import {
   FiBarChart2
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { formatVND } from '../utils/currency';
 
 export default function InstructorDashboard() {
   const { user } = useAuth();
@@ -128,7 +129,7 @@ export default function InstructorDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Tổng doanh thu</p>
-              <p className="text-2xl font-bold">${stats.totalRevenue.toFixed(2)}</p>
+              <p className="text-2xl font-bold">{formatVND(stats.totalRevenue)}</p>
             </div>
             <FiDollarSign className="text-3xl text-primary-500" />
           </div>
@@ -179,7 +180,7 @@ export default function InstructorDashboard() {
                       </div>
                     </td>
                     <td className="py-3 px-4">{course.enrolledCount}</td>
-                    <td className="py-3 px-4">${course.price.toFixed(2)}</td>
+                    <td className="py-3 px-4">{formatVND(course.price)}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center">
                         <span className="mr-1">{course.rating.toFixed(1)}</span>
@@ -238,6 +239,13 @@ export default function InstructorDashboard() {
                           title="Phân tích"
                         >
                           <FiBarChart2 size={16} />
+                        </Link>
+                        <Link
+                          to={`/instructor/course/${course.id}/students`}
+                          className="p-1 text-gray-500 hover:text-blue-600"
+                          title="Quản lý học viên"
+                        >
+                          <FiUsers size={16} />
                         </Link>
                       </div>
                     </td>

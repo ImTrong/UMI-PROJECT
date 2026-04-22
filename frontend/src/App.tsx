@@ -23,10 +23,6 @@ import Checkout from './pages/Checkout'
 import CheckoutSuccess from './pages/CheckoutSuccess'
 import BecomeInstructor from './pages/BecomeInstructor'
 import Payments from './pages/Payments'
-import AdminPayments from './pages/AdminPayments'
-import AdminUsers from './pages/AdminUsers'
-import AdminCategories from './pages/AdminCategories'
-import AdminCourses from './pages/AdminCourses'
 import EditCourse from './pages/EditCourse'
 import Learning from './pages/Learning'
 import MyLearning from './pages/MyLearning'
@@ -34,7 +30,10 @@ import PurchasedCourses from './pages/PurchasedCourses'
 import Certificates from './pages/Certificates'
 import Badges from './pages/Badges'
 import Activity from './pages/Activity'
+import MyTasks from './pages/MyTasks'
 import AssignmentSubmissions from './pages/instructor/AssignmentSubmissions'
+import CourseStudents from './pages/instructor/CourseStudents'
+import CourseStudentDetail from './pages/instructor/CourseStudentDetail'
 
 function App() {
   const { isAuthenticated, loading } = useAuth()
@@ -130,26 +129,6 @@ function App() {
               <Payments />
             </ProtectedRoute>
           } />
-          <Route path="/admin/payments" element={
-            <ProtectedRoute requiredRole="ADMIN">
-              <AdminPayments />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/users" element={
-            <ProtectedRoute requiredRole="ADMIN">
-              <AdminUsers />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/categories" element={
-            <ProtectedRoute requiredRole="ADMIN">
-              <AdminCategories />
-            </ProtectedRoute>
-          } />
-          <Route path="/admin/courses" element={
-            <ProtectedRoute requiredRole="ADMIN">
-              <AdminCourses />
-            </ProtectedRoute>
-          } />
           <Route path="/courses/:slug/edit" element={
             <ProtectedRoute>
               <EditCourse />
@@ -187,11 +166,26 @@ function App() {
               <Activity />
             </ProtectedRoute>
           } />
+          <Route path="/tasks" element={
+            <ProtectedRoute>
+              <MyTasks />
+            </ProtectedRoute>
+          } />
           
           {/* Instructor Routes */}
           <Route path="/instructor/assignments/:assignmentId/submissions" element={
             <ProtectedRoute requiredRole="INSTRUCTOR">
               <AssignmentSubmissions />
+            </ProtectedRoute>
+          } />
+          <Route path="/instructor/course/:courseId/students" element={
+            <ProtectedRoute requiredRole="INSTRUCTOR">
+              <CourseStudents />
+            </ProtectedRoute>
+          } />
+          <Route path="/instructor/course/:courseId/students/:studentId" element={
+            <ProtectedRoute requiredRole="INSTRUCTOR">
+              <CourseStudentDetail />
             </ProtectedRoute>
           } />
         </Routes>

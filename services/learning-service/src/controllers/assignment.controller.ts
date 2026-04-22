@@ -60,10 +60,10 @@ export class AssignmentController {
         assignmentId,
         userId: req.user.userId,
         courseId: req.body.courseId,
-        content: req.body.content,
-        fileUrl: req.body.fileUrl,
+        content: req.body.content || req.body.submissionText,
+        fileUrl: req.body.fileUrl || (Array.isArray(req.body.fileUrls) ? req.body.fileUrls[0] : undefined),
         fileKey: req.body.fileKey,
-        fileName: req.body.fileName,
+        fileName: req.body.fileName || (Array.isArray(req.body.fileUrls) && req.body.fileUrls.length > 0 ? req.body.fileUrls[0].split('/').pop() : undefined),
       });
       res.status(HTTP_STATUS.CREATED).json({ message: 'Assignment submitted', data: submission });
     } catch (error: any) {
@@ -116,6 +116,9 @@ export class AssignmentController {
       if (!req.user) return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       const { assignmentId } = req.params;
       const submission = await AssignmentService.getUserSubmission(assignmentId, req.user.userId);
+      if (!submission) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'Submission not found' });
+      }
       res.status(HTTP_STATUS.OK).json({ data: submission });
     } catch (error: any) {
       logger.error('Get user submission error:', error);
@@ -127,8 +130,8 @@ export class AssignmentController {
     try {
       if (!req.user) return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       const { assignmentId } = req.params;
-      const { fileName, mimeType } = req.body;
-      const result = await AssignmentService.getUploadUrl(assignmentId, fileName, mimeType);
+      const { fileName, mimeType, contentType } = req.body;
+      const result = await AssignmentService.getUploadUrl(assignmentId, fileName, mimeType || contentType);
       res.status(HTTP_STATUS.OK).json({ data: result });
     } catch (error: any) {
       logger.error('Get upload URL error:', error);

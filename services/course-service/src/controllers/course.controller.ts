@@ -41,8 +41,10 @@ export class CourseController {
     try {
       const { courseId } = req.params;
       const user = req.user ? { userId: req.user.userId, role: req.user.role || 'STUDENT' } : undefined;
+      const authHeader = req.headers.authorization;
+      const token = authHeader && authHeader.split(' ')[1];
 
-      const course = await CourseService.getCourseById(courseId, user);
+      const course = await CourseService.getCourseById(courseId, user, token);
 
       res.status(HTTP_STATUS.OK).json({
         data: course,
@@ -72,8 +74,10 @@ export class CourseController {
     try {
       const { slug } = req.params;
       const user = req.user ? { userId: req.user.userId, role: req.user.role || 'STUDENT' } : undefined;
+      const authHeader = req.headers.authorization;
+      const token = authHeader && authHeader.split(' ')[1];
 
-      const course = await CourseService.getCourseBySlug(slug, user);
+      const course = await CourseService.getCourseBySlug(slug, user, token);
 
       res.status(HTTP_STATUS.OK).json({
         data: course,
@@ -361,6 +365,27 @@ export class CourseController {
     } catch (error: any) {
       logger.error('Get course students error:', error);
       res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
+    }
+  }
+
+  static async getCourseStudentDetail(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user || (req.user.role !== 'INSTRUCTOR' && req.user.role !== 'ADMIN')) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: 'Instructor access required' });
+      }
+      const { courseId, studentId } = req.params;
+      const result = await CourseService.getInstructorStudentDetail(courseId, studentId, req.user.userId);
+      res.status(HTTP_STATUS.OK).json({ data: result });
+    } catch (error: any) {
+      logger.error('Get student detail error:', error);
+      if (
+        error.message === ERROR_MESSAGES.COURSE_NOT_FOUND ||
+        error.message === ERROR_MESSAGES.FORBIDDEN ||
+        error.message === 'Student progress not found'
+      ) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get student detail' });
     }
   }
 

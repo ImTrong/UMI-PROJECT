@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Order } from '../../services/order.service';
 import { formatDistanceToNow } from 'date-fns';
+import { formatVND } from '../../utils/currency';
 
 interface OrderCardProps {
   order: Order;
@@ -55,7 +56,7 @@ export const OrderCard = ({ order, onCancel, canCancel }: OrderCardProps) => {
         </div>
         <div className="text-right">
           <p className="text-lg font-bold text-primary-600">
-            ${order.totalPrice.toFixed(2)}
+            {formatVND(order.totalPrice)}
           </p>
           <div className="flex space-x-2 mt-1">
             <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(order.status)}`}>
@@ -73,7 +74,7 @@ export const OrderCard = ({ order, onCancel, canCancel }: OrderCardProps) => {
         {order.items.slice(0, 3).map((item, index) => (
           <div key={index} className="flex justify-between text-sm">
             <span className="text-gray-600">{item.courseTitle}</span>
-            <span className="text-gray-900">${item.finalPrice.toFixed(2)}</span>
+            <span className="text-gray-900">{formatVND(item.finalPrice)}</span>
           </div>
         ))}
         {order.items.length > 3 && (

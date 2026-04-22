@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { FiDollarSign, FiTrendingUp, FiRefreshCw } from 'react-icons/fi';
+import { formatVND } from '../utils/currency';
 
 export default function AdminPayments() {
   const { user } = useAuth();
@@ -88,7 +89,7 @@ export default function AdminPayments() {
               <div>
                 <p className="text-sm text-gray-500">Tổng Doanh thu</p>
                 <p className="text-2xl font-bold text-gray-900">
-                  ${stats.totalRevenue.toFixed(2)}
+                  {formatVND(stats.totalRevenue)}
                 </p>
               </div>
             </div>
@@ -141,7 +142,7 @@ export default function AdminPayments() {
                     <p className="text-xs text-gray-500">Người dùng: {payment.userId.slice(-8)}</p>
                   </div>
                 </td>
-                <td className="py-3 px-4 font-medium">${payment.amount.toFixed(2)}</td>
+                <td className="py-3 px-4 font-medium">{formatVND(payment.amount)}</td>
                 <td className="py-3 px-4">
                   <span className={`text-xs px-2 py-1 rounded-full ${
                     payment.status === 'SUCCEEDED' ? 'bg-green-100 text-green-700' :

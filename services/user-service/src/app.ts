@@ -56,6 +56,8 @@ app.get('/api/users/health', UserController.healthCheck);
 // ==================== User Profile Routes ====================
 
 // Public routes (with authentication)
+app.post('/api/users/batch', UserController.getBatchUsers);
+
 app.get(
   '/api/users',
   authenticateToken,

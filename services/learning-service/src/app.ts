@@ -8,10 +8,12 @@ import { BadgeController } from './controllers/badge.controller';
 import { ActivityController } from './controllers/activity.controller';
 import { QuizController } from './controllers/quiz.controller';
 import { AssignmentController } from './controllers/assignment.controller';
+import { TaskController } from './controllers/task.controller';
 import { authenticateToken } from './middleware/auth.middleware';
 import {
   validateLessonComplete,
   validateCourseId,
+  validateUserId,
   validatePagination,
   handleValidationErrors,
 } from './middleware/validation.middleware';
@@ -41,8 +43,12 @@ app.get('/api/learning/health', ProgressController.healthCheck);
 
 // Progress routes
 app.get('/api/learning/progress/me', authenticateToken, ProgressController.getUserProgress);
+app.get('/api/learning/stats', authenticateToken, ProgressController.getLearningStats);
+app.post('/api/learning/sync-enrollments', authenticateToken, ProgressController.syncEnrollments);
 app.get('/api/learning/courses/enrolled', authenticateToken, validatePagination, handleValidationErrors, ProgressController.getEnrolledCourses);
 app.get('/api/learning/progress/course/:courseId', authenticateToken, validateCourseId, handleValidationErrors, ProgressController.getCourseProgress);
+app.get('/api/learning/progress/course/:courseId/students', validateCourseId, handleValidationErrors, ProgressController.getCourseStudents);
+app.get('/api/learning/progress/course/:courseId/students/:userId', validateCourseId, validateUserId, handleValidationErrors, ProgressController.getStudentCourseProgress);
 app.post('/api/learning/progress/:courseId/:lessonId/complete', authenticateToken, validateLessonComplete, handleValidationErrors, ProgressController.markLessonComplete);
 app.post('/api/learning/courses/:courseId/enroll', authenticateToken, validateCourseId, handleValidationErrors, ProgressController.enrollInCourse);
 
@@ -81,6 +87,10 @@ app.post('/api/learning/assignment/:assignmentId/upload-url', authenticateToken,
 app.get('/api/learning/assignment/:assignmentId/submissions', authenticateToken, AssignmentController.getSubmissions);
 app.get('/api/learning/assignment/:assignmentId/submission/me', authenticateToken, AssignmentController.getUserSubmission);
 app.put('/api/learning/assignment/submission/:submissionId/grade', authenticateToken, AssignmentController.gradeSubmission);
+
+// ==================== Task Routes ====================
+app.get('/api/learning/course/:courseId/tasks', authenticateToken, TaskController.getCourseTasks);
+app.get('/api/learning/tasks/pending', authenticateToken, TaskController.getUserTasks);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });

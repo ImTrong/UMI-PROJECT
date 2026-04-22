@@ -41,7 +41,7 @@ export const authenticateToken = async (
 
     // Fetch role from user-service so controllers can check req.user.role
     try {
-      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
       const userResponse = await axios.get(`${userServiceUrl}/api/users/${req.user.userId}`, {
         headers: { Authorization: authHeader! },
       });
@@ -65,7 +65,7 @@ export const requireRole = (roles: string[]) => {
     }
 
     try {
-      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
       const authHeader = req.headers.authorization;
       const response: AxiosResponse<{ data: { role: string } }> = 
         await axios.get(`${userServiceUrl}/api/users/${req.user.userId}`, {

@@ -274,7 +274,10 @@ export class AssignmentService {
         fileName,
         mimeType,
       });
-      return result;
+      return {
+        uploadUrl: result.uploadUrl,
+        fileUrl: result.fileUrl || result.publicUrl,
+      };
     } catch (error) {
       logger.error('File storage unavailable:', error);
       throw new Error('File upload service is not available');

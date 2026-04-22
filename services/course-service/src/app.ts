@@ -106,6 +106,7 @@ app.post('/api/courses/:courseId/reject', authenticateToken, requireRole(['ADMIN
 // Instructor Dashboard routes
 app.get('/api/courses/instructor/dashboard', authenticateToken, requireInstructorOrAdmin, CourseController.getInstructorDashboard);
 app.get('/api/courses/instructor/:courseId/students', authenticateToken, requireInstructorOrAdmin, validateCourseId, handleValidationErrors, CourseController.getCourseStudents);
+app.get('/api/courses/instructor/:courseId/students/:studentId', authenticateToken, requireInstructorOrAdmin, validateCourseId, handleValidationErrors, CourseController.getCourseStudentDetail);
 
 app.get('/api/courses/slug/:slug', authenticateOptional, CourseController.getCourseBySlug);
 
@@ -136,6 +137,19 @@ app.post(
 app.post(
   '/api/courses/:courseId/increment-enrollment',
   CourseController.incrementEnrollment
+);
+app.get(
+  '/api/courses/internal/:courseId/lessons',
+  validateCourseId,
+  handleValidationErrors,
+  LessonController.getCourseLessonsInternal
+);
+app.get(
+  '/api/courses/internal/:courseId/lessons/:lessonId',
+  validateCourseId,
+  validateLessonId,
+  handleValidationErrors,
+  LessonController.getLessonByIdInternal
 );
 
 // Dynamic param route - MUST be after /slug/:slug and /me

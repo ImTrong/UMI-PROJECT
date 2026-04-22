@@ -62,7 +62,11 @@ export const requireRole = (roles: string[]) => {
     // Get user role from user service
     try {
       const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
-      const response = await axios.get(`${userServiceUrl}/api/users/${req.user.userId}`);
+      const response = await axios.get(`${userServiceUrl}/api/users/${req.user.userId}`, {
+        headers: {
+          Authorization: req.headers.authorization,
+        },
+      });
       const userRole = response.data.data.role;
 
       if (!roles.includes(userRole)) {

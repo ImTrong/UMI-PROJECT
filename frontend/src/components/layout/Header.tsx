@@ -15,7 +15,8 @@ import {
   FiGrid,
   FiSearch,
   FiX,
-  FiChevronDown
+  FiChevronDown,
+  FiCheckSquare
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 
@@ -46,6 +47,7 @@ export default function Header() {
 
   const studentMenu = [
     { name: 'Khóa học đã mua', href: '/purchased-courses', icon: FiBookOpen },
+    { name: 'Bài tập & Trắc nghiệm', href: '/tasks', icon: FiCheckSquare },
     { name: 'Góc học tập', href: '/my-learning', icon: FiActivity },
     { name: 'Chứng chỉ', href: '/certificates', icon: FiAward },
     { name: 'Huy chương', href: '/badges', icon: FiAward },

@@ -70,12 +70,12 @@ export interface Badge {
 
 export interface Question {
   id: string;
-  quizId: string;
-  questionText: string;
-  questionType: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE';
-  options: any[]; // Array of { id, text }
+  text?: string;
+  questionText?: string;
+  type?: 'MULTIPLE_CHOICE' | 'MULTI_SELECT' | 'TRUE_FALSE';
+  questionType?: 'SINGLE_CHOICE' | 'MULTIPLE_CHOICE' | 'TRUE_FALSE';
+  options: Array<{ id: string; text: string }>;
   points: number;
-  orderIndex: number;
 }
 
 export interface Quiz {
@@ -94,9 +94,9 @@ export interface QuizAttempt {
   id: string;
   quizId: string;
   userId: string;
-  status: 'IN_PROGRESS' | 'COMPLETED' | 'TIMED_OUT' | 'ABANDONED';
+  status: 'IN_PROGRESS' | 'SUBMITTED' | 'TIMED_OUT';
   startedAt: string;
-  completedAt?: string;
+  submittedAt?: string;
   score?: number;
   passed?: boolean;
 }
@@ -119,9 +119,10 @@ export interface AssignmentSubmission {
   id: string;
   assignmentId: string;
   userId: string;
-  status: 'DRAFT' | 'SUBMITTED' | 'LATE_SUBMISSION' | 'GRADED' | 'RETURNED';
-  submissionText?: string;
-  fileUrls: string[];
+  status: 'SUBMITTED' | 'GRADING' | 'GRADED' | 'RETURNED';
+  content?: string;
+  fileUrl?: string;
+  fileName?: string;
   submittedAt?: string;
   score?: number;
   feedback?: string;
@@ -137,6 +138,20 @@ export interface ActivityLog {
   durationSeconds: number;
   metadata: any;
   createdAt: string;
+}
+
+export interface TaskItem {
+  id: string;
+  type: 'QUIZ' | 'ASSIGNMENT';
+  title: string;
+  courseId: string;
+  courseTitle?: string;
+  lessonId: string;
+  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'LATE';
+  score?: number;
+  dueDate?: string;
+  maxScore?: number;
+  passingScore?: number;
 }
 
 export interface LearningStats {
@@ -306,7 +321,7 @@ export const learningService = {
     return response.data.data;
   },
 
-  async submitQuiz(attemptId: string, answers: any[]): Promise<{ attempt: QuizAttempt; result: any }> {
+  async submitQuiz(attemptId: string, answers: any[]): Promise<{ attempt: QuizAttempt; results: any }> {
     const response = await learningApi.post(`/api/learning/quiz/attempt/${attemptId}/submit`, { answers });
     return response.data.data;
   },
@@ -322,13 +337,24 @@ export const learningService = {
     return response.data.data;
   },
 
-  async submitAssignment(assignmentId: string, data: { submissionText?: string; fileUrls: string[]; status: 'DRAFT' | 'SUBMITTED' }): Promise<AssignmentSubmission> {
+  async submitAssignment(assignmentId: string, data: { courseId: string; content?: string; fileUrl?: string; fileKey?: string; fileName?: string }): Promise<AssignmentSubmission> {
     const response = await learningApi.post(`/api/learning/assignment/${assignmentId}/submit`, data);
     return response.data.data;
   },
 
   async getMyAssignmentSubmission(assignmentId: string): Promise<AssignmentSubmission> {
-    const response = await learningApi.get(`/api/learning/assignment/${assignmentId}/my-submission`);
+    const response = await learningApi.get(`/api/learning/assignment/${assignmentId}/submission/me`);
+    return response.data.data;
+  },
+
+  // Tasks
+  async getCourseTasks(courseId: string): Promise<Record<string, 'QUIZ' | 'ASSIGNMENT'>> {
+    const response = await learningApi.get(`/api/learning/course/${courseId}/tasks`);
+    return response.data.data;
+  },
+
+  async getPendingTasks(): Promise<TaskItem[]> {
+    const response = await learningApi.get('/api/learning/tasks/pending');
     return response.data.data;
   },
 

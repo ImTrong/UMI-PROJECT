@@ -19,6 +19,7 @@ import {
 } from 'react-icons/fi';
 import { courseService, Course, Category, CourseFilters } from '../services/course.service';
 import { useDebounce } from '../hooks/useDebounce';
+import { formatVND } from '../utils/currency';
 
 // ─── View mode ───
 type ViewMode = 'grid' | 'list';
@@ -43,10 +44,10 @@ const LEVEL_OPTIONS = [
 const PRICE_PRESETS = [
   { label: 'Tất cả', min: '', max: '' },
   { label: 'Miễn phí', min: '0', max: '0' },
-  { label: '< $25', min: '', max: '25' },
-  { label: '$25 - $50', min: '25', max: '50' },
-  { label: '$50 - $100', min: '50', max: '100' },
-  { label: '> $100', min: '100', max: '' },
+  { label: '< 25.000 VNĐ', min: '', max: '25000' },
+  { label: '25.000 - 50.000 VNĐ', min: '25000', max: '50000' },
+  { label: '50.000 - 100.000 VNĐ', min: '50000', max: '100000' },
+  { label: '> 100.000 VNĐ', min: '100000', max: '' },
 ];
 
 export default function SearchCourses() {
@@ -237,7 +238,7 @@ export default function SearchCourses() {
             )}
             {(filters.minPrice || filters.maxPrice) && (
               <FilterTag
-                label={`$${filters.minPrice || '0'} - $${filters.maxPrice || '∞'}`}
+                label={`${filters.minPrice || '0'} VNĐ - ${filters.maxPrice || '∞'} VNĐ`}
                 onRemove={() => {
                   updateFilter('minPrice', '');
                   updateFilter('maxPrice', '');
@@ -709,7 +710,7 @@ function CourseGridCard({ course, search }: { course: Course; search: string }) 
           {/* Price Badge */}
           <div className="absolute top-3 right-3">
             <span className="bg-white/95 backdrop-blur-sm text-primary-700 font-bold px-3 py-1.5 rounded-full text-sm shadow-lg">
-              {course.price === 0 ? 'Miễn phí' : `$${course.price}`}
+              {course.price === 0 ? 'Miễn phí' : formatVND(course.price)}
             </span>
           </div>
           {!course.published && (
@@ -833,7 +834,7 @@ function CourseListCard({ course, search }: { course: Course; search: string }) 
               </div>
             </div>
             <span className="text-xl font-bold text-primary-600">
-              {course.price === 0 ? 'Miễn phí' : `$${course.price}`}
+              {course.price === 0 ? 'Miễn phí' : formatVND(course.price)}
             </span>
           </div>
         </div>

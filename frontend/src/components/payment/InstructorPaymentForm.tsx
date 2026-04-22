@@ -8,6 +8,7 @@ import {
 import { loadStripe } from '@stripe/stripe-js';
 import { paymentService } from '../../services/payment.service';
 import { FiCreditCard, FiLock } from 'react-icons/fi';
+import { formatVND } from '../../utils/currency';
 
 // Load Stripe (ensure VITE_STRIPE_PUBLISHABLE_KEY is set in .env)
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
@@ -102,7 +103,7 @@ const PaymentForm = ({ amount, paymentIntent, onSuccess, onError }: InstructorPa
         disabled={!stripe || !paymentIntent || processing}
         className="w-full btn-primary py-3 text-lg font-bold shadow-lg transform hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
       >
-        {processing ? 'Đang xử lý...' : `Thanh toán $${amount.toFixed(2)}`}
+        {processing ? 'Đang xử lý...' : `Thanh toán ${formatVND(amount)}`}
       </button>
     </form>
   );

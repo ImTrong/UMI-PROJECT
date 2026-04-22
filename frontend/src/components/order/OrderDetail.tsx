@@ -1,6 +1,7 @@
 import { Order } from '../../services/order.service';
 import { format } from 'date-fns';
 import { FiCheckCircle, FiClock, FiXCircle, FiPackage, FiCreditCard } from 'react-icons/fi';
+import { formatVND } from '../../utils/currency';
 
 interface OrderDetailProps {
   order: Order;
@@ -74,14 +75,14 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
                 <div>
                   <p className="font-medium">{item.courseTitle}</p>
                   {item.discount > 0 && (
-                    <p className="text-sm text-green-600">Save ${item.discount.toFixed(2)}</p>
+                    <p className="text-sm text-green-600">Giảm {formatVND(item.discount)}</p>
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="font-medium">${item.finalPrice.toFixed(2)}</p>
+                  <p className="font-medium">{formatVND(item.finalPrice)}</p>
                   {item.discount > 0 && (
                     <p className="text-sm text-gray-500 line-through">
-                      ${item.price.toFixed(2)}
+                      {formatVND(item.price)}
                     </p>
                   )}
                 </div>
@@ -95,17 +96,17 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-600">Subtotal</span>
-              <span>${order.subtotal.toFixed(2)}</span>
+              <span>{formatVND(order.subtotal)}</span>
             </div>
             {order.discount > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Discount</span>
-                <span>-${order.discount.toFixed(2)}</span>
+                <span>-{formatVND(order.discount)}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-lg pt-2 border-t">
               <span>Total</span>
-              <span className="text-primary-600">${order.totalPrice.toFixed(2)}</span>
+              <span className="text-primary-600">{formatVND(order.totalPrice)}</span>
             </div>
           </div>
         </div>

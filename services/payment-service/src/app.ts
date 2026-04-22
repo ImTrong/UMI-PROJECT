@@ -143,6 +143,13 @@ app.get(
 
 // Admin routes
 app.get(
+  '/api/payments',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  PaymentController.getAllPayments
+);
+
+app.get(
   '/api/payments/stats',
   authenticateToken,
   requireRole(['ADMIN']),

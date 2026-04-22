@@ -4,7 +4,7 @@ import { courseService, Category, CreateCourseData } from '../../services/course
 
 interface CourseFormProps {
   initialData?: CreateCourseData;
-  onSubmit: (data: CreateCourseData) => Promise<void>;
+  onSubmit: (data: CreateCourseData, thumbnailFile?: File | null) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -14,6 +14,8 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
   const [newRequirement, setNewRequirement] = useState('');
   const [targetAudience, setTargetAudience] = useState<string[]>(initialData?.targetAudience || []);
   const [newAudience, setNewAudience] = useState('');
+  const [thumbnailPreview, setThumbnailPreview] = useState<string>(initialData?.thumbnail || '');
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
 
   const { register, handleSubmit, formState: { errors } } = useForm<CreateCourseData>({
     defaultValues: initialData || {
@@ -63,7 +65,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
       targetAudience,
       categoryId: data.categoryId === '' ? undefined : data.categoryId,
     };
-    await onSubmit(formattedData);
+    await onSubmit(formattedData, thumbnailFile);
   };
 
   return (
@@ -142,15 +144,44 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
           </select>
         </div>
 
-        <div>
+        <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Đường dẫn Ảnh thu nhỏ (Thumbnail)
+            Ảnh thu nhỏ (Thumbnail)
           </label>
-          <input
-            {...register('thumbnail')}
-            className="input-field"
-            placeholder="https://example.com/image.jpg"
-          />
+          <div className="space-y-3">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const file = e.target.files?.[0] || null;
+                setThumbnailFile(file);
+                if (file) {
+                  const previewUrl = URL.createObjectURL(file);
+                  setThumbnailPreview(previewUrl);
+                }
+              }}
+              className="input-field"
+            />
+            <input
+              {...register('thumbnail', {
+                onChange: (e) => {
+                  const value = e.target.value as string;
+                  if (value) setThumbnailPreview(value);
+                },
+              })}
+              className="input-field"
+              placeholder="Hoặc dán URL ảnh: https://example.com/image.jpg"
+            />
+            {thumbnailPreview && (
+              <div className="border rounded-lg p-2 bg-gray-50">
+                <img
+                  src={thumbnailPreview}
+                  alt="Thumbnail preview"
+                  className="w-full max-h-56 object-cover rounded"
+                />
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

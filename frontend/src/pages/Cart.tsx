@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { FiShoppingBag, FiArrowLeft } from 'react-icons/fi';
 import { fetchCart, removeFromCart } from '../store/cartSlice';
+import { formatVND } from '../utils/currency';
 
 export default function Cart() {
   const navigate = useNavigate();
@@ -132,15 +133,15 @@ export default function Cart() {
             <div className="space-y-3 mb-4">
               <div className="flex justify-between">
                 <span className="text-gray-600">Tạm tính</span>
-                <span>${totalPrice.toFixed(2)}</span>
+                <span>{formatVND(totalPrice)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-600">Giảm giá</span>
-                <span className="text-green-600">$0.00</span>
+                <span className="text-green-600">{formatVND(0)}</span>
               </div>
               <div className="flex justify-between font-bold text-lg pt-3 border-t">
                 <span>Tổng cộng</span>
-                <span className="text-primary-600">${totalPrice.toFixed(2)}</span>
+                <span className="text-primary-600">{formatVND(totalPrice)}</span>
               </div>
             </div>
             <button

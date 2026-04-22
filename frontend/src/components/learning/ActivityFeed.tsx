@@ -1,72 +1,102 @@
 import { ActivityLog } from '../../services/learning.service';
 import { formatDistanceToNow } from 'date-fns';
-import { FiBookOpen, FiCheckCircle, FiAward, FiPlayCircle, FiShoppingCart } from 'react-icons/fi';
+import { vi } from 'date-fns/locale';
+import { FiBookOpen, FiCheckCircle, FiAward, FiPlayCircle, FiShoppingCart, FiActivity } from 'react-icons/fi';
 
 interface ActivityFeedProps {
   activities: ActivityLog[];
 }
 
 export const ActivityFeed = ({ activities }: ActivityFeedProps) => {
-  const getActivityIcon = (action: string) => {
+  const getActivityData = (action: string) => {
     switch (action) {
       case 'COURSE_ENROLL':
-        return <FiShoppingCart className="text-green-500" />;
+        return { icon: <FiShoppingCart />, bg: 'bg-green-100', text: 'text-green-600', border: 'border-green-200' };
       case 'COURSE_COMPLETE':
-        return <FiCheckCircle className="text-blue-500" />;
+        return { icon: <FiCheckCircle />, bg: 'bg-primary-100', text: 'text-primary-600', border: 'border-primary-200' };
       case 'LESSON_START':
-        return <FiPlayCircle className="text-yellow-500" />;
+        return { icon: <FiPlayCircle />, bg: 'bg-yellow-100', text: 'text-yellow-600', border: 'border-yellow-200' };
       case 'LESSON_COMPLETE':
-        return <FiCheckCircle className="text-green-500" />;
+        return { icon: <FiCheckCircle />, bg: 'bg-teal-100', text: 'text-teal-600', border: 'border-teal-200' };
       case 'CERTIFICATE_GENERATED':
-        return <FiAward className="text-purple-500" />;
+        return { icon: <FiAward />, bg: 'bg-purple-100', text: 'text-purple-600', border: 'border-purple-200' };
       case 'BADGE_EARNED':
-        return <FiAward className="text-orange-500" />;
+        return { icon: <FiAward />, bg: 'bg-orange-100', text: 'text-orange-600', border: 'border-orange-200' };
       default:
-        return <FiBookOpen className="text-gray-500" />;
+        return { icon: <FiBookOpen />, bg: 'bg-gray-100', text: 'text-gray-600', border: 'border-gray-200' };
     }
   };
 
-  const getActivityText = (activity: ActivityLog) => {
+  const getActivityDescription = (activity: ActivityLog) => {
     switch (activity.action) {
       case 'COURSE_ENROLL':
-        return `Đã đăng ký ${activity.metadata?.courseTitle || 'một khóa học'}`;
+        return <span>Đã đăng ký khóa học <strong className="text-gray-900">{activity.metadata?.courseTitle || 'Một khóa học'}</strong></span>;
       case 'COURSE_COMPLETE':
-        return `Đã hoàn thành ${activity.metadata?.courseTitle || 'một khóa học'}`;
+        return <span>Tuyệt vời! Bạn đã hoàn thành khóa học <strong className="text-primary-600">{activity.metadata?.courseTitle || 'Một khóa học'}</strong></span>;
       case 'LESSON_START':
-        return `Bắt đầu ${activity.metadata?.lessonTitle || 'một bài học'}`;
+        return <span>Đã bắt đầu học bài <strong className="text-gray-900">{activity.metadata?.lessonTitle || 'Một bài học'}</strong></span>;
       case 'LESSON_COMPLETE':
-        return `Đã hoàn thành ${activity.metadata?.lessonTitle || 'một bài học'}`;
+        return <span>Đã học xong bài <strong className="text-gray-900">{activity.metadata?.lessonTitle || 'Một bài học'}</strong></span>;
       case 'CERTIFICATE_GENERATED':
-        return `Nhận chứng chỉ cho ${activity.metadata?.courseTitle || 'một khóa học'}`;
+        return <span>Nhận chứng chỉ tốt nghiệp khóa <strong className="text-purple-600">{activity.metadata?.courseTitle || 'Một khóa học'}</strong></span>;
       case 'BADGE_EARNED':
-        return `Đạt huy hiệu ${activity.metadata?.badgeName || 'mới'}`;
+        return <span>Chinh phục huy hiệu mới <strong className="text-orange-600">{activity.metadata?.badgeName || 'Mới'}</strong></span>;
       default:
-        return activity.action;
+        return <span>Thực hiện hành động <strong className="text-gray-900">{activity.action}</strong></span>;
     }
   };
 
+  if (activities.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4 text-center bg-gray-50 rounded-2xl border border-gray-100 border-dashed">
+        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-sm mb-4">
+          <FiActivity className="w-8 h-8 text-gray-400" />
+        </div>
+        <h3 className="text-lg font-bold text-gray-900 mb-1">Chưa có hoạt động nào</h3>
+        <p className="text-sm text-gray-500 max-w-sm">Hành trình ngàn dặm bắt đầu từ một bước chân. Hãy bắt đầu học tập ngay hôm nay!</p>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-3">
-      {activities.length === 0 ? (
-        <p className="text-gray-500 text-center py-4">Chưa có hoạt động gần đây</p>
-      ) : (
-        activities.map((activity) => (
-          <div key={activity.id} className="flex items-start space-x-3">
-            <div className="mt-1">{getActivityIcon(activity.action)}</div>
-            <div className="flex-1">
-              <p className="text-sm text-gray-900">{getActivityText(activity)}</p>
-              <p className="text-xs text-gray-500">
-                {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
-              </p>
-              {activity.durationSeconds > 0 && (
-                <p className="text-xs text-gray-400 mt-1">
-                  Đã học {Math.floor(activity.durationSeconds / 60)} phút
-                </p>
-              )}
+    <div className="relative pl-4 sm:pl-0">
+      {/* Vertical Timeline Line */}
+      <div className="absolute left-[27px] sm:left-[35px] top-4 bottom-8 w-0.5 bg-gray-100 rounded-full"></div>
+      
+      <div className="space-y-8">
+        {activities.map((activity) => {
+          const style = getActivityData(activity.action);
+          return (
+            <div key={activity.id} className="relative flex items-start group">
+              {/* Timeline Dot/Icon */}
+              <div className={`relative z-10 flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-full border-[6px] border-white flex items-center justify-center ${style.bg} ${style.text} shadow-sm group-hover:scale-110 transition-transform duration-300`}>
+                <div className="text-xl sm:text-2xl">{style.icon}</div>
+              </div>
+              
+              {/* Content Card */}
+              <div className="ml-4 sm:ml-6 flex-1 pt-1.5">
+                <div className={`bg-white p-5 rounded-2xl border transition-all duration-300 shadow-sm hover:shadow-md ${style.border}`}>
+                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2 mb-2">
+                    <p className="text-sm sm:text-base text-gray-700 font-medium">
+                      {getActivityDescription(activity)}
+                    </p>
+                    <span className="inline-flex text-xs font-semibold text-gray-400 bg-gray-50 px-2.5 py-1 rounded-full border border-gray-100 sm:shrink-0">
+                      {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true, locale: vi })}
+                    </span>
+                  </div>
+                  
+                  {activity.durationSeconds > 0 && (
+                    <div className="inline-flex items-center text-xs font-medium text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">
+                      <FiPlayCircle className="mr-1.5 text-gray-400" />
+                      Đã dành {Math.floor(activity.durationSeconds / 60)} phút học tập
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        ))
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 };

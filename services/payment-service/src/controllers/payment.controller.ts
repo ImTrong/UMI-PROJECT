@@ -219,6 +219,24 @@ export class PaymentController {
     }
   }
 
+  static async getAllPayments(req: AuthRequest, res: Response) {
+    try {
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+      const status = req.query.status as string;
+
+      const result = await PaymentService.getAllPayments(page, limit, status);
+
+      res.status(HTTP_STATUS.OK).json(result);
+    } catch (error: any) {
+      logger.error('Get all payments error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to get payments',
+      });
+    }
+  }
+
+
   static async refundPayment(req: AuthRequest, res: Response) {
     try {
       if (!req.user) {

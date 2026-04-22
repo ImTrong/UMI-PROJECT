@@ -122,6 +122,27 @@ export class UserService {
     return userProfile;
   }
 
+  static async getBatchUserProfiles(userIds: string[]) {
+    if (!userIds || userIds.length === 0) {
+      return [];
+    }
+
+    const users = await prisma.userProfile.findMany({
+      where: {
+        userId: { in: userIds },
+      },
+      select: {
+        userId: true,
+        fullName: true,
+        email: true,
+        avatar: true,
+        role: true,
+      },
+    });
+
+    return users;
+  }
+
   static async getAllUserProfiles(page: number = 1, limit: number = 10, filters?: any) {
     const skip = (page - 1) * limit;
     

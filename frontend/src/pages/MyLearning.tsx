@@ -1,176 +1,283 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { learningService, CourseProgress } from '../services/learning.service';
-import { ProgressBar } from '../components/learning/ProgressBar';
+import { courseService, Course } from '../services/course.service';
 import { useAuth } from '../hooks/useAuth';
-import { FiBookOpen, FiCheckCircle, FiClock, FiTrendingUp } from 'react-icons/fi';
+import { FiBookOpen, FiCheckCircle, FiClock, FiTrendingUp, FiPlayCircle, FiRefreshCw, FiBook, FiAward } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+
+interface EnrichedCourse extends CourseProgress {
+  details?: Course;
+}
 
 export default function MyLearning() {
   const { isAuthenticated } = useAuth();
-  const [courses, setCourses] = useState<CourseProgress[]>([]);
+  const [courses, setCourses] = useState<EnrichedCourse[]>([]);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'in-progress' | 'completed'>('all');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) return;
     loadData();
+    window.scrollTo(0, 0);
   }, [isAuthenticated, filter]);
 
   const loadData = async () => {
     setLoading(true);
     try {
-      const [coursesData, statsData] = await Promise.all([
+      const [progressData, statsData] = await Promise.all([
         learningService.getEnrolledCourses(1, 100, filter === 'all' ? undefined : filter),
         learningService.getLearningStats(),
       ]);
-      setCourses(coursesData.courses);
+      
+      const enrolledCourses: CourseProgress[] = progressData.courses;
+      
+      if (enrolledCourses.length > 0) {
+        // Fetch detailed data for thumbnails
+        const courseIds = enrolledCourses.map((c) => c.courseId);
+        const detailedCourses = await courseService.getBatchCourses(courseIds);
+  
+        // Map details
+        const enriched: EnrichedCourse[] = enrolledCourses.map((progress) => {
+          const details = detailedCourses.find((c) => c.id === progress.courseId);
+          return {
+            ...progress,
+            details,
+          };
+        });
+        setCourses(enriched);
+      } else {
+        setCourses([]);
+      }
+      
       setStats(statsData);
     } catch (error) {
       console.error('Failed to load learning data:', error);
+      toast.error('Không thể tải dữ liệu góc học tập');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSync = async () => {
+    setIsSyncing(true);
     try {
       const result = await learningService.syncEnrollments();
-      toast.success(`Đã đồng bộ ${result.syncedCount} khóa học`);
+      toast.success(`Đồng bộ thành công ${result.syncedCount} khóa học`);
       loadData();
     } catch (error) {
       toast.error('Đồng bộ khóa học thất bại');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
-  if (loading) {
+  if (loading && courses.length === 0) {
     return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      <div className="flex justify-center items-center min-h-[500px]">
+        <div className="relative w-16 h-16">
+          <div className="absolute top-0 left-0 w-full h-full border-4 border-primary-200 rounded-full animate-ping"></div>
+          <div className="absolute top-0 left-0 w-full h-full border-4 border-primary-600 rounded-full border-t-transparent animate-spin"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Góc học tập</h1>
-        <button onClick={handleSync} className="text-sm text-primary-600 hover:text-primary-700">
-          Đồng bộ Khóa học
-        </button>
-      </div>
-
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="card flex items-center space-x-3">
-            <FiBookOpen className="text-2xl text-primary-500" />
+    <div className="min-h-screen bg-gray-50/50 pt-8 pb-20">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        
+        {/* Hero Banner Area */}
+        <div className="relative mb-10 p-8 rounded-3xl overflow-hidden bg-gradient-to-br from-indigo-600 via-primary-700 to-primary-900 shadow-xl overflow-hidden group">
+          <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-white/10 blur-3xl group-hover:scale-150 transition-transform duration-1000"></div>
+          <div className="absolute bottom-0 left-10 -mb-20 w-48 h-48 rounded-full bg-primary-400/20 blur-2xl group-hover:scale-150 transition-transform duration-1000"></div>
+          
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center">
             <div>
-              <p className="text-2xl font-bold">{stats.overall.totalCoursesEnrolled}</p>
-              <p className="text-sm text-gray-500">Đã đăng ký</p>
+              <h1 className="text-4xl font-extrabold text-white mb-3">Góc học tập</h1>
+              <p className="text-primary-100 text-lg max-w-2xl font-medium">
+                Tiếp tục hành trình chinh phục tri thức. Hôm nay bạn sẽ học gì?
+              </p>
             </div>
-          </div>
-          <div className="card flex items-center space-x-3">
-            <FiCheckCircle className="text-2xl text-green-500" />
-            <div>
-              <p className="text-2xl font-bold">{stats.overall.totalCoursesCompleted}</p>
-              <p className="text-sm text-gray-500">Đã hoàn thành</p>
-            </div>
-          </div>
-          <div className="card flex items-center space-x-3">
-            <FiClock className="text-2xl text-yellow-500" />
-            <div>
-              <p className="text-2xl font-bold">{stats.overall.totalStudyTimeHours}</p>
-              <p className="text-sm text-gray-500">Giờ học</p>
-            </div>
-          </div>
-          <div className="card flex items-center space-x-3">
-            <FiTrendingUp className="text-2xl text-purple-500" />
-            <div>
-              <p className="text-2xl font-bold">{stats.overall.streakDays}</p>
-              <p className="text-sm text-gray-500">Ngày liên tục</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Filter Tabs */}
-      <div className="flex space-x-2 mb-6 border-b">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 ${filter === 'all' ? 'border-b-2 border-primary-500 text-primary-600' : 'text-gray-500'}`}
-        >
-          Tất cả Khóa học
-        </button>
-        <button
-          onClick={() => setFilter('in-progress')}
-          className={`px-4 py-2 ${filter === 'in-progress' ? 'border-b-2 border-primary-500 text-primary-600' : 'text-gray-500'}`}
-        >
-          Đang học
-        </button>
-        <button
-          onClick={() => setFilter('completed')}
-          className={`px-4 py-2 ${filter === 'completed' ? 'border-b-2 border-primary-500 text-primary-600' : 'text-gray-500'}`}
-        >
-          Đã hoàn thành
-        </button>
-      </div>
-
-      {/* Course List */}
-      {courses.length === 0 ? (
-        <div className="card text-center py-12">
-          <p className="text-gray-500">Không tìm thấy khóa học nào</p>
-          <Link to="/courses" className="btn-primary mt-4 inline-block">
-            Khám phá Khóa học
-          </Link>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-4">
-          {courses.map((course) => (
-            <Link
-              key={course.id}
-              to={`/learning/${course.courseId}`}
-              className="card hover:shadow-md transition"
+            
+            <button 
+              onClick={handleSync} 
+              disabled={isSyncing}
+              className="mt-6 md:mt-0 flex items-center bg-white/20 hover:bg-white/30 backdrop-blur-md text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-sm border border-white/20 disabled:opacity-75"
             >
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg">{course.courseTitle}</h3>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Ngày đăng ký: {new Date(course.enrolledAt).toLocaleDateString()}
-                  </p>
-                  {course.completedAt && (
-                    <p className="text-sm text-green-600 mt-1">
-                      Ngày hoàn thành: {new Date(course.completedAt).toLocaleDateString()}
-                    </p>
-                  )}
-                  <div className="mt-3">
-                    <ProgressBar percentage={course.progressPercentage} size="sm" />
-                    <p className="text-sm text-gray-500 mt-1">
-                      Đã xong {course.completedLessons} / {course.totalLessons} bài học • Học trong {Math.floor(course.timeSpentSeconds / 60)} phút
-                    </p>
-                  </div>
-                </div>
-                <div className="ml-4">
-                  {course.progressPercentage === 100 ? (
-                    <span className="bg-green-100 text-green-700 text-sm px-3 py-1 rounded-full">
-                      Đã hoàn thành
-                    </span>
-                  ) : course.progressPercentage > 0 ? (
-                    <span className="bg-yellow-100 text-yellow-700 text-sm px-3 py-1 rounded-full">
-                      {Math.round(course.progressPercentage)}%
-                    </span>
-                  ) : (
-                    <span className="bg-gray-100 text-gray-700 text-sm px-3 py-1 rounded-full">
-                      Chưa bắt đầu
-                    </span>
-                  )}
-                </div>
-              </div>
-            </Link>
-          ))}
+              <FiRefreshCw className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+              {isSyncing ? 'Đang đồng bộ...' : 'Đồng bộ khóa học'}
+            </button>
+          </div>
         </div>
-      )}
+
+        {/* Stats Grid */}
+        {stats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center space-x-4">
+              <div className="w-12 h-12 bg-blue-50 text-blue-500 rounded-full flex items-center justify-center shrink-0">
+                <FiBook className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-2xl font-extrabold text-gray-900">{stats.overall.totalCoursesEnrolled}</p>
+                <p className="text-xs sm:text-sm text-gray-500 font-medium">Đang đăng ký</p>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center space-x-4">
+              <div className="w-12 h-12 bg-green-50 text-green-500 rounded-full flex items-center justify-center shrink-0">
+                <FiAward className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-2xl font-extrabold text-gray-900">{stats.overall.totalCoursesCompleted}</p>
+                <p className="text-xs sm:text-sm text-gray-500 font-medium">Hoàn thành</p>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center space-x-4">
+              <div className="w-12 h-12 bg-orange-50 text-orange-500 rounded-full flex items-center justify-center shrink-0">
+                <FiClock className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-2xl font-extrabold text-gray-900">{Math.round(stats.overall.totalStudyTimeHours)}</p>
+                <p className="text-xs sm:text-sm text-gray-500 font-medium">Giờ học (Tổng)</p>
+              </div>
+            </div>
+            
+            <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex items-center space-x-4">
+              <div className="w-12 h-12 bg-purple-50 text-purple-500 rounded-full flex items-center justify-center shrink-0">
+                <FiTrendingUp className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-2xl font-extrabold text-gray-900">{stats.overall.streakDays}</p>
+                <p className="text-xs sm:text-sm text-gray-500 font-medium">Ngày liên tiếp</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Filters Tabs */}
+        <div className="flex flex-wrap items-center gap-2 mb-8 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm max-w-fit">
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-6 py-2.5 rounded-xl font-medium text-sm transition-all ${
+              filter === 'all' 
+                ? 'bg-primary-600 text-white shadow-md shadow-primary-600/30' 
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Tất cả
+          </button>
+          <button
+            onClick={() => setFilter('in-progress')}
+            className={`px-6 py-2.5 rounded-xl font-medium text-sm transition-all ${
+              filter === 'in-progress' 
+                ? 'bg-primary-600 text-white shadow-md shadow-primary-600/30' 
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Đang học
+          </button>
+          <button
+            onClick={() => setFilter('completed')}
+            className={`px-6 py-2.5 rounded-xl font-medium text-sm transition-all ${
+              filter === 'completed' 
+                ? 'bg-primary-600 text-white shadow-md shadow-primary-600/30' 
+                : 'text-gray-600 hover:bg-gray-50'
+            }`}
+          >
+            Đã hoàn thành
+          </button>
+        </div>
+
+        {/* Settings Grid view */}
+        {courses.length === 0 ? (
+          <div className="bg-white rounded-3xl p-16 text-center shadow-sm border border-gray-100">
+            <div className="w-24 h-24 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FiBookOpen className="w-10 h-10" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">Chưa có khóa học nào để hiển thị</h2>
+            <p className="text-gray-500 mb-8 max-w-md mx-auto">Bạn chưa có khóa học nào hoặc không có khóa học nào khớp với bộ lọc.</p>
+            <Link 
+              to="/courses" 
+              className="inline-flex items-center justify-center px-8 py-3.5 text-base font-semibold text-primary-600 bg-primary-50 rounded-xl hover:bg-primary-100 transition-all"
+            >
+              Khám phá khóa học
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            {courses.map((course) => {
+              const isCompleted = course.progressPercentage === 100;
+              
+              return (
+                <Link
+                  key={course.id}
+                  to={`/learning/${course.courseId}`}
+                  className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-300 border border-gray-100 flex flex-col hover:-translate-y-1"
+                >
+                  <div className="relative h-44 overflow-hidden bg-gray-100">
+                    {course.details?.thumbnail ? (
+                      <img
+                        src={course.details.thumbnail}
+                        alt={course.courseTitle}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-in-out"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-indigo-50">
+                        <FiBookOpen size={40} className="text-indigo-200" />
+                      </div>
+                    )}
+                    
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <div className="bg-white text-gray-900 px-5 py-2.5 rounded-full font-bold shadow-xl flex items-center transform scale-75 group-hover:scale-100 transition-all">
+                        <FiPlayCircle className="mr-2 text-primary-600" size={20} /> Tiếp tục học
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-5 flex flex-col flex-grow">
+                     <h3 className="font-bold text-gray-900 text-base leading-snug mb-4 line-clamp-2 min-h-[3rem] group-hover:text-primary-600 transition-colors">
+                      {course.courseTitle}
+                    </h3>
+                    
+                    <div className="mt-auto space-y-4">
+                      {/* Detailed Progress Bar */}
+                      <div>
+                        <div className="flex justify-between items-end mb-1.5">
+                          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Tiến độ</span>
+                          <span className={`text-sm font-bold ${isCompleted ? 'text-green-600' : 'text-primary-600'}`}>
+                            {Math.round(course.progressPercentage)}%
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
+                          <div 
+                            className={`h-2 rounded-full transition-all duration-1000 ${isCompleted ? 'bg-green-500' : 'bg-primary-500'}`} 
+                            style={{ width: `${Math.min(100, Math.max(0, course.progressPercentage))}%` }}
+                          ></div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between text-xs text-gray-500 font-medium">
+                        <div className="flex items-center bg-gray-50 px-2 py-1 rounded-md">
+                          <FiCheckCircle className="mr-1.5 w-3.5 h-3.5" />
+                          <span>{course.completedLessons} / {course.totalLessons}</span>
+                        </div>
+                        <div className="flex items-center bg-gray-50 px-2 py-1 rounded-md">
+                          <FiClock className="mr-1.5 w-3.5 h-3.5" />
+                          <span>{Math.floor(course.timeSpentSeconds / 60)} phút</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

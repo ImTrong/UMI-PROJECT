@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { FiStar, FiUsers } from 'react-icons/fi';
 import { Course } from '../../services/course.service';
+import { formatVND } from '../../utils/currency';
 
 interface CourseCardProps {
   course: Course;
@@ -52,7 +53,7 @@ export const CourseCard = ({ course, showInstructor = false }: CourseCardProps) 
                course.level === 'INTERMEDIATE' ? 'Trung bình' : 'Nâng cao'}
             </span>
             <span className="text-lg font-bold text-primary-600">
-              ${course.price}
+              {formatVND(course.price)}
             </span>
           </div>
 

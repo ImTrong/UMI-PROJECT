@@ -9,6 +9,7 @@ import { AppDispatch } from '../store';
 import { addToCart } from '../store/cartSlice';
 import toast from 'react-hot-toast';
 import { FiPlay, FiUsers, FiStar, FiBookOpen, FiShoppingCart } from 'react-icons/fi';
+import { formatVND } from '../utils/currency';
 
 export default function CourseDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -26,6 +27,7 @@ export default function CourseDetail() {
   const [userReview, setUserReview] = useState<Review | null>(null);
   const [isEnrolled] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
+  const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null);
 
   const handleAddToCart = async () => {
     if (!isAuthenticated) {
@@ -129,7 +131,6 @@ export default function CourseDetail() {
   if (!course) return null;
 
   const totalRatings = Object.values(ratingDistribution).reduce((a, b) => a + b, 0);
-
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Course Header */}
@@ -153,7 +154,7 @@ export default function CourseDetail() {
               </div>
             </div>
             <div className="mt-6">
-              <span className="text-3xl font-bold">${course.price}</span>
+              <span className="text-3xl font-bold">{formatVND(course.price)}</span>
             </div>
             {isEnrolled ? (
               <button className="mt-4 btn-primary bg-white text-primary-600 hover:bg-gray-100">
@@ -212,7 +213,10 @@ export default function CourseDetail() {
                       {Math.floor(lesson.duration / 60)}:{(lesson.duration % 60).toString().padStart(2, '0')}
                     </span>
                     {lesson.isPreview && (
-                      <button className="text-primary-600 text-sm hover:underline">
+                      <button
+                        onClick={() => setPreviewLesson(lesson)}
+                        className="text-primary-600 text-sm hover:underline"
+                      >
                         Xem trước
                       </button>
                     )}
@@ -398,6 +402,42 @@ export default function CourseDetail() {
           </div>
         </div>
       </div>
+
+      {previewLesson && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl w-full max-w-4xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-3 border-b">
+              <div>
+                <p className="text-xs text-primary-600 font-semibold uppercase">Video học thử</p>
+                <h3 className="font-semibold text-gray-900">{previewLesson.title}</h3>
+              </div>
+              <button
+                onClick={() => setPreviewLesson(null)}
+                className="text-gray-500 hover:text-gray-700 text-sm font-medium"
+              >
+                Đóng
+              </button>
+            </div>
+
+            <div className="bg-black">
+              {previewLesson.videoUrl.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={previewLesson.videoUrl}
+                  title={previewLesson.title}
+                  className="w-full h-[70vh]"
+                />
+              ) : (
+                <video
+                  src={previewLesson.videoUrl}
+                  controls
+                  autoPlay
+                  className="w-full max-h-[70vh]"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

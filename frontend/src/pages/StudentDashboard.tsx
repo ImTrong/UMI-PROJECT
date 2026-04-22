@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { learningService, CourseProgress, LearningStats } from '../services/learning.service';
+import { learningService, CourseProgress, LearningStats, TaskItem } from '../services/learning.service';
 import { ProgressBar } from '../components/learning/ProgressBar';
 import { ActivityFeed } from '../components/learning/ActivityFeed';
-import { FiBookOpen, FiClock, FiAward, FiTrendingUp, FiCalendar, FiTarget } from 'react-icons/fi';
+import { FiBookOpen, FiClock, FiAward, FiTrendingUp, FiCalendar, FiTarget, FiCheckSquare } from 'react-icons/fi';
+import { formatVND } from '../utils/currency';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
@@ -12,6 +13,7 @@ export default function StudentDashboard() {
   const [stats, setStats] = useState<LearningStats | null>(null);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any>(null);
+  const [pendingTasks, setPendingTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -21,17 +23,19 @@ export default function StudentDashboard() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [coursesData, statsData, activityData, recommendationsData] = await Promise.all([
+      const [coursesData, statsData, activityData, recommendationsData, tasksData] = await Promise.all([
         learningService.getEnrolledCourses(1, 10),
         learningService.getLearningStats(),
         learningService.getRecentActivity(5),
         learningService.getRecommendations(),
+        learningService.getPendingTasks().catch(() => []),
       ]);
       
       setEnrolledCourses(coursesData.courses);
       setStats(statsData);
       setRecentActivity(activityData);
       setRecommendations(recommendationsData);
+      setPendingTasks(tasksData.filter(t => t.status !== 'COMPLETED'));
       
     } catch (error) {
       console.error('Failed to load dashboard data:', error);
@@ -166,7 +170,7 @@ export default function StudentDashboard() {
                     <h3 className="font-semibold">{course.title}</h3>
                     <p className="text-sm text-gray-500 mt-1 line-clamp-2">{course.description}</p>
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-primary-600 font-bold">${course.price}</span>
+                      <span className="text-primary-600 font-bold">{formatVND(course.price)}</span>
                       <span className="text-sm text-gray-500">
                         {course.level === 'BEGINNER' ? 'Người mới' : 
                          course.level === 'INTERMEDIATE' ? 'Trung cấp' : 'Nâng cao'}
@@ -207,6 +211,32 @@ export default function StudentDashboard() {
               </div>
             </div>
           )}
+
+          {/* Pending Tasks */}
+          <div className="card border-l-4 border-l-primary-500">
+            <h3 className="font-semibold mb-3 flex items-center">
+              <FiCheckSquare className="mr-2 text-primary-500" />
+              Nhiệm vụ cần làm ({pendingTasks.length})
+            </h3>
+            {pendingTasks.length > 0 ? (
+              <div className="space-y-3">
+                {pendingTasks.slice(0, 3).map((task) => (
+                  <Link key={task.id} to={`/learning/${task.courseId}?lessonId=${task.lessonId}`} className="block p-3 bg-gray-50 rounded-lg hover:bg-primary-50 transition">
+                    <p className="font-medium text-sm text-gray-900 truncate">{task.title}</p>
+                    <div className="flex justify-between items-center mt-1">
+                      <span className="text-xs text-gray-500 font-semibold">{task.type === 'QUIZ' ? 'Trắc nghiệm' : 'Bài tập'}</span>
+                      {task.dueDate && <span className="text-xs text-gray-500"><FiClock className="inline mr-1"/>{new Date(task.dueDate).toLocaleDateString()}</span>}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 text-center py-2">Bạn không có bài tập nào sắp tới.</p>
+            )}
+            <Link to="/tasks" className="block text-center text-sm text-primary-600 hover:underline mt-4">
+              Xem tất cả →
+            </Link>
+          </div>
 
           {/* Recent Activity */}
           <div className="card">

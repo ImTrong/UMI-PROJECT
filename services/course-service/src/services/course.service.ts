@@ -1,5 +1,6 @@
 import { Level } from '@prisma/client';
 import slugify from 'slugify';
+import axios from 'axios';
 import prisma from '../utils/prisma';
 import { ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
@@ -82,7 +83,7 @@ export class CourseService {
     return course;
   }
 
-  static async getCourseById(courseId: string, user?: { userId: string, role: string }) {
+  static async getCourseById(courseId: string, user?: { userId: string, role: string }, authToken?: string) {
     const course = await prisma.course.findUnique({
       where: { id: courseId },
       include: {
@@ -103,13 +104,32 @@ export class CourseService {
 
     const isAdmin = user?.role === 'ADMIN';
     const isOwner = user?.userId === course.instructorId;
-    const canViewUnpublished = isAdmin || isOwner;
+    
+    // Check enrollment status
+    let isEnrolled = false;
+    if (user?.userId && authToken) {
+      try {
+        const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:3006';
+        const response = await axios.get(
+          `${learningServiceUrl}/api/learning/progress/course/${courseId}`,
+          { headers: { Authorization: `Bearer ${authToken}` } }
+        );
+        if (response.data && response.data.data) {
+          isEnrolled = true;
+        }
+      } catch (error) {
+        // Just log and continue, maybe it's not purchased
+        logger.debug(`Enrollment check failed for course ${courseId}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    const canViewUnpublished = isAdmin || isOwner || isEnrolled;
 
     if (!course.published && !canViewUnpublished) {
       throw new Error(ERROR_MESSAGES.COURSE_NOT_PUBLISHED);
     }
 
-    // Filter out unpublished lessons for regular users
+    // Filter out unpublished lessons for regular guest users
     if (!canViewUnpublished) {
       course.lessons = course.lessons.filter(l => l.isPreview);
     }
@@ -128,7 +148,7 @@ export class CourseService {
     };
   }
 
-  static async getCourseBySlug(slug: string, user?: { userId: string, role: string }) {
+  static async getCourseBySlug(slug: string, user?: { userId: string, role: string }, authToken?: string) {
     const course = await prisma.course.findUnique({
       where: { slug },
       include: {
@@ -149,7 +169,25 @@ export class CourseService {
 
     const isAdmin = user?.role === 'ADMIN';
     const isOwner = user?.userId === course.instructorId;
-    const canViewUnpublished = isAdmin || isOwner;
+
+    // Check enrollment status
+    let isEnrolled = false;
+    if (user?.userId && authToken) {
+      try {
+        const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:3006';
+        const response = await axios.get(
+          `${learningServiceUrl}/api/learning/progress/course/${course.id}`,
+          { headers: { Authorization: `Bearer ${authToken}` } }
+        );
+        if (response.data && response.data.data) {
+          isEnrolled = true;
+        }
+      } catch (error) {
+        logger.debug(`Enrollment check failed for slug ${slug}: ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    const canViewUnpublished = isAdmin || isOwner || isEnrolled;
 
     if (!course.published && !canViewUnpublished) {
       throw new Error(ERROR_MESSAGES.COURSE_NOT_PUBLISHED);
@@ -536,16 +574,128 @@ export class CourseService {
     // Call learning-service to get enrolled students progress
     const axios = require('axios');
     const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:3006';
+    const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
 
     try {
       const response = await axios.get(
         `${learningServiceUrl}/api/learning/progress/course/${courseId}/students`
       );
-      return { course: { id: course.id, title: course.title }, students: response.data.data || [] };
+      
+      const progresses = response.data.data || [];
+      
+      // Now fetch user details
+      const userIds = [...new Set(progresses.map((p: any) => p.userId))];
+      let userMap: any = {};
+      
+      if (userIds.length > 0) {
+        try {
+          const userRes = await axios.post(`${userServiceUrl}/api/users/batch`, { ids: userIds });
+          const users = userRes.data.data || [];
+          userMap = users.reduce((acc: any, u: any) => ({ ...acc, [u.userId]: u }), {});
+        } catch (error) {
+          logger.error('Failed to fetch batch users', error);
+        }
+      }
+
+      // Merge
+      const students = progresses.map((p: any) => ({
+        ...p,
+        user: {
+          userId: p.userId,
+          fullName: userMap[p.userId]?.fullName || 'Unknown',
+          avatar: userMap[p.userId]?.avatar || '',
+        }
+      }));
+
+      return { course: { id: course.id, title: course.title }, students };
     } catch (error) {
       // Fallback: return basic course info if learning-service is down
       return { course: { id: course.id, title: course.title, enrolledCount: course.enrolledCount }, students: [] };
     }
+  }
+
+  static async getInstructorStudentDetail(courseId: string, studentId: string, instructorId: string) {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+    });
+
+    if (!course) throw new Error(ERROR_MESSAGES.COURSE_NOT_FOUND);
+    if (course.instructorId !== instructorId) throw new Error(ERROR_MESSAGES.FORBIDDEN);
+
+    const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:3006';
+    const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+
+    const lessons = await prisma.lesson.findMany({
+      where: { courseId },
+      orderBy: { order: 'asc' },
+      select: {
+        id: true,
+        title: true,
+        order: true,
+      },
+    });
+
+    let progressData: any;
+    try {
+      const progressResponse = await axios.get(
+        `${learningServiceUrl}/api/learning/progress/course/${courseId}/students/${studentId}`
+      );
+      progressData = progressResponse.data.data;
+    } catch {
+      throw new Error('Student progress not found');
+    }
+
+    const userResponse = await axios.post(`${userServiceUrl}/api/users/batch`, { ids: [studentId] });
+    const student = userResponse.data.data?.[0];
+
+    const lessonProgressMap = new Map<string, {
+      lessonId: string;
+      completed?: boolean;
+      timeSpentSeconds?: number;
+      watchCount?: number;
+      lastWatchedAt?: string | Date | null;
+    }>(
+      (progressData.lessons || []).map((item: any) => [item.lessonId, item])
+    );
+
+    const lessonStatuses = lessons.map((lesson) => {
+      const progress = lessonProgressMap.get(lesson.id);
+
+      let status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' = 'NOT_STARTED';
+      if (progress?.completed) {
+        status = 'COMPLETED';
+      } else if ((progress?.timeSpentSeconds || 0) > 0 || (progress?.watchCount || 0) > 0) {
+        status = 'IN_PROGRESS';
+      }
+
+      return {
+        lessonId: lesson.id,
+        title: lesson.title,
+        order: lesson.order,
+        status,
+        lastWatchedAt: progress?.lastWatchedAt || null,
+      };
+    });
+
+    return {
+      course: {
+        id: course.id,
+        title: course.title,
+      },
+      student: {
+        userId: studentId,
+        fullName: student?.fullName || 'Unknown',
+        avatar: student?.avatar || '',
+      },
+      progress: {
+        progressPercentage: progressData.progressPercentage || 0,
+        completedLessons: progressData.completedLessons || 0,
+        totalLessons: progressData.totalLessons || lessons.length,
+        enrolledAt: progressData.enrolledAt || null,
+        lastAccessedAt: progressData.lastAccessedAt || null,
+      },
+      lessons: lessonStatuses,
+    };
   }
 
   static async incrementEnrollment(courseId: string) {
