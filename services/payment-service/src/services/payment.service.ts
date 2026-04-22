@@ -24,7 +24,7 @@ export interface ConfirmPaymentData {
 
 export class PaymentService {
   static async createPaymentIntent(data: CreatePaymentData) {
-    const { orderId, orderNumber, userId, amount, currency = 'usd', type = 'COURSE_PURCHASE', metadata = {} } = data;
+    const { orderId, orderNumber, userId, amount, currency = 'vnd', type = 'COURSE_PURCHASE', metadata = {} } = data;
 
     // Validation for course purchase
     if (type === 'COURSE_PURCHASE' && (!orderId || !orderNumber)) {
@@ -187,7 +187,6 @@ export class PaymentService {
       where: {
         orderId,
         userId,
-        status: { in: [PaymentStatus.PENDING, PaymentStatus.PROCESSING] },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -354,7 +353,8 @@ export class PaymentService {
       const stripeRefund = await StripeService.refundPayment(
         payment.stripePaymentIntentId!,
         refundAmount,
-        reason
+        reason,
+        payment.currency
       );
 
       // Create refund record

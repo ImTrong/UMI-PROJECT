@@ -112,7 +112,7 @@ export class OrderService {
         orderNumber: order.orderNumber,
         userId: order.userId,
         amount: order.totalPrice,
-        currency: 'usd',
+        currency: 'vnd',
         description: `Order ${order.orderNumber} - ${validatedItems.length} course(s)`,
       });
 
