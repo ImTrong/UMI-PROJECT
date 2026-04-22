@@ -1,6 +1,9 @@
 import Stripe from 'stripe';
 import logger from '../utils/logger';
 
+const ZERO_DECIMAL_CURRENCIES = ['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf'];
+const isZeroDecimal = (currency: string) => ZERO_DECIMAL_CURRENCIES.includes(currency.toLowerCase());
+
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2023-10-16',
   maxNetworkRetries: 3,
@@ -27,7 +30,7 @@ export class StripeService {
   static async createPaymentIntent(data: CreatePaymentIntentData): Promise<PaymentIntentResult> {
     try {
       const paymentIntent = await stripe.paymentIntents.create({
-        amount: Math.round(data.amount * 100), // Stripe uses cents
+        amount: isZeroDecimal(data.currency) ? Math.round(data.amount) : Math.round(data.amount * 100),
         currency: data.currency.toLowerCase(),
         metadata: data.metadata,
         ...(data.customerId && { customer: data.customerId }),
@@ -42,7 +45,7 @@ export class StripeService {
       return {
         id: paymentIntent.id,
         clientSecret: paymentIntent.client_secret!,
-        amount: paymentIntent.amount / 100,
+        amount: isZeroDecimal(paymentIntent.currency) ? paymentIntent.amount : paymentIntent.amount / 100,
         currency: paymentIntent.currency,
         status: paymentIntent.status,
         customerId: paymentIntent.customer as string | undefined,
@@ -64,7 +67,7 @@ export class StripeService {
       return {
         id: paymentIntent.id,
         status: paymentIntent.status,
-        amount: paymentIntent.amount / 100,
+        amount: isZeroDecimal(paymentIntent.currency) ? paymentIntent.amount : paymentIntent.amount / 100,
         currency: paymentIntent.currency,
         customerId: paymentIntent.customer as string | undefined,
       };
@@ -81,7 +84,7 @@ export class StripeService {
       return {
         id: paymentIntent.id,
         status: paymentIntent.status,
-        amount: paymentIntent.amount / 100,
+        amount: isZeroDecimal(paymentIntent.currency) ? paymentIntent.amount : paymentIntent.amount / 100,
         currency: paymentIntent.currency,
         customerId: paymentIntent.customer as string | undefined,
         metadata: paymentIntent.metadata,
@@ -92,11 +95,18 @@ export class StripeService {
     }
   }
 
-  static async refundPayment(paymentIntentId: string, amount?: number, reason?: string) {
+  static async refundPayment(paymentIntentId: string, amount?: number, reason?: string, currency?: string) {
     try {
+      let refundAmount: number | undefined;
+      if (amount && currency) {
+        refundAmount = isZeroDecimal(currency) ? Math.round(amount) : Math.round(amount * 100);
+      } else if (amount) {
+        refundAmount = Math.round(amount * 100);
+      }
+
       const refund = await stripe.refunds.create({
         payment_intent: paymentIntentId,
-        amount: amount ? Math.round(amount * 100) : undefined,
+        amount: refundAmount,
         reason: reason as Stripe.RefundCreateParams.Reason,
       });
 
@@ -105,7 +115,7 @@ export class StripeService {
       return {
         id: refund.id,
         status: refund.status,
-        amount: refund.amount / 100,
+        amount: isZeroDecimal(refund.currency) ? refund.amount : refund.amount / 100,
         currency: refund.currency,
       };
     } catch (error: any) {

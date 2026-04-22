@@ -58,6 +58,7 @@ export default function Checkout() {
               orderId: orderId!,
               orderNumber: orderData.orderNumber,
               amount: orderData.totalPrice,
+              currency: 'vnd',
             });
             setPaymentIntent(newPayment);
           } catch (createError: any) {
