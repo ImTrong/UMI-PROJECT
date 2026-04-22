@@ -12,6 +12,7 @@ import {
   FiUserCheck,
   FiUserX,
 } from 'react-icons/fi';
+import { formatVND } from '../utils/currency';
 import { 
   Chart as ChartJS, 
   ArcElement, 
@@ -256,7 +257,7 @@ export default function AdminDashboard() {
             <div>
               <p className="text-sm text-gray-500">Tổng số Đơn hàng</p>
               <p className="text-2xl font-bold">{stats?.orders.total || 0}</p>
-              <p className="text-xs text-green-600 mt-1">${stats?.orders.monthlyRevenue?.toFixed(2)} trong tháng này</p>
+              <p className="text-xs text-green-600 mt-1">{formatVND(stats?.orders.monthlyRevenue || 0)} trong tháng này</p>
             </div>
             <FiShoppingCart className="text-3xl text-primary-500" />
           </div>
@@ -270,7 +271,7 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-500">Tổng Doanh thu</p>
-              <p className="text-2xl font-bold">${stats?.orders.revenue?.toFixed(2) || 0}</p>
+              <p className="text-2xl font-bold">{formatVND(stats?.orders.revenue || 0)}</p>
               <p className="text-xs text-green-600 mt-1">Từ {stats?.payments.succeeded || 0} khoản thanh toán</p>
             </div>
             <FiDollarSign className="text-3xl text-primary-500" />
@@ -321,7 +322,7 @@ export default function AdminDashboard() {
                 <tr key={order.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="py-3 px-4">{order.orderNumber}</td>
                   <td className="py-3 px-4">{order.userId.slice(-8)}</td>
-                  <td className="py-3 px-4">${order.totalPrice.toFixed(2)}</td>
+                  <td className="py-3 px-4">{formatVND(order.totalPrice)}</td>
                   <td className="py-3 px-4">
                     <span className={`text-xs px-2 py-1 rounded-full ${
                       order.status === 'COMPLETED' ? 'bg-green-100 text-green-700' :

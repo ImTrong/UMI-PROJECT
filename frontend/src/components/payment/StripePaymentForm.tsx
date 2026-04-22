@@ -8,6 +8,7 @@ import {
 import { loadStripe } from '@stripe/stripe-js';
 import { orderService } from '../../services/order.service';
 import { FiCreditCard, FiLock } from 'react-icons/fi';
+import { formatVND } from '../../utils/currency';
 
 // Load Stripe
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -137,7 +138,7 @@ const PaymentForm = ({
         disabled={!stripe || processing}
         className="w-full btn-primary disabled:opacity-50"
       >
-        {processing ? 'Đang xử lý...' : `Thanh toán $${amount.toFixed(2)}`}
+        {processing ? 'Đang xử lý...' : `Thanh toán ${formatVND(amount)}`}
       </button>
     </form>
   );

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { courseService, Course, Lesson } from '../services/course.service';
 import { learningService, CourseProgress } from '../services/learning.service';
 import { CoursePlayer } from '../components/learning/CoursePlayer';
@@ -8,7 +8,23 @@ import { AssignmentPlayer } from '../components/learning/AssignmentPlayer';
 import { ProgressBar } from '../components/learning/ProgressBar';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
-import { FiCheckCircle, FiClock } from 'react-icons/fi';
+import { FiCheckCircle, FiClock, FiFileText, FiCheckSquare, FiVideo } from 'react-icons/fi';
+
+interface LessonResource {
+  title?: string;
+  name?: string;
+  type?: string;
+  content?: string;
+  url?: string;
+  fileUrl?: string;
+  fileType?: string;
+}
+
+interface LessonSection {
+  id: string;
+  title: string;
+  lessons: Lesson[];
+}
 
 export default function Learning() {
   const { courseId } = useParams<{ courseId: string }>();
@@ -20,6 +36,37 @@ export default function Learning() {
   const [currentLesson, setCurrentLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [lessonType, setLessonType] = useState<'VIDEO' | 'QUIZ' | 'ASSIGNMENT' | 'PDF' | 'TEXT'>('VIDEO');
+  const [tasks, setTasks] = useState<Record<string, 'QUIZ' | 'ASSIGNMENT'>>({});
+
+  const location = useLocation();
+  const queryParams = new URLSearchParams(location.search);
+  const targetLessonId = queryParams.get('lessonId');
+
+  const lessonSections = useMemo<LessonSection[]>(() => {
+    if (lessons.length === 0) return [];
+
+    const sections = new Map<string, LessonSection>();
+
+    lessons.forEach((lesson) => {
+      const rawTitle = lesson.title || '';
+      const sectionPrefixMatch = rawTitle.match(/^(Section\s*\d+|Chương\s*\d+|Phần\s*\d+)\s*[:\-]\s*/i);
+      const sectionTitle = sectionPrefixMatch?.[1]?.trim() || 'Nội dung khóa học';
+      const sectionId = sectionTitle.toLowerCase().replace(/\s+/g, '-');
+
+      if (!sections.has(sectionId)) {
+        sections.set(sectionId, {
+          id: sectionId,
+          title: sectionTitle,
+          lessons: [],
+        });
+      }
+
+      sections.get(sectionId)!.lessons.push(lesson);
+    });
+
+    return Array.from(sections.values());
+  }, [lessons]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -33,33 +80,46 @@ export default function Learning() {
 
   const loadData = async () => {
     try {
-      const [courseData, progressData, lessonsData] = await Promise.all([
+      const [courseData, progressData, lessonsData, tasksData] = await Promise.all([
         courseService.getCourseById(courseId!),
         learningService.getCourseProgress(courseId!).catch(() => null),
         courseService.getCourseLessons(courseId!),
+        learningService.getCourseTasks(courseId!).catch(() => ({})),
       ]);
       
       setCourse(courseData);
       setProgress(progressData);
       setLessons(lessonsData);
+      setTasks(tasksData);
       
-      // Find first incomplete lesson or first lesson
-      let firstIncomplete = lessonsData.find(l => {
-        const lessonProgress = progressData?.lessons?.find(lp => lp.lessonId === l.id);
-        return !lessonProgress?.completed;
-      });
-      
-      if (!firstIncomplete && lessonsData.length > 0) {
-        firstIncomplete = lessonsData[0];
+      let initialLesson = null;
+      if (targetLessonId) {
+        initialLesson = lessonsData.find(l => l.id === targetLessonId);
       }
       
-      if (firstIncomplete) {
-        setCurrentLesson(firstIncomplete);
-        setSelectedLessonId(firstIncomplete.id);
+      if (!initialLesson) {
+        // Find first incomplete lesson or first lesson
+        initialLesson = lessonsData.find(l => {
+          const lessonProgress = progressData?.lessons?.find(lp => lp.lessonId === l.id);
+          return !lessonProgress?.completed;
+        });
       }
-    } catch (error) {
+      
+      if (!initialLesson && lessonsData.length > 0) {
+        initialLesson = lessonsData[0];
+      }
+      
+      if (initialLesson) {
+        setCurrentLesson(initialLesson);
+        setSelectedLessonId(initialLesson.id);
+      }
+    } catch (error: any) {
       console.error('Failed to load course:', error);
-      toast.error('Không tìm thấy khóa học');
+      if (error.response?.status === 403) {
+        toast.error('Bạn không có quyền truy cập khóa học này hoặc khóa học chưa được xuất bản');
+      } else {
+        toast.error('Không tìm thấy khóa học hoặc có lỗi xảy ra');
+      }
       navigate('/my-learning');
     } finally {
       setLoading(false);
@@ -70,6 +130,33 @@ export default function Learning() {
     setCurrentLesson(lesson);
     setSelectedLessonId(lesson.id);
   };
+
+  useEffect(() => {
+    const detectLessonType = () => {
+      if (!currentLesson) return;
+
+      if (getLessonPdfUrl(currentLesson)) {
+        setLessonType('PDF');
+        return;
+      }
+
+      if (tasks[currentLesson.id]) {
+        setLessonType(tasks[currentLesson.id]);
+        return;
+      }
+
+      const textInfo = getLessonTextContent(currentLesson);
+      if (Boolean(currentLesson.videoUrl) && !currentLesson.videoUrl.toLowerCase().endsWith('.pdf')) {
+        setLessonType('VIDEO');
+      } else if (textInfo) {
+        setLessonType('TEXT');
+      } else {
+        setLessonType('VIDEO');
+      }
+    };
+
+    detectLessonType();
+  }, [currentLesson, tasks]);
 
   const handleLessonComplete = async () => {
     if (!currentLesson || !progress) return;
@@ -84,7 +171,12 @@ export default function Learning() {
       setProgress(result.courseProgress);
       
       if (result.courseCompleted) {
-        toast.success('🎉 Đã hoàn thành khóa học! Hãy kiểm tra chứng chỉ của bạn.');
+        try {
+          await learningService.generateCertificate(courseId!);
+          toast.success('🎉 Chúc mừng! Bạn đã hoàn thành khóa học và nhận chứng chỉ.');
+        } catch {
+          toast.success('🎉 Đã hoàn thành khóa học! Bạn có thể nhận chứng chỉ trong mục Chứng chỉ.');
+        }
       } else {
         toast.success('Đã hoàn thành bài học!');
       }
@@ -104,6 +196,54 @@ export default function Learning() {
     // Update progress periodically
   };
 
+  const parseLessonResources = (lesson: Lesson): LessonResource[] => {
+    if (!lesson.resources) return [];
+
+    if (Array.isArray(lesson.resources)) {
+      return lesson.resources as LessonResource[];
+    }
+
+    if (typeof lesson.resources === 'string') {
+      try {
+        const parsed = JSON.parse(lesson.resources);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+
+    return [];
+  };
+
+  const getLessonPdfUrl = (lesson: Lesson): string | null => {
+    if (lesson.videoUrl && lesson.videoUrl.toLowerCase().endsWith('.pdf')) {
+      return lesson.videoUrl;
+    }
+
+    const resources = parseLessonResources(lesson);
+    const pdfResource = resources.find((res) => {
+      const fileType = (res.fileType || res.type || '').toLowerCase();
+      const link = (res.fileUrl || res.url || '').toLowerCase();
+      return fileType.includes('pdf') || link.endsWith('.pdf');
+    });
+
+    return (pdfResource?.fileUrl || pdfResource?.url || null) as string | null;
+  };
+
+  const getLessonTextContent = (lesson: Lesson): string | null => {
+    const resources = parseLessonResources(lesson);
+    const textResource = resources.find((res) => {
+      const fileType = (res.fileType || res.type || '').toLowerCase();
+      return fileType.includes('text') || fileType.includes('note') || Boolean(res.content);
+    });
+
+    if (textResource?.content) {
+      return textResource.content;
+    }
+
+    return lesson.description || null;
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -116,84 +256,56 @@ export default function Learning() {
 
   return (
     <div className="flex h-screen bg-gray-100">
-      {/* Sidebar - Lesson List */}
-      <div className="w-80 bg-white border-r flex flex-col">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold text-lg">{course.title}</h2>
-          {progress && (
-            <div className="mt-3">
-              <ProgressBar percentage={progress.progressPercentage} size="sm" />
-              <p className="text-sm text-gray-500 mt-1">
-                Đã hoàn thành {progress.completedLessons} / {progress.totalLessons} bài học
-              </p>
-            </div>
-          )}
-        </div>
-        
-        <div className="flex-1 overflow-y-auto">
-          {lessons.map((lesson, index) => {
-            const lessonProgress = progress?.lessons?.find(l => l.lessonId === lesson.id);
-            const isCompleted = lessonProgress?.completed;
-            const isCurrent = selectedLessonId === lesson.id;
-            
-            return (
-              <button
-                key={lesson.id}
-                onClick={() => handleLessonSelect(lesson)}
-                className={`w-full text-left p-4 hover:bg-gray-50 transition border-b ${
-                  isCurrent ? 'bg-primary-50 border-l-4 border-l-primary-500' : ''
-                }`}
-              >
-                <div className="flex items-start space-x-3">
-                  {isCompleted ? (
-                    <FiCheckCircle className="text-green-500 mt-1 flex-shrink-0" />
-                  ) : (
-                    <span className="text-gray-400 text-sm mt-1 flex-shrink-0">{index + 1}</span>
-                  )}
-                  <div className="flex-1">
-                    <p className={`text-sm ${isCurrent ? 'font-semibold text-primary-700' : 'text-gray-700'}`}>
-                      {lesson.title}
-                    </p>
-                    <div className="flex items-center space-x-2 mt-1 text-xs text-gray-500">
-                      <FiClock size={12} />
-                      <span>{Math.floor(lesson.duration / 60)} phút</span>
-                      {lesson.isPreview && (
-                        <span className="text-primary-500">Học thử</span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      
-      {/* Main Content - Video Player */}
-      <div className="flex-1 flex flex-col">
+      {/* Main Content - Left Side */}
+      <div className="flex-1 flex flex-col overflow-hidden">
         {currentLesson ? (
           <>
-            {currentLesson.title.toLowerCase().includes('quiz') || currentLesson.videoUrl?.includes('QUIZ') ? (
+            {lessonType === 'QUIZ' ? (
               <div className="flex-1 overflow-y-auto">
                 <QuizPlayer
                   lessonId={currentLesson.id}
                   onComplete={handleLessonComplete}
                 />
               </div>
-            ) : currentLesson.title.toLowerCase().includes('assignment') || currentLesson.videoUrl?.includes('ASSIGNMENT') ? (
+            ) : lessonType === 'ASSIGNMENT' ? (
               <div className="flex-1 overflow-y-auto">
                 <AssignmentPlayer
                   lessonId={currentLesson.id}
+                  courseId={courseId!}
                   onComplete={handleLessonComplete}
                 />
               </div>
-            ) : (
+            ) : lessonType === 'VIDEO' ? (
               <CoursePlayer
+                key={currentLesson.id}
                 lesson={currentLesson}
                 progress={progress?.lessons?.find(l => l.lessonId === currentLesson.id)}
                 onComplete={handleLessonComplete}
                 onTimeUpdate={handleTimeUpdate}
               />
+            ) : lessonType === 'PDF' ? (
+              <div className="flex-1 bg-white p-4 overflow-hidden">
+                <div className="h-full w-full border rounded-lg overflow-hidden">
+                  <iframe
+                    src={getLessonPdfUrl(currentLesson)!}
+                    title={currentLesson.title}
+                    className="w-full h-full"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 bg-white p-6 overflow-y-auto">
+                <div className="max-w-4xl mx-auto">
+                  <div className="inline-flex items-center text-sm text-primary-700 bg-primary-50 px-3 py-1 rounded-full mb-4">
+                    <FiFileText className="mr-2" />
+                    Nội dung bài học
+                  </div>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-4">{currentLesson.title}</h2>
+                  <p className="text-gray-700 whitespace-pre-wrap leading-7">
+                    {getLessonTextContent(currentLesson) || 'Bài học này hiện chưa có video hoặc tài liệu bổ sung.'}
+                  </p>
+                </div>
+              </div>
             )}
             
             <div className="p-6 bg-white border-t">
@@ -215,6 +327,76 @@ export default function Learning() {
             <p className="text-gray-500">Chọn một bài học để bắt đầu học</p>
           </div>
         )}
+      </div>
+
+      {/* Sidebar - Right Side */}
+      <div className="w-96 bg-white border-l flex flex-col">
+        <div className="p-4 border-b">
+          <h2 className="font-semibold text-lg">{course.title}</h2>
+          {progress && (
+            <div className="mt-3">
+              <ProgressBar percentage={progress.progressPercentage} size="sm" />
+              <p className="text-sm text-gray-500 mt-1">
+                Đã hoàn thành {progress.completedLessons} / {progress.totalLessons} bài học
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto">
+          {lessonSections.map((section, sectionIndex) => (
+            <div key={section.id} className="border-b border-gray-100 last:border-b-0">
+              <div className="px-4 py-3 bg-gray-50">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Section {sectionIndex + 1}
+                </p>
+                <p className="text-sm font-semibold text-gray-800 mt-1">{section.title}</p>
+              </div>
+
+              {section.lessons.map((lesson, lessonIndex) => {
+                const lessonProgress = progress?.lessons?.find(l => l.lessonId === lesson.id);
+                const isCompleted = lessonProgress?.completed;
+                const isCurrent = selectedLessonId === lesson.id;
+
+                return (
+                  <button
+                    key={lesson.id}
+                    onClick={() => handleLessonSelect(lesson)}
+                    className={`w-full text-left p-4 hover:bg-gray-50 transition border-t ${
+                      isCurrent ? 'bg-primary-50 border-l-4 border-l-primary-500' : 'border-l-4 border-l-transparent'
+                    }`}
+                  >
+                    <div className="flex items-start space-x-3">
+                      {isCompleted ? (
+                        <FiCheckCircle className="text-green-500 mt-1 flex-shrink-0" title="Đã hoàn thành" />
+                      ) : (
+                        <span className="text-gray-400 text-sm mt-1 flex-shrink-0 w-4 text-center">{lessonIndex + 1}</span>
+                      )}
+                      <div className="flex-1">
+                        <div className="flex items-start space-x-2 mt-0.5">
+                           {tasks[lesson.id] === 'QUIZ' ? (
+                             <div className="p-1 bg-purple-100 rounded text-purple-600 flex-shrink-0 mt-0.5" title="Bài kiểm tra"><FiCheckSquare size={12}/></div>
+                           ) : tasks[lesson.id] === 'ASSIGNMENT' ? (
+                             <div className="p-1 bg-amber-100 rounded text-amber-600 flex-shrink-0 mt-0.5" title="Bài tập"><FiFileText size={12}/></div>
+                           ) : (
+                             <div className="p-1 bg-blue-100 rounded text-blue-500 flex-shrink-0 mt-0.5" title="Video bài giảng"><FiVideo size={12}/></div>
+                           )}
+                           <p className={`text-sm ${isCurrent ? 'font-bold text-primary-700' : 'text-gray-700 font-medium'}`}>
+                             {lesson.title}
+                           </p>
+                        </div>
+                        <div className="flex items-center space-x-2 mt-1.5 text-xs text-gray-500 pl-7">
+                          <FiClock size={12} />
+                          <span>{Math.floor(lesson.duration / 60)} phút</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

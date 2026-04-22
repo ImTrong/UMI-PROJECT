@@ -5,9 +5,11 @@ import axios from 'axios';
 
 export const AssignmentPlayer = ({
   lessonId,
+  courseId,
   onComplete,
 }: {
   lessonId: string;
+  courseId: string;
   onComplete: () => void;
 }) => {
   const [assignment, setAssignment] = useState<Assignment | null>(null);
@@ -36,11 +38,11 @@ export const AssignmentPlayer = ({
       try {
         const sub = await learningService.getMyAssignmentSubmission(a.id);
         setSubmission(sub);
-        if (sub.status === 'DRAFT' || sub.status === 'RETURNED') {
-          setSubmissionText(sub.submissionText || '');
+        if (sub.status !== 'GRADED') {
+          setSubmissionText(sub.content || '');
         }
       } catch (err: any) {
-        // 404 means no submission yet, which is fine
+        // 404 means no submission yet
       }
     } catch (err: any) {
       if (err.response?.status !== 404) {
@@ -85,40 +87,35 @@ export const AssignmentPlayer = ({
     setFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async (status: 'DRAFT' | 'SUBMITTED') => {
+  const handleSubmit = async () => {
     if (!assignment) return;
     setSubmitting(true);
     setError('');
     
     try {
-      // 1. Upload files to MinIO
-      const uploadedFileUrls: string[] = submission?.fileUrls || [];
-      
-      for (const file of files) {
-        // Get presigned URL
+      let uploadedFileUrl = submission?.fileUrl;
+      let uploadedFileName = submission?.fileName;
+
+      if (files.length > 0) {
+        const file = files[0];
         const { uploadUrl, fileUrl } = await learningService.getUploadUrl(assignment.id, file.name, file.type);
-        
-        // Upload directly to MinIO
         await axios.put(uploadUrl, file, {
-          headers: { 'Content-Type': file.type }
+          headers: { 'Content-Type': file.type },
         });
-        
-        uploadedFileUrls.push(fileUrl);
+        uploadedFileUrl = fileUrl;
+        uploadedFileName = file.name;
       }
 
-      // 2. Submit the assignment data
       const res = await learningService.submitAssignment(assignment.id, {
-        submissionText,
-        fileUrls: uploadedFileUrls,
-        status,
+        courseId,
+        content: submissionText,
+        fileUrl: uploadedFileUrl,
+        fileName: uploadedFileName,
       });
 
       setSubmission(res);
       setFiles([]); // Clear local files after upload
-      
-      if (status === 'SUBMITTED') {
-        onComplete();
-      }
+      onComplete();
     } catch (err: any) {
       setError(err.response?.data?.error || 'Không thể nộp bài tập. Vui lòng thử lại.');
     } finally {
@@ -130,7 +127,7 @@ export const AssignmentPlayer = ({
   if (!assignment) return <div className="p-8 text-center text-gray-500">Không tìm thấy bài tập nào cho bài học này.</div>;
 
   const isGraded = submission?.status === 'GRADED';
-  const isSubmitted = submission?.status === 'SUBMITTED' || submission?.status === 'LATE_SUBMISSION';
+  const isSubmitted = submission?.status === 'SUBMITTED' || submission?.status === 'GRADING';
   const isReadOnly = isGraded || isSubmitted;
 
   return (
@@ -174,7 +171,7 @@ export const AssignmentPlayer = ({
           </div>
           <div className="flex-1">
             <h3 className={`font-bold ${isGraded ? 'text-green-800' : isSubmitted ? 'text-blue-800' : 'text-gray-800'}`}>
-              Trạng thái: {submission.status.replace('_', ' ')}
+              Trạng thái: {submission.status}
             </h3>
             {isGraded && (
               <div className="mt-2 text-sm text-gray-700">
@@ -216,21 +213,16 @@ export const AssignmentPlayer = ({
           </div>
 
           {/* Existing Files */}
-          {submission?.fileUrls && submission.fileUrls.length > 0 && (
+          {submission?.fileUrl && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Các tệp đã tải lên trước đó</label>
               <div className="space-y-2">
-                {submission.fileUrls.map((url, idx) => {
-                  const fileName = url.split('/').pop() || `File ${idx + 1}`;
-                  return (
-                    <div key={idx} className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                      <FiFile className="text-gray-400" size={20} />
-                      <a href={url} target="_blank" rel="noreferrer" className="flex-1 text-primary-600 hover:underline truncate">
-                        {fileName}
-                      </a>
-                    </div>
-                  );
-                })}
+                <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                  <FiFile className="text-gray-400" size={20} />
+                  <a href={submission.fileUrl} target="_blank" rel="noreferrer" className="flex-1 text-primary-600 hover:underline truncate">
+                    {submission.fileName || submission.fileUrl.split('/').pop()}
+                  </a>
+                </div>
               </div>
             </div>
           )}
@@ -258,7 +250,7 @@ export const AssignmentPlayer = ({
                   Nhấn để tải lên hoặc kéo & thả tệp
                 </h4>
                 <p className="text-sm text-gray-500 mb-4 px-8">
-                  Hỗ trợ tải lên nhiều tệp. Nghiêm cấm tải lên nội dung độc hại hoặc các tệp không được phép.
+                  Hỗ trợ tải lên 1 tệp cho mỗi lần nộp bài. Nghiêm cấm tải lên nội dung độc hại hoặc tệp không được phép.
                 </p>
                 
                 {assignment.allowedFileTypes.length > 0 && (
@@ -273,7 +265,6 @@ export const AssignmentPlayer = ({
                 
                 <input
                   type="file"
-                  multiple
                   ref={fileInputRef}
                   onChange={handleFileInput}
                   className="hidden"
@@ -321,16 +312,8 @@ export const AssignmentPlayer = ({
             <div className="flex justify-end gap-4 pt-6 mt-8 border-t">
               <button
                 type="button"
-                onClick={() => handleSubmit('DRAFT')}
-                disabled={submitting}
-                className="btn-secondary px-6 disabled:opacity-50"
-              >
-                Lưu vào bản nháp
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSubmit('SUBMITTED')}
-                disabled={submitting || (!submissionText.trim() && files.length === 0 && (!submission?.fileUrls || submission.fileUrls.length === 0))}
+                onClick={handleSubmit}
+                disabled={submitting || (!submissionText.trim() && files.length === 0 && !submission?.fileUrl)}
                 className="btn-primary px-8 shadow-lg shadow-primary-500/30 disabled:opacity-50 disabled:shadow-none"
               >
                 {submitting ? (

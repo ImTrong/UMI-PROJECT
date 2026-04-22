@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { CartItem } from '../../services/order.service';
 import { FiCreditCard, FiShield } from 'react-icons/fi';
+import { formatVND } from '../../utils/currency';
 
 interface CheckoutFormProps {
   items: CartItem[];
@@ -31,22 +32,22 @@ export const CheckoutForm = ({ items, totalPrice, onSubmit, isLoading }: Checkou
           {items.map((item, index) => (
             <div key={index} className="flex justify-between">
               <span className="text-gray-600">{item.title}</span>
-              <span className="font-medium">${item.price.toFixed(2)}</span>
+              <span className="font-medium">{formatVND(item.price)}</span>
             </div>
           ))}
         </div>
         <div className="border-t pt-3 space-y-2">
           <div className="flex justify-between">
             <span className="text-gray-600">Tạm tính</span>
-            <span>${totalPrice.toFixed(2)}</span>
+            <span>{formatVND(totalPrice)}</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">Giảm giá</span>
-            <span className="text-green-600">$0.00</span>
+            <span className="text-green-600">{formatVND(0)}</span>
           </div>
           <div className="flex justify-between font-bold text-lg pt-2 border-t">
             <span>Tổng cộng</span>
-            <span className="text-primary-600">${totalPrice.toFixed(2)}</span>
+            <span className="text-primary-600">{formatVND(totalPrice)}</span>
           </div>
         </div>
       </div>
@@ -96,7 +97,7 @@ export const CheckoutForm = ({ items, totalPrice, onSubmit, isLoading }: Checkou
             disabled={isLoading}
             className="w-full btn-primary disabled:opacity-50"
           >
-            {isLoading ? 'Đang xử lý...' : `Tiến hành đặt hàng • $${totalPrice.toFixed(2)}`}
+            {isLoading ? 'Đang xử lý...' : `Tiến hành đặt hàng • ${formatVND(totalPrice)}`}
           </button>
 
           <div className="flex items-center justify-center space-x-2 text-xs text-gray-500 mt-4">

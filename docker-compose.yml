@@ -63,7 +63,7 @@ services:
       retries: 3
 
   # ============================================
-  # Frontend Service (Placeholder)
+  # Frontend Service (For end-users)
   # Port: 3000
   # ============================================
   frontend:
@@ -77,7 +77,20 @@ services:
       - "3000:80"
     networks:
       - elearning-network
-    # Note: Ensure you have a Dockerfile in ./frontend
+
+  # ============================================
+  # Admin Frontend Service
+  # Port: 4000
+  # ============================================
+  admin-frontend:
+    build:
+      context: ./admin-frontend
+      dockerfile: Dockerfile
+    container_name: elearning-admin-frontend
+    ports:
+      - "4000:80"
+    networks:
+      - elearning-network
 
   # ============================================
   # Microservice 1: Authentication Service
@@ -170,6 +183,7 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin123
       MINIO_PUBLIC_URL: "http://127.0.0.1:9000"
+      LEARNING_SERVICE_URL: "http://learning-service:3006"
     depends_on:
       mongodb:
         condition: service_healthy

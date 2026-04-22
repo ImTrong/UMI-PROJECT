@@ -282,6 +282,35 @@ export class PaymentService {
     };
   }
 
+  static async getAllPayments(page: number = 1, limit: number = 10, status?: string) {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (status) {
+      where.status = status;
+    }
+
+    const [payments, total] = await Promise.all([
+      prisma.payment.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.payment.count({ where }),
+    ]);
+
+    return {
+      payments,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+
   static async refundPayment(
     paymentId: string,
     userId: string,

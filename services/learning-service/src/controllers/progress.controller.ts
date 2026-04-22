@@ -27,11 +27,36 @@ export class ProgressController {
       const progress = await ProgressService.getCourseProgress(req.user.userId, courseId);
       res.status(HTTP_STATUS.OK).json({ data: progress });
     } catch (error: any) {
+      if (error.message === ERROR_MESSAGES.PROGRESS_NOT_FOUND) {
+        return res.status(HTTP_STATUS.OK).json({ data: null });
+      }
       logger.error('Get course progress error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get course progress' });
+    }
+  }
+
+  static async getCourseStudents(req: AuthRequest, res: Response) {
+    try {
+      const { courseId } = req.params;
+      const studentsProgress = await ProgressService.getCourseStudents(courseId);
+      res.status(HTTP_STATUS.OK).json({ data: studentsProgress });
+    } catch (error: any) {
+      logger.error('Get course students error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get course students' });
+    }
+  }
+
+  static async getStudentCourseProgress(req: AuthRequest, res: Response) {
+    try {
+      const { courseId, userId } = req.params;
+      const studentProgress = await ProgressService.getStudentCourseProgress(courseId, userId);
+      res.status(HTTP_STATUS.OK).json({ data: studentProgress });
+    } catch (error: any) {
+      logger.error('Get student course progress error:', error);
       if (error.message === ERROR_MESSAGES.PROGRESS_NOT_FOUND) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
       }
-      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get course progress' });
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get student progress' });
     }
   }
 
@@ -116,5 +141,31 @@ export class ProgressController {
     const health = await ProgressService.healthCheck();
     const statusCode = health.database === 'connected' ? HTTP_STATUS.OK : HTTP_STATUS.INTERNAL_SERVER_ERROR;
     res.status(statusCode).json(health);
+  }
+
+  static async getLearningStats(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const stats = await ProgressService.getLearningStats(req.user.userId);
+      res.status(HTTP_STATUS.OK).json({ data: stats });
+    } catch (error) {
+      logger.error('Get learning stats error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get learning stats' });
+    }
+  }
+
+  static async syncEnrollments(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const result = await ProgressService.syncEnrollments(req.user.userId);
+      res.status(HTTP_STATUS.OK).json({ data: result });
+    } catch (error) {
+      logger.error('Sync enrollments error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to sync enrollments' });
+    }
   }
 }

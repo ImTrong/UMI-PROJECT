@@ -6,6 +6,40 @@ import logger from '../utils/logger';
 import { FileStorageService } from '@umi/file-storage';
 
 export class LessonController {
+  static async getCourseLessonsInternal(req: AuthRequest, res: Response) {
+    try {
+      const { courseId } = req.params;
+      const lessons = await LessonService.getCourseLessonsInternal(courseId);
+
+      res.status(HTTP_STATUS.OK).json({
+        data: lessons,
+      });
+    } catch (error: any) {
+      logger.error('Get internal course lessons error:', error);
+      if (error.message === ERROR_MESSAGES.COURSE_NOT_FOUND) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get internal lessons' });
+    }
+  }
+
+  static async getLessonByIdInternal(req: AuthRequest, res: Response) {
+    try {
+      const { courseId, lessonId } = req.params;
+      const lesson = await LessonService.getLessonByIdInternal(courseId, lessonId);
+
+      res.status(HTTP_STATUS.OK).json({
+        data: lesson,
+      });
+    } catch (error: any) {
+      logger.error('Get internal lesson by id error:', error);
+      if (error.message === ERROR_MESSAGES.LESSON_NOT_FOUND) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get internal lesson' });
+    }
+  }
+
   static async getUploadUrl(req: AuthRequest, res: Response) {
     try {
       if (!req.user) {

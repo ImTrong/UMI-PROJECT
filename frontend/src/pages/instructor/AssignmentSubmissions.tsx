@@ -109,7 +109,7 @@ export default function AssignmentSubmissions() {
                       <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         sub.status === 'GRADED' ? 'bg-green-100 text-green-800' :
                         sub.status === 'SUBMITTED' ? 'bg-blue-100 text-blue-800' :
-                        sub.status === 'LATE_SUBMISSION' ? 'bg-amber-100 text-amber-800' :
+                        sub.status === 'RETURNED' ? 'bg-amber-100 text-amber-800' :
                         'bg-gray-100 text-gray-800'
                       }`}>
                         {sub.status.replace('_', ' ')}
@@ -125,7 +125,7 @@ export default function AssignmentSubmissions() {
                       <button
                         onClick={() => openGradingModal(sub)}
                         className="text-primary-600 hover:text-primary-900"
-                        disabled={sub.status === 'DRAFT'}
+                        disabled={false}
                       >
                         {sub.status === 'GRADED' ? 'Edit Grade' : 'Grade'}
                       </button>
@@ -166,27 +166,25 @@ export default function AssignmentSubmissions() {
               <div className="mb-6">
                 <h4 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wider">Student's Work</h4>
                 
-                {selectedSubmission.submissionText && (
+                {selectedSubmission.content && (
                   <div className="mb-4 bg-white border border-gray-200 rounded-lg p-4 prose max-w-none text-sm text-gray-700">
-                    <p className="whitespace-pre-wrap">{selectedSubmission.submissionText}</p>
+                    <p className="whitespace-pre-wrap">{selectedSubmission.content}</p>
                   </div>
                 )}
 
-                {selectedSubmission.fileUrls && selectedSubmission.fileUrls.length > 0 && (
+                {selectedSubmission.fileUrl && (
                   <div className="space-y-2">
-                    {selectedSubmission.fileUrls.map((url, i) => (
-                      <a href={url} target="_blank" rel="noreferrer" key={i} className="flex items-center justify-between p-3 bg-primary-50 rounded-lg text-primary-700 hover:bg-primary-100 transition">
-                        <div className="flex items-center gap-3">
-                          <FiFile />
-                          <span className="font-medium text-sm">{url.split('/').pop() || `Attachment ${i + 1}`}</span>
-                        </div>
-                        <FiDownload size={18} />
-                      </a>
-                    ))}
+                    <a href={selectedSubmission.fileUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 bg-primary-50 rounded-lg text-primary-700 hover:bg-primary-100 transition">
+                      <div className="flex items-center gap-3">
+                        <FiFile />
+                        <span className="font-medium text-sm">{selectedSubmission.fileName || selectedSubmission.fileUrl.split('/').pop() || 'Attachment'}</span>
+                      </div>
+                      <FiDownload size={18} />
+                    </a>
                   </div>
                 )}
                 
-                {!selectedSubmission.submissionText && (!selectedSubmission.fileUrls || selectedSubmission.fileUrls.length === 0) && (
+                {!selectedSubmission.content && !selectedSubmission.fileUrl && (
                   <p className="text-gray-500 italic text-sm p-4 bg-gray-50 rounded text-center">Empty submission.</p>
                 )}
               </div>

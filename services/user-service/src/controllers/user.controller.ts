@@ -61,6 +61,26 @@ export class UserController {
     }
   }
 
+  static async getBatchUsers(req: AuthRequest, res: Response) {
+    try {
+      const { ids } = req.body;
+      if (!ids || !Array.isArray(ids)) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'ids array is required' });
+      }
+
+      const users = await UserService.getBatchUserProfiles(ids);
+
+      res.status(HTTP_STATUS.OK).json({
+        data: users,
+      });
+    } catch (error: any) {
+      logger.error('Get batch users error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to get batch users',
+      });
+    }
+  }
+
   static async getMyProfile(req: AuthRequest, res: Response) {
     try {
       if (!req.user) {

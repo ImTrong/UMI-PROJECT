@@ -16,6 +16,55 @@ export interface LessonCompleteData {
 }
 
 export class ProgressService {
+  private static async getCurrentLessonCount(courseId: string): Promise<number> {
+    const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://localhost:3003';
+    try {
+      const lessonsResponse: AxiosResponse<{ data: LessonDetails[] }> = await axios.get(
+        `${courseServiceUrl}/api/courses/internal/${courseId}/lessons`
+      );
+      return lessonsResponse.data.data.length;
+    } catch {
+      return 0;
+    }
+  }
+
+  private static async syncCourseProgressTotals(userId: string, courseId: string) {
+    const [courseProgress, totalLessonsFromCourseService] = await Promise.all([
+      prisma.courseProgress.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+      }),
+      this.getCurrentLessonCount(courseId),
+    ]);
+
+    if (!courseProgress) return null;
+
+    const completedLessons = await prisma.lessonProgress.count({
+      where: { userId, courseId, completed: true },
+    });
+
+    const safeTotalLessons = Math.max(totalLessonsFromCourseService, 0);
+    const safeCompletedLessons = Math.min(completedLessons, safeTotalLessons);
+    const progressPercentage = safeTotalLessons > 0 ? (safeCompletedLessons / safeTotalLessons) * 100 : 0;
+
+    if (
+      courseProgress.totalLessons !== safeTotalLessons ||
+      courseProgress.completedLessons !== safeCompletedLessons ||
+      Math.round(courseProgress.progressPercentage * 100) !== Math.round(progressPercentage * 100)
+    ) {
+      return prisma.courseProgress.update({
+        where: { id: courseProgress.id },
+        data: {
+          totalLessons: safeTotalLessons,
+          completedLessons: safeCompletedLessons,
+          progressPercentage,
+          completedAt: progressPercentage === 100 ? (courseProgress.completedAt || new Date()) : null,
+          lastAccessedAt: new Date(),
+        },
+      });
+    }
+
+    return courseProgress;
+  }
   static async initializeUserProgress(userId: string) {
     const existing = await prisma.userProgress.findUnique({ where: { userId } });
     if (!existing) {
@@ -46,6 +95,7 @@ export class ProgressService {
   }
 
   static async getCourseProgress(userId: string, courseId: string) {
+    await this.syncCourseProgressTotals(userId, courseId);
     const courseProgress = await prisma.courseProgress.findUnique({
       where: { userId_courseId: { userId, courseId } },
       include: { lessons: { orderBy: { lastWatchedAt: 'desc' } } },
@@ -76,8 +126,17 @@ export class ProgressService {
       orderBy: { lastAccessedAt: 'desc' }
     });
 
+    await Promise.all(courses.map((course) => this.syncCourseProgressTotals(userId, course.courseId)));
+
+    const refreshedCourses = await prisma.courseProgress.findMany({
+      where: whereClause,
+      skip,
+      take: limit,
+      orderBy: { lastAccessedAt: 'desc' }
+    });
+
     return {
-      courses,
+      courses: refreshedCourses,
       pagination: {
         total,
         page,
@@ -87,21 +146,49 @@ export class ProgressService {
     };
   }
 
+  static async getCourseStudents(courseId: string) {
+    const courseProgresses = await prisma.courseProgress.findMany({
+      where: { courseId },
+      orderBy: { lastAccessedAt: 'desc' }
+    });
+    return courseProgresses;
+  }
+
+  static async getStudentCourseProgress(courseId: string, userId: string) {
+    const courseProgress = await prisma.courseProgress.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+      include: {
+        lessons: {
+          orderBy: { lastWatchedAt: 'desc' },
+        },
+      },
+    });
+
+    if (!courseProgress) {
+      throw new Error(ERROR_MESSAGES.PROGRESS_NOT_FOUND);
+    }
+
+    return courseProgress;
+  }
+
   static async markLessonComplete(data: LessonCompleteData) {
     const { userId, courseId, lessonId, timeSpentSeconds = 0 } = data;
 
     const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://localhost:3003';
     let course: CourseDetails;
+    let allLessons: LessonDetails[] = [];
     try {
-      const response: AxiosResponse<{ data: CourseDetails }> = await axios.get(
-        `${courseServiceUrl}/api/courses/${courseId}`
-      );
-      course = response.data.data;
+      const [courseResponse, lessonsResponse] = await Promise.all([
+        axios.get<{ data: CourseDetails }>(`${courseServiceUrl}/api/courses/${courseId}`),
+        axios.get<{ data: LessonDetails[] }>(`${courseServiceUrl}/api/courses/internal/${courseId}/lessons`),
+      ]);
+      course = courseResponse.data.data;
+      allLessons = lessonsResponse.data.data || [];
     } catch {
       throw new Error(ERROR_MESSAGES.COURSE_NOT_FOUND);
     }
 
-    const lesson = course.lessons?.find((l: LessonDetails) => l.id === lessonId);
+    const lesson = allLessons.find((l: LessonDetails) => l.id === lessonId);
     if (!lesson) throw new Error(ERROR_MESSAGES.LESSON_NOT_FOUND);
 
     await this.initializeUserProgress(userId);
@@ -116,10 +203,12 @@ export class ProgressService {
           userId,
           courseId,
           courseTitle: course.title,
-          totalLessons: course.lessons?.length || 0,
+          totalLessons: allLessons.length || 0,
         },
       });
     }
+
+    courseProgress = await this.syncCourseProgressTotals(userId, courseId) || courseProgress;
 
     let lessonProgress = await prisma.lessonProgress.findUnique({
       where: { userId_courseId_lessonId: { userId, courseId, lessonId } },
@@ -158,7 +247,9 @@ export class ProgressService {
         where: { userId, courseId, completed: true },
       });
 
-      const progressPercentage = (completedLessons / courseProgress.totalLessons) * 100;
+      const progressPercentage = courseProgress.totalLessons > 0
+        ? (completedLessons / courseProgress.totalLessons) * 100
+        : 0;
 
       await prisma.courseProgress.update({
         where: { id: courseProgress.id },
@@ -293,7 +384,7 @@ export class ProgressService {
     if (existing) return existing;
 
     const lessonsResponse: AxiosResponse<{ data: LessonDetails[] }> = await axios.get(
-      `${courseServiceUrl}/api/courses/${courseId}/lessons`
+      `${courseServiceUrl}/api/courses/internal/${courseId}/lessons`
     );
 
     const enrollment = await prisma.courseProgress.create({
@@ -341,5 +432,52 @@ export class ProgressService {
         database: 'disconnected' as const,
       };
     }
+  }
+
+  static async getLearningStats(userId: string) {
+    const userProgress = await this.getUserProgress(userId);
+
+    const completionRate = userProgress.totalCoursesEnrolled > 0 
+      ? (userProgress.totalCoursesCompleted / userProgress.totalCoursesEnrolled) * 100 
+      : 0;
+
+    const overall = {
+      totalCoursesEnrolled: userProgress.totalCoursesEnrolled,
+      totalCoursesCompleted: userProgress.totalCoursesCompleted,
+      totalLessonsCompleted: userProgress.totalLessonsCompleted,
+      totalStudyTimeHours: userProgress.totalStudyTime / 3600,
+      streakDays: userProgress.streakDays,
+      completionRate,
+    };
+
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const weeklyActivityRaw = await prisma.activityLog.groupBy({
+      by: ['action'],
+      where: {
+        userId,
+        createdAt: {
+          gte: oneWeekAgo
+        }
+      },
+      _count: true
+    });
+
+    return {
+      overall,
+      weeklyActivity: weeklyActivityRaw,
+      dailyActivity: []
+    };
+  }
+
+  static async syncEnrollments(userId: string) {
+    const courses = await prisma.courseProgress.findMany({
+      where: { userId }
+    });
+    
+    await Promise.all(courses.map((course) => this.syncCourseProgressTotals(userId, course.courseId)));
+    
+    return { syncedCount: courses.length };
   }
 }

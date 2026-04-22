@@ -5,6 +5,7 @@ import { LessonManager } from '../components/course/LessonManager';
 import { courseService, Course, CreateCourseData } from '../services/course.service';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
+import axios from 'axios';
 
 export default function EditCourse() {
   const { slug } = useParams<{ slug: string }>();
@@ -43,11 +44,27 @@ export default function EditCourse() {
     }
   }, [slug, user, isAuthenticated, navigate, loading]);
 
-  const handleSubmit = async (data: CreateCourseData) => {
+  const handleSubmit = async (data: CreateCourseData, thumbnailFile?: File | null) => {
     if (!course) return;
     setUpdating(true);
     try {
-      const updated = await courseService.updateCourse(course.id, data);
+      const { thumbnail, ...baseData } = data;
+      let finalThumbnailUrl = thumbnail;
+
+      if (thumbnailFile) {
+        const { uploadUrl, fileUrl } = await courseService.getUploadUrl(course.id, thumbnailFile.name, thumbnailFile.type);
+        await axios.put(uploadUrl, thumbnailFile, {
+          headers: {
+            'Content-Type': thumbnailFile.type,
+          },
+        });
+        finalThumbnailUrl = fileUrl;
+      }
+
+      const updated = await courseService.updateCourse(course.id, {
+        ...baseData,
+        thumbnail: finalThumbnailUrl,
+      });
       toast.success('Cập nhật khóa học thành công!');
       if (updated.slug !== course.slug) {
         navigate(`/courses/${updated.slug}/edit`);

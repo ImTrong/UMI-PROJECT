@@ -4,6 +4,7 @@ import { courseService, CreateCourseData } from '../services/course.service';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { useEffect } from 'react';
+import axios from 'axios';
 
 export default function CreateCourse() {
   const navigate = useNavigate();
@@ -16,11 +17,29 @@ export default function CreateCourse() {
     }
   }, [isAuthenticated, user, navigate]);
 
-  const handleSubmit = async (data: CreateCourseData) => {
+  const handleSubmit = async (data: CreateCourseData, thumbnailFile?: File | null) => {
     try {
-      const course = await courseService.createCourse(data);
+      const { thumbnail, ...baseData } = data;
+      const course = await courseService.createCourse(baseData);
+
+      let finalThumbnailUrl = thumbnail;
+
+      if (thumbnailFile) {
+        const { uploadUrl, fileUrl } = await courseService.getUploadUrl(course.id, thumbnailFile.name, thumbnailFile.type);
+        await axios.put(uploadUrl, thumbnailFile, {
+          headers: {
+            'Content-Type': thumbnailFile.type,
+          },
+        });
+        finalThumbnailUrl = fileUrl;
+      }
+
+      if (finalThumbnailUrl) {
+        await courseService.updateCourse(course.id, { thumbnail: finalThumbnailUrl });
+      }
+
       toast.success('Tạo khóa học thành công!');
-      navigate(`/courses/${course.slug}`);
+      navigate(`/courses/${course.slug}/edit`);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Không thể tạo khóa học');
     }

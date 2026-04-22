@@ -6,6 +6,7 @@ import { StripePaymentForm } from '../components/payment/StripePaymentForm';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { FiArrowLeft, FiShield, FiAlertCircle } from 'react-icons/fi';
+import { formatVND } from '../utils/currency';
 
 export default function Checkout() {
   const { orderId } = useParams<{ orderId: string }>();
@@ -162,24 +163,24 @@ export default function Checkout() {
             {order.items.map((item, index) => (
               <div key={index} className="flex justify-between">
                 <span className="text-gray-600">{item.courseTitle}</span>
-                <span>${item.finalPrice.toFixed(2)}</span>
+                <span>{formatVND(item.finalPrice)}</span>
               </div>
             ))}
           </div>
           <div className="border-t pt-3 space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-600">Tạm tính</span>
-              <span>${order.subtotal.toFixed(2)}</span>
+              <span>{formatVND(order.subtotal)}</span>
             </div>
             {order.discount > 0 && (
               <div className="flex justify-between text-green-600">
                 <span>Giảm giá</span>
-                <span>-${order.discount.toFixed(2)}</span>
+                <span>-{formatVND(order.discount)}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-lg pt-2 border-t">
               <span>Tổng cộng</span>
-              <span className="text-primary-600">${order.totalPrice.toFixed(2)}</span>
+              <span className="text-primary-600">{formatVND(order.totalPrice)}</span>
             </div>
           </div>
         </div>

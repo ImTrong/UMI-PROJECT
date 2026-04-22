@@ -1,5 +1,6 @@
 import { FiTrash2, FiShoppingCart } from 'react-icons/fi';
 import { CartItem as CartItemType } from '../../services/order.service';
+import { formatVND } from '../../utils/currency';
 
 interface CartItemProps {
   item: CartItemType;
@@ -32,7 +33,7 @@ export const CartItem = ({ item, onRemove }: CartItemProps) => {
 
       {/* Price */}
       <div className="text-right">
-        <p className="font-bold text-primary-600">${item.price.toFixed(2)}</p>
+        <p className="font-bold text-primary-600">{formatVND(item.price)}</p>
       </div>
 
       {/* Remove Button */}

@@ -1,6 +1,7 @@
 import { Payment } from '../../services/payment.service';
 import { format } from 'date-fns';
 import { FiCheckCircle, FiClock, FiXCircle, FiRefreshCw, FiCreditCard } from 'react-icons/fi';
+import { formatVND } from '../../utils/currency';
 
 interface PaymentCardProps {
   payment: Payment;
@@ -59,7 +60,7 @@ export const PaymentCard = ({ payment, onRefund }: PaymentCardProps) => {
         </div>
         <div className="text-right">
           <p className="text-xl font-bold text-primary-600">
-            ${payment.amount.toFixed(2)}
+            {formatVND(payment.amount)}
           </p>
           <p className="text-xs text-gray-500">
             {format(new Date(payment.createdAt), 'MMM dd, yyyy')}

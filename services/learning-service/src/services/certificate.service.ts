@@ -22,15 +22,18 @@ export class CertificateService {
     });
     if (existing) return existing;
 
-    const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+    const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
     const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://localhost:3003';
 
     let user: UserDetails;
     let course: CourseDetails;
 
     try {
-      const userRes: AxiosResponse<{ data: UserDetails }> = await axios.get(`${userServiceUrl}/api/users/${userId}`);
-      user = userRes.data.data;
+      const userRes: AxiosResponse<{ data: UserDetails[] }> = await axios.post(`${userServiceUrl}/api/users/batch`, { ids: [userId] });
+      user = userRes.data.data?.[0];
+      if (!user) {
+        throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+      }
     } catch {
       throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
     }
