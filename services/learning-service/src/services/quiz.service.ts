@@ -2,6 +2,19 @@ import { PrismaClient, QuizAttemptStatus } from '@prisma/client';
 import { ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 
+let fileStorage: any = null;
+try {
+  const fileStorageModule = require('../../../shared/file-storage/src');
+  fileStorage = fileStorageModule.fileStorage;
+} catch {
+  try {
+    const fileStorageModule = require('../../shared/file-storage/src');
+    fileStorage = fileStorageModule.fileStorage;
+  } catch {
+    logger.warn('FileStorageService not available for quiz attachments');
+  }
+}
+
 const prisma = new PrismaClient();
 
 // Question structure stored in Quiz.questions JSON
@@ -316,5 +329,26 @@ export class QuizService {
 
     await prisma.quiz.delete({ where: { id: quizId } });
     logger.info(`Quiz deleted: ${quizId}`);
+  }
+
+  /**
+   * Get presigned upload URL for quiz attachment files (import files)
+   */
+  static async getUploadUrl(fileName: string, mimeType: string) {
+    if (!fileStorage) {
+      throw new Error('File storage service is not available');
+    }
+
+    const result = await fileStorage.getPresignedUploadUrl({
+      bucket: 'quiz-attachments',
+      fileName,
+      mimeType,
+    });
+
+    return {
+      uploadUrl: result.uploadUrl,
+      fileUrl: result.publicUrl,
+      fileKey: result.fileKey,
+    };
   }
 }

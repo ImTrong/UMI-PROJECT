@@ -285,6 +285,26 @@ export const learningService = {
     await learningApi.delete(`/api/learning/certificates/${certificateId}`);
   },
 
+  async getCertificateById(certificateId: string): Promise<Certificate> {
+    const response = await learningApi.get(`/api/learning/certificates/${certificateId}/detail`);
+    return response.data.data;
+  },
+
+  async downloadCertificate(certificateId: string): Promise<void> {
+    const response = await learningApi.get(`/api/learning/certificates/${certificateId}/download`, {
+      responseType: 'blob',
+    });
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `certificate-${certificateId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  },
+
   // Badges
   async getUserBadges(): Promise<Badge[]> {
     const response = await learningApi.get('/api/learning/badges/me');

@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { learningService, Quiz } from '../../services/learning.service';
-import { FiPlus, FiTrash2, FiSave, FiAlertCircle, FiChevronDown, FiChevronUp, FiMessageCircle, FiCheckCircle } from 'react-icons/fi';
+import { FiPlus, FiTrash2, FiSave, FiAlertCircle, FiChevronDown, FiChevronUp, FiMessageCircle, FiCheckCircle, FiUpload, FiDownload, FiFile, FiX, FiCheck } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 // ===== FRONTEND editing format =====
 interface FrontendOption {
@@ -97,6 +98,13 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
   // Accordion state
   const [expandedIndices, setExpandedIndices] = useState<Set<number>>(new Set([0]));
 
+  // Import state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importedQuestions, setImportedQuestions] = useState<FrontendQuestion[]>([]);
+  const [importFileName, setImportFileName] = useState('');
+  const [importError, setImportError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     loadQuiz();
   }, [lessonId]);
@@ -138,6 +146,176 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
     setExpandedIndices(newSet);
   };
 
+  // ===== Import helpers =====
+  const generateSampleJSON = () => {
+    const sample: FrontendQuestion[] = [
+      {
+        questionText: 'Đâu là ngôn ngữ lập trình phổ biến nhất?',
+        questionType: 'SINGLE_CHOICE',
+        options: [
+          { id: 'opt-1', text: 'Python', isCorrect: true },
+          { id: 'opt-2', text: 'HTML', isCorrect: false },
+          { id: 'opt-3', text: 'CSS', isCorrect: false },
+          { id: 'opt-4', text: 'SQL', isCorrect: false },
+        ],
+        points: 10,
+        explanation: 'Python là ngôn ngữ lập trình phổ biến và đa năng nhất hiện nay.',
+      },
+      {
+        questionText: 'React là một framework?',
+        questionType: 'TRUE_FALSE',
+        options: [
+          { id: 'opt-t', text: 'Đúng', isCorrect: false },
+          { id: 'opt-f', text: 'Sai', isCorrect: true },
+        ],
+        points: 5,
+        explanation: 'React là một thư viện (library), không phải framework.',
+      },
+    ];
+    return sample;
+  };
+
+  const downloadSampleJSON = () => {
+    const sample = generateSampleJSON();
+    const blob = new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'quiz-template.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const downloadSampleExcel = () => {
+    const data = [
+      {
+        questionText: 'Đâu là ngôn ngữ lập trình phổ biến nhất?',
+        questionType: 'SINGLE_CHOICE',
+        optionA: 'Python',
+        optionB: 'HTML',
+        optionC: 'CSS',
+        optionD: 'SQL',
+        correctAnswer: 'A',
+        points: 10,
+        explanation: 'Python là ngôn ngữ lập trình phổ biến và đa năng nhất hiện nay.',
+      },
+      {
+        questionText: 'React là một framework?',
+        questionType: 'TRUE_FALSE',
+        optionA: 'Đúng',
+        optionB: 'Sai',
+        optionC: '',
+        optionD: '',
+        correctAnswer: 'B',
+        points: 5,
+        explanation: 'React là một thư viện (library), không phải framework.',
+      },
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Questions');
+    XLSX.writeFile(wb, 'quiz-template.xlsx');
+  };
+
+  const parseJSONFile = (text: string): FrontendQuestion[] => {
+    const parsed = JSON.parse(text);
+    const arr = Array.isArray(parsed) ? parsed : [parsed];
+    return arr.map((q: any, idx: number) => ({
+      questionText: q.questionText || q.text || '',
+      questionType: q.questionType || 'SINGLE_CHOICE',
+      options: (q.options || []).map((opt: any, oi: number) => ({
+        id: opt.id || `imp-${Date.now()}-${idx}-${oi}`,
+        text: opt.text || '',
+        isCorrect: opt.isCorrect === true,
+      })),
+      points: q.points || 10,
+      explanation: q.explanation || '',
+    }));
+  };
+
+  const parseExcelFile = (data: ArrayBuffer): FrontendQuestion[] => {
+    const wb = XLSX.read(data, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows: any[] = XLSX.utils.sheet_to_json(ws);
+    
+    return rows.map((row, idx) => {
+      const options: FrontendOption[] = [];
+      const optionLabels = ['A', 'B', 'C', 'D', 'E', 'F'];
+      const correctAnswers = (row.correctAnswer || 'A').toString().toUpperCase().split(',').map((s: string) => s.trim());
+      
+      for (const label of optionLabels) {
+        const text = row[`option${label}`];
+        if (text && text.toString().trim()) {
+          options.push({
+            id: `imp-${Date.now()}-${idx}-${label}`,
+            text: text.toString().trim(),
+            isCorrect: correctAnswers.includes(label),
+          });
+        }
+      }
+
+      let questionType: FrontendQuestion['questionType'] = 'SINGLE_CHOICE';
+      const rawType = (row.questionType || '').toString().toUpperCase();
+      if (rawType === 'TRUE_FALSE' || rawType === 'TRUEFALSE') {
+        questionType = 'TRUE_FALSE';
+      } else if (rawType === 'MULTIPLE_CHOICE' || rawType === 'MULTI_SELECT' || correctAnswers.length > 1) {
+        questionType = 'MULTIPLE_CHOICE';
+      }
+
+      return {
+        questionText: (row.questionText || row.question || '').toString(),
+        questionType,
+        options,
+        points: parseInt(row.points) || 10,
+        explanation: (row.explanation || '').toString(),
+      };
+    });
+  };
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImportError('');
+    setImportFileName(file.name);
+
+    try {
+      if (file.name.endsWith('.json')) {
+        const text = await file.text();
+        const parsed = parseJSONFile(text);
+        if (parsed.length === 0) throw new Error('File không chứa câu hỏi nào.');
+        setImportedQuestions(parsed);
+        setShowImportModal(true);
+      } else if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        const buffer = await file.arrayBuffer();
+        const parsed = parseExcelFile(buffer);
+        if (parsed.length === 0) throw new Error('File không chứa câu hỏi nào.');
+        setImportedQuestions(parsed);
+        setShowImportModal(true);
+      } else {
+        setImportError('Chỉ hỗ trợ file .json hoặc .xlsx');
+        toast.error('Định dạng file không được hỗ trợ');
+      }
+    } catch (err: any) {
+      setImportError(err.message || 'Lỗi khi đọc file');
+      toast.error('Không thể đọc file: ' + (err.message || 'Lỗi không xác định'));
+    }
+    // Reset input
+    e.target.value = '';
+  };
+
+  const confirmImport = () => {
+    const newQuestions = [...questions, ...importedQuestions];
+    setQuestions(newQuestions);
+    // Auto-expand imported questions
+    const newIndices = new Set(expandedIndices);
+    for (let i = questions.length; i < newQuestions.length; i++) {
+      newIndices.add(i);
+    }
+    setExpandedIndices(newIndices);
+    setShowImportModal(false);
+    setImportedQuestions([]);
+    toast.success(`Đã import ${importedQuestions.length} câu hỏi thành công!`);
+  };
   const handleAddQuestion = () => {
     const newIndex = questions.length;
     setQuestions([
@@ -320,13 +498,32 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
             <h4 className="text-xl font-bold text-gray-800">2. Bộ câu hỏi ({questions.length})</h4>
             <p className="text-sm text-gray-500 mt-1">Tổng điểm: <strong className="text-primary-600">{totalPoints} điểm</strong></p>
           </div>
-          <div className="flex items-center gap-3">
-             <button type="button" onClick={() => setExpandedIndices(new Set(questions.map((_, i) => i)))} className="text-sm text-gray-500 hover:text-primary-600 font-medium px-2">Mở tất cả</button>
-             <button type="button" onClick={() => setExpandedIndices(new Set())} className="text-sm text-gray-500 hover:text-primary-600 font-medium px-2 border-r border-gray-300 pr-4">Gập tất cả</button>
-             <button type="button" onClick={handleAddQuestion} className="btn-secondary text-sm flex items-center gap-2 py-2 px-4 shadow-sm border-primary-200 text-primary-700 bg-primary-50 hover:bg-primary-100">
-               <FiPlus strokeWidth={3} /> Thêm câu hỏi
-             </button>
-          </div>
+          <div className="flex items-center gap-3 flex-wrap">
+              <button type="button" onClick={() => setExpandedIndices(new Set(questions.map((_, i) => i)))} className="text-sm text-gray-500 hover:text-primary-600 font-medium px-2">Mở tất cả</button>
+              <button type="button" onClick={() => setExpandedIndices(new Set())} className="text-sm text-gray-500 hover:text-primary-600 font-medium px-2 border-r border-gray-300 pr-4">Gập tất cả</button>
+              
+              {/* Import from file */}
+              <div className="relative">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,.xlsx,.xls"
+                  onChange={handleFileImport}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="btn-secondary text-sm flex items-center gap-2 py-2 px-4 shadow-sm border-green-200 text-green-700 bg-green-50 hover:bg-green-100"
+                >
+                  <FiUpload strokeWidth={2.5} /> Import file
+                </button>
+              </div>
+
+              <button type="button" onClick={handleAddQuestion} className="btn-secondary text-sm flex items-center gap-2 py-2 px-4 shadow-sm border-primary-200 text-primary-700 bg-primary-50 hover:bg-primary-100">
+                <FiPlus strokeWidth={3} /> Thêm câu hỏi
+              </button>
+           </div>
         </div>
 
         <div className="space-y-4">
@@ -507,6 +704,31 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
           )}
         </div>
 
+        {/* Download templates */}
+        <div className="mt-8 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+          <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FiDownload className="text-gray-500" /> Tải file mẫu để import câu hỏi
+          </p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={downloadSampleJSON}
+              className="text-sm flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors text-gray-700 font-medium shadow-sm"
+            >
+              <FiFile size={14} className="text-blue-500" />
+              Mẫu JSON
+            </button>
+            <button
+              type="button"
+              onClick={downloadSampleExcel}
+              className="text-sm flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors text-gray-700 font-medium shadow-sm"
+            >
+              <FiFile size={14} className="text-green-600" />
+              Mẫu Excel (.xlsx)
+            </button>
+          </div>
+        </div>
+
         {/* BOTTOM ACTIONS */}
         <div className="mt-10 flex justify-end gap-3 pt-6 border-t border-gray-200 bg-white sticky bottom-0 z-10 pb-2">
           <button type="button" onClick={onClose} className="px-6 py-2.5 font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors">Thoát</button>
@@ -515,6 +737,99 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
             {saving ? 'Đang mã hóa & lưu...' : 'Xuất bản Trắc nghiệm'}
           </button>
         </div>
+
+        {/* =============== Import Preview Modal =============== */}
+        {showImportModal && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowImportModal(false)}>
+            <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+              {/* Modal Header */}
+              <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-5 flex justify-between items-center text-white">
+                <div>
+                  <h3 className="text-lg font-bold flex items-center gap-2">
+                    <FiUpload size={20} /> Preview Import
+                  </h3>
+                  <p className="text-green-100 text-sm mt-1">
+                    {importFileName} — {importedQuestions.length} câu hỏi
+                  </p>
+                </div>
+                <button onClick={() => setShowImportModal(false)} className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors">
+                  <FiX size={20} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="overflow-y-auto max-h-[55vh] p-6">
+                {importError && (
+                  <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
+                    <FiAlertCircle className="inline mr-2" />{importError}
+                  </div>
+                )}
+                
+                <div className="space-y-3">
+                  {importedQuestions.map((q, idx) => (
+                    <div key={idx} className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 hover:border-green-200 transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className="w-7 h-7 rounded-lg bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0 mt-0.5">
+                          {idx + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-800 text-sm">{q.questionText || <span className="text-gray-400 italic">Không có nội dung</span>}</p>
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 border text-gray-500">
+                              {q.questionType === 'SINGLE_CHOICE' ? 'Một đáp án' : q.questionType === 'MULTIPLE_CHOICE' ? 'Nhiều đáp án' : 'Đúng/Sai'}
+                            </span>
+                            <span className="text-xs text-gray-500">{q.points} điểm</span>
+                          </div>
+                          <div className="mt-2 grid grid-cols-2 gap-1.5">
+                            {q.options.map((opt, oi) => (
+                              <div key={oi} className={`text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 ${
+                                opt.isCorrect 
+                                  ? 'bg-green-50 text-green-700 border border-green-200 font-medium' 
+                                  : 'bg-white text-gray-600 border border-gray-100'
+                              }`}>
+                                {opt.isCorrect && <FiCheck size={12} className="flex-shrink-0" />}
+                                {opt.text}
+                              </div>
+                            ))}
+                          </div>
+                          {q.explanation && (
+                            <p className="mt-2 text-xs text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-100">
+                              💡 {q.explanation}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="border-t p-5 flex items-center justify-between bg-gray-50">
+                <p className="text-sm text-gray-500">
+                  Sẽ thêm <strong className="text-green-700">{importedQuestions.length}</strong> câu hỏi vào danh sách hiện tại ({questions.length} câu)
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowImportModal(false)}
+                    className="px-5 py-2.5 font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmImport}
+                    className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl shadow-lg shadow-green-500/30 transition-colors flex items-center gap-2"
+                  >
+                    <FiCheck size={18} />
+                    Xác nhận Import ({importedQuestions.length} câu)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </form>
     </div>
   );

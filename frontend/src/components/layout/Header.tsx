@@ -16,7 +16,8 @@ import {
   FiSearch,
   FiX,
   FiChevronDown,
-  FiCheckSquare
+  FiCheckSquare,
+  FiList
 } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
 
@@ -47,6 +48,7 @@ export default function Header() {
 
   const studentMenu = [
     { name: 'Khóa học đã mua', href: '/purchased-courses', icon: FiBookOpen },
+    { name: 'Lịch sử đơn hàng', href: '/orders', icon: FiList },
     { name: 'Bài tập & Trắc nghiệm', href: '/tasks', icon: FiCheckSquare },
     { name: 'Góc học tập', href: '/my-learning', icon: FiActivity },
     { name: 'Chứng chỉ', href: '/certificates', icon: FiAward },
@@ -59,7 +61,7 @@ export default function Header() {
     { name: 'Bảng điều khiển', href: '/dashboard', icon: FiGrid },
   ];
 
-  const visibleStudentMenu = isAuthenticated && user?.role === 'STUDENT' ? studentMenu : [];
+  const visibleStudentMenu = isAuthenticated ? studentMenu : [];
   const visibleInstructorMenu = isAuthenticated && (user?.role === 'INSTRUCTOR' || user?.role === 'ADMIN') ? instructorMenu : [];
 
   const allNavItems = [...mainMenu, ...visibleStudentMenu, ...visibleInstructorMenu];

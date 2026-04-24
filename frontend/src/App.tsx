@@ -28,6 +28,8 @@ import Learning from './pages/Learning'
 import MyLearning from './pages/MyLearning'
 import PurchasedCourses from './pages/PurchasedCourses'
 import Certificates from './pages/Certificates'
+import CertificateDetail from './pages/CertificateDetail'
+import CertificateVerify from './pages/CertificateVerify'
 import Badges from './pages/Badges'
 import Activity from './pages/Activity'
 import MyTasks from './pages/MyTasks'
@@ -158,6 +160,13 @@ function App() {
               <Certificates />
             </ProtectedRoute>
           } />
+          <Route path="/certificates/:certificateId" element={
+            <ProtectedRoute>
+              <CertificateDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/verify-certificate" element={<CertificateVerify />} />
+          <Route path="/verify-certificate/:certificateNumber" element={<CertificateVerify />} />
           <Route path="/badges" element={
             <ProtectedRoute>
               <Badges />

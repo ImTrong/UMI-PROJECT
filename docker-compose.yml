@@ -24,6 +24,7 @@ services:
       - mongo-data:/data/db
     networks:
       - elearning-network
+    restart: unless-stopped
     healthcheck:
       test: >
         mongosh -u admin -p securepassword123 --authenticationDatabase admin --quiet --eval "try { rs.status().ok } catch (e) { rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongodb:27017' }] }); }"
@@ -77,6 +78,7 @@ services:
       - "3000:80"
     networks:
       - elearning-network
+    restart: unless-stopped
 
   # ============================================
   # Admin Frontend Service
@@ -91,6 +93,7 @@ services:
       - "4000:80"
     networks:
       - elearning-network
+    restart: unless-stopped
 
   # ============================================
   # Microservice 1: Authentication Service
@@ -120,6 +123,7 @@ services:
         condition: service_healthy
     networks:
       - elearning-network
+    restart: unless-stopped
     command: sh -c "npx prisma db push && node dist-seed/prisma/seed.js && node dist/src/index.js"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3001/api/auth/health"]
@@ -153,6 +157,7 @@ services:
         condition: service_started
     networks:
       - elearning-network
+    restart: unless-stopped
     command: sh -c "sleep 5 && npx prisma db push && node dist-seed/prisma/seed.js && node dist/src/index.js"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3002/api/users/health"]
@@ -189,6 +194,7 @@ services:
         condition: service_healthy
     networks:
       - elearning-network
+    restart: unless-stopped
     command: sh -c "npx prisma db push && node dist-seed/prisma/seed.js && node dist/index.js"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3003/api/courses/health"]
@@ -222,6 +228,7 @@ services:
         condition: service_healthy
     networks:
       - elearning-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3004/api/orders/health"]
       interval: 10s
@@ -253,6 +260,7 @@ services:
         condition: service_healthy
     networks:
       - elearning-network
+    restart: unless-stopped
     command: sh -c "npx prisma db push && node dist/index.js"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3005/api/payments/health"]
@@ -289,6 +297,7 @@ services:
         condition: service_healthy
     networks:
       - elearning-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3006/api/learning/health"]
       interval: 10s

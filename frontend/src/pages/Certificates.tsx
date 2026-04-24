@@ -38,11 +38,14 @@ export default function Certificates() {
     }
   };
 
-  const handleDownload = (certificate: Certificate) => {
-    if (certificate.certificateUrl) {
-      window.open(certificate.certificateUrl, '_blank');
-    } else {
-      toast.error('Tệp chứng chỉ không khả dụng');
+  const handleDownload = async (certificate: Certificate) => {
+    const toastId = toast.loading('Đang chuẩn bị tải chứng chỉ...');
+    try {
+      await learningService.downloadCertificate(certificate.id);
+      toast.success('Đã tải chứng chỉ thành công!', { id: toastId });
+    } catch (error) {
+      console.error('Download failed:', error);
+      toast.error('Tải chứng chỉ thất bại', { id: toastId });
     }
   };
 

@@ -132,6 +132,55 @@ export class CertificateService {
     };
   }
 
+  /**
+   * Get a single certificate by ID (owned by user)
+   */
+  static async getCertificateById(certificateId: string, userId: string) {
+    const certificate = await prisma.certificate.findUnique({
+      where: { id: certificateId },
+    });
+
+    if (!certificate) throw new Error('Certificate not found');
+    if (certificate.userId !== userId) throw new Error(ERROR_MESSAGES.FORBIDDEN);
+
+    return certificate;
+  }
+
+  /**
+   * Get certificate file path for download; re-generate if missing
+   */
+  static async getCertificateFilePath(certificateId: string, userId: string): Promise<string> {
+    const certificate = await this.getCertificateById(certificateId, userId);
+
+    let filePath = certificate.certificateUrl || '';
+
+    // If file doesn't exist, try to regenerate
+    const fs = await import('fs');
+    if (!filePath || !fs.existsSync(filePath)) {
+      logger.warn(`Certificate file missing for ${certificate.certificateNumber}, regenerating...`);
+      try {
+        filePath = await CertificateGenerator.generate({
+          certificateNumber: certificate.certificateNumber,
+          userName: certificate.userName,
+          courseTitle: certificate.courseTitle,
+          issueDate: certificate.issueDate,
+          verificationUrl: certificate.verificationUrl || '',
+        });
+
+        // Update DB with new path
+        await prisma.certificate.update({
+          where: { id: certificateId },
+          data: { certificateUrl: filePath },
+        });
+      } catch (error) {
+        logger.error('Failed to regenerate certificate PDF:', error);
+        throw new Error('Certificate file is not available');
+      }
+    }
+
+    return filePath;
+  }
+
   static async verifyCertificate(certificateNumber: string) {
     const certificate = await prisma.certificate.findUnique({
       where: { certificateNumber },

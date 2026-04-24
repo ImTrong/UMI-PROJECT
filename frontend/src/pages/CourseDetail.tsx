@@ -210,7 +210,7 @@ export default function CourseDetail() {
                   </div>
                   <div className="flex items-center space-x-4">
                     <span className="text-sm text-gray-500">
-                      {Math.floor(lesson.duration / 60)}:{(lesson.duration % 60).toString().padStart(2, '0')}
+                      {Math.ceil(lesson.duration / 60)} phút
                     </span>
                     {lesson.isPreview && (
                       <button
@@ -395,7 +395,14 @@ export default function CourseDetail() {
               <div className="flex justify-between">
                 <span className="text-gray-600">Thời lượng</span>
                 <span className="font-medium">
-                  {Math.floor(lessons.reduce((sum, l) => sum + l.duration, 0) / 3600)} giờ
+                  {(() => {
+                    const totalSeconds = lessons.reduce((sum, l) => sum + l.duration, 0);
+                    const hours = Math.floor(totalSeconds / 3600);
+                    const minutes = Math.ceil((totalSeconds % 3600) / 60);
+                    if (hours > 0 && minutes > 0) return `${hours} giờ ${minutes} phút`;
+                    if (hours > 0) return `${hours} giờ`;
+                    return `${minutes} phút`;
+                  })()}
                 </span>
               </div>
             </div>
