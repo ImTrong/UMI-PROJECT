@@ -201,15 +201,14 @@ export class LessonService {
       }
     }
 
+    // Luôn lấy tất cả lessons để frontend có đủ dữ liệu tính thời lượng
     const lessons = await prisma.lesson.findMany({
-      where: {
-        courseId,
-        ...(includeUnpublished || isEnrolled ? {} : { isPreview: true }),
-      },
+      where: { courseId },
       orderBy: { order: 'asc' },
     });
 
     if (!includeUnpublished && !isEnrolled) {
+      // Trả về tất cả lessons nhưng ẩn videoUrl cho bài không phải preview
       return lessons.map(l => ({ 
         ...l, 
         videoUrl: l.isPreview ? l.videoUrl : '' 

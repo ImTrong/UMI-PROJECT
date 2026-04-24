@@ -55,6 +55,56 @@ export class CertificateController {
     }
   }
 
+  static async getCertificateDetail(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { certificateId } = req.params;
+      const certificate = await CertificateService.getCertificateById(certificateId, req.user.userId);
+      res.status(HTTP_STATUS.OK).json({ data: certificate });
+    } catch (error: any) {
+      logger.error('Get certificate detail error:', error);
+      if (error.message === 'Certificate not found') {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      if (error.message === ERROR_MESSAGES.FORBIDDEN) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get certificate' });
+    }
+  }
+
+  static async downloadCertificate(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { certificateId } = req.params;
+      const filePath = await CertificateService.getCertificateFilePath(certificateId, req.user.userId);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'Certificate file not found' });
+      }
+
+      const fileName = `certificate-${certificateId}.pdf`;
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+
+      const fileStream = fs.createReadStream(filePath);
+      fileStream.pipe(res);
+    } catch (error: any) {
+      logger.error('Download certificate error:', error);
+      if (error.message === 'Certificate not found') {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      if (error.message === ERROR_MESSAGES.FORBIDDEN) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to download certificate' });
+    }
+  }
+
   static async healthCheck(req: AuthRequest, res: Response) {
     const health = await CertificateService.healthCheck();
     const statusCode = health.database === 'connected' ? HTTP_STATUS.OK : HTTP_STATUS.INTERNAL_SERVER_ERROR;

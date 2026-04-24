@@ -59,6 +59,8 @@ app.post('/api/learning/internal/courses/:courseId/enroll', validateCourseId, ha
 app.post('/api/learning/certificates/:courseId/generate', authenticateToken, validateCourseId, handleValidationErrors, CertificateController.generateCertificate);
 app.get('/api/learning/certificates/me', authenticateToken, validatePagination, handleValidationErrors, CertificateController.getUserCertificates);
 app.get('/api/learning/certificates/verify/:certificateNumber', CertificateController.verifyCertificate);
+app.get('/api/learning/certificates/:certificateId/detail', authenticateToken, CertificateController.getCertificateDetail);
+app.get('/api/learning/certificates/:certificateId/download', authenticateToken, CertificateController.downloadCertificate);
 
 // Badge routes
 app.get('/api/learning/badges/me', authenticateToken, BadgeController.getUserBadges);
