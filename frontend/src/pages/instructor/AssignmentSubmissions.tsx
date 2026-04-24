@@ -28,7 +28,7 @@ export default function AssignmentSubmissions() {
       const data = await learningService.getAssignmentSubmissions(assignmentId!);
       setSubmissions(data);
     } catch (error) {
-      toast.error('Failed to load submissions');
+      toast.error('Tải danh sách bài nộp thất bại');
     } finally {
       setLoading(false);
     }
@@ -50,10 +50,10 @@ export default function AssignmentSubmissions() {
         status,
       });
       setSubmissions(submissions.map(s => s.id === updated.id ? updated : s));
-      toast.success(status === 'GRADED' ? 'Grade submitted successfully' : 'Submission returned to student');
+      toast.success(status === 'GRADED' ? 'Chấm điểm thành công' : 'Bài nộp đã được trả lại cho học viên');
       setSelectedSubmission(null);
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Failed to submit grade');
+      toast.error(error.response?.data?.error || 'Chấm điểm thất bại');
     } finally {
       setGrading(false);
     }
@@ -74,8 +74,8 @@ export default function AssignmentSubmissions() {
           <FiChevronLeft size={20} />
         </button>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Student Submissions</h1>
-          <p className="text-gray-500 text-sm">Review, grade, and provide feedback</p>
+          <h1 className="text-2xl font-bold text-gray-900">Bài nộp của học viên</h1>
+          <p className="text-gray-500 text-sm">Xem xét, chấm điểm và góp ý</p>
         </div>
       </div>
 
@@ -84,18 +84,18 @@ export default function AssignmentSubmissions() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Submitted Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Học viên</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày nộp</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Điểm</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Thao tác</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {submissions.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
-                    No submissions found for this assignment yet.
+                    Chưa có bài nộp nào cho bài tập này.
                   </td>
                 </tr>
               ) : (
@@ -127,7 +127,7 @@ export default function AssignmentSubmissions() {
                         className="text-primary-600 hover:text-primary-900"
                         disabled={false}
                       >
-                        {sub.status === 'GRADED' ? 'Edit Grade' : 'Grade'}
+                        {sub.status === 'GRADED' ? 'Sửa điểm' : 'Chấm điểm'}
                       </button>
                     </td>
                   </tr>
@@ -144,7 +144,7 @@ export default function AssignmentSubmissions() {
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
             <div className="p-6 border-b flex justify-between items-center">
               <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-purple-600">
-                Grade Submission
+                Chấm điểm bài nộp
               </h3>
               <button onClick={() => setSelectedSubmission(null)} className="text-gray-400 hover:text-gray-600">
                 <FiX size={24} />
@@ -154,17 +154,17 @@ export default function AssignmentSubmissions() {
             <div className="p-6 overflow-y-auto flex-1">
               <div className="mb-6 grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Student ID</p>
+                  <p className="text-sm text-gray-500 mb-1">Mã học viên</p>
                   <p className="font-medium">{selectedSubmission.userId}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500 mb-1">Submitted at</p>
+                  <p className="text-sm text-gray-500 mb-1">Ngày nộp</p>
                   <p className="font-medium">{selectedSubmission.submittedAt ? new Date(selectedSubmission.submittedAt).toLocaleString() : 'N/A'}</p>
                 </div>
               </div>
 
               <div className="mb-6">
-                <h4 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wider">Student's Work</h4>
+                <h4 className="font-semibold text-gray-800 mb-3 text-sm uppercase tracking-wider">Bài làm của học viên</h4>
                 
                 {selectedSubmission.content && (
                   <div className="mb-4 bg-white border border-gray-200 rounded-lg p-4 prose max-w-none text-sm text-gray-700">
@@ -177,7 +177,7 @@ export default function AssignmentSubmissions() {
                     <a href={selectedSubmission.fileUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 bg-primary-50 rounded-lg text-primary-700 hover:bg-primary-100 transition">
                       <div className="flex items-center gap-3">
                         <FiFile />
-                        <span className="font-medium text-sm">{selectedSubmission.fileName || selectedSubmission.fileUrl.split('/').pop() || 'Attachment'}</span>
+                        <span className="font-medium text-sm">{selectedSubmission.fileName || selectedSubmission.fileUrl.split('/').pop() || 'Tệp đính kèm'}</span>
                       </div>
                       <FiDownload size={18} />
                     </a>
@@ -185,16 +185,16 @@ export default function AssignmentSubmissions() {
                 )}
                 
                 {!selectedSubmission.content && !selectedSubmission.fileUrl && (
-                  <p className="text-gray-500 italic text-sm p-4 bg-gray-50 rounded text-center">Empty submission.</p>
+                  <p className="text-gray-500 italic text-sm p-4 bg-gray-50 rounded text-center">Bài nộp trống.</p>
                 )}
               </div>
 
               <hr className="my-6" />
 
-              <h4 className="font-semibold text-gray-800 mb-4 text-sm uppercase tracking-wider">Grading</h4>
+              <h4 className="font-semibold text-gray-800 mb-4 text-sm uppercase tracking-wider">Chấm điểm</h4>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Score (Points)</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Điểm số</label>
                   <input
                     type="number"
                     min="0"
@@ -204,12 +204,12 @@ export default function AssignmentSubmissions() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Instructor Feedback</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nhận xét của giảng viên</label>
                   <textarea
                     value={feedback}
                     onChange={(e) => setFeedback(e.target.value)}
                     className="input-field min-h-[120px]"
-                    placeholder="Provide constructive feedback for the student..."
+                    placeholder="Góp ý mang tính xây dựng cho học viên..."
                   />
                 </div>
               </div>
@@ -221,14 +221,14 @@ export default function AssignmentSubmissions() {
                 disabled={grading}
                 className="btn-secondary"
               >
-                Return to Student
+                Trả lại cho học viên
               </button>
               <button
                 onClick={() => submitGrade('GRADED')}
                 disabled={grading}
                 className="btn-primary flex items-center gap-2 px-8"
               >
-                <FiCheck /> {grading ? 'Saving...' : 'Submit Grade'}
+                <FiCheck /> {grading ? 'Đang lưu...' : 'Gửi điểm'}
               </button>
             </div>
           </div>

@@ -37,6 +37,7 @@ COPY --from=builder /app/shared/file-storage ./shared/file-storage
 COPY --from=builder /app/services/course-service/package*.json ./services/course-service/
 COPY --from=builder /app/services/course-service/node_modules ./services/course-service/node_modules
 COPY --from=builder /app/services/course-service/dist ./services/course-service/dist
+COPY --from=builder /app/services/course-service/dist-seed ./services/course-service/dist-seed
 COPY --from=builder /app/services/course-service/prisma ./services/course-service/prisma
 
 WORKDIR /app/services/course-service

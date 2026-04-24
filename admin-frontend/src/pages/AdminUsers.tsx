@@ -218,11 +218,11 @@ export default function AdminUsers() {
     setActionLoading(true);
     try {
       await userService.adminDeleteUser(deleteConfirm);
-      toast.success('Xóa người dùng thành công');
+      toast.success('Đã vô hiệu hóa tài khoản người dùng');
       setDeleteConfirm(null);
       loadUsers();
     } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Xóa người dùng thất bại');
+      toast.error(error.response?.data?.error || 'Vô hiệu hóa tài khoản thất bại');
     }
     setActionLoading(false);
   };
@@ -408,13 +408,13 @@ export default function AdminUsers() {
       {deleteConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 animate-fadeIn">
-            <h3 className="text-lg font-bold text-gray-900 mb-2">Xóa Người dùng</h3>
-            <p className="text-sm text-gray-600 mb-6">Bạn có chắc chắn muốn xóa vĩnh viễn người dùng này? Thao tác này không thể hoàn tác.</p>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">Vô hiệu hóa Người dùng</h3>
+            <p className="text-sm text-gray-600 mb-6">Bạn có chắc chắn muốn vô hiệu hóa tài khoản này? Tài khoản sẽ bị khóa nhưng không bị xóa khỏi hệ thống.</p>
             <div className="flex justify-end space-x-3">
               <button onClick={() => setDeleteConfirm(null)} className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-lg font-medium">Hủy</button>
               <button onClick={handleDelete} disabled={actionLoading}
                 className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium">
-                {actionLoading ? 'Đang xóa...' : 'Xóa'}
+                {actionLoading ? 'Đang xử lý...' : 'Vô hiệu hóa'}
               </button>
             </div>
           </div>

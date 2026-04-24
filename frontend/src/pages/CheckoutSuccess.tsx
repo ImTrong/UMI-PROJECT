@@ -45,7 +45,7 @@ export default function CheckoutSuccess() {
       } catch (error) {
         console.error('Failed to verify payment status:', error);
         if (isMounted) {
-          toast.error('Failed to load order details');
+          toast.error('Không thể tải thông tin đơn hàng');
           setStatus('error');
         }
       }
@@ -69,11 +69,11 @@ export default function CheckoutSuccess() {
             <div className="flex justify-center">
               <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-primary-600"></div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800">Verifying your payment...</h2>
+            <h2 className="text-2xl font-bold text-gray-800">Đang xác minh thanh toán...</h2>
             <p className="text-gray-500">
-              Please wait while we confirm your payment with the payment gateway.
+              Vui lòng chờ trong khi chúng tôi xác nhận thanh toán với cổng thanh toán.
               <br />
-              Do not close this page. This might take a few seconds.
+              Đừng đóng trang này. Quá trình có thể mất vài giây.
             </p>
           </div>
         )}
@@ -83,22 +83,22 @@ export default function CheckoutSuccess() {
             <div className="flex justify-center">
               <FiCheckCircle className="text-green-500 w-20 h-20" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-800">Payment Successful!</h2>
+            <h2 className="text-3xl font-bold text-gray-800">Thanh toán thành công!</h2>
             <p className="text-gray-600">
-              Thank you for your purchase! Your order <strong>#{order?.orderNumber}</strong> has been successfully processed.
+              Cảm ơn bạn đã mua hàng! Đơn hàng <strong>#{order?.orderNumber}</strong> của bạn đã được xử lý thành công.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center mt-6">
               <button 
                 onClick={() => navigate(`/orders/${orderId}`)} 
                 className="btn-secondary"
               >
-                View Order Details
+                Xem chi tiết đơn hàng
               </button>
               <button 
                 onClick={() => navigate('/purchased-courses')} 
                 className="btn-primary"
               >
-                Go to My Courses
+                Đi đến khóa học của tôi
               </button>
             </div>
           </div>
@@ -109,17 +109,17 @@ export default function CheckoutSuccess() {
             <div className="flex justify-center">
               <FiClock className="text-yellow-500 w-16 h-16" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800">Payment Processing</h2>
+            <h2 className="text-2xl font-bold text-gray-800">Đang xử lý thanh toán</h2>
             <p className="text-gray-600">
-              Your payment has been submitted, but we are still waiting for confirmation from our payment provider. 
-              Usually, this shouldn't take long. You can check the order details page for updates.
+              Thanh toán của bạn đã được gửi, nhưng chúng tôi vẫn đang chờ xác nhận từ nhà cung cấp dịch vụ thanh toán. 
+              Thông thường quá trình này sẽ không mất nhiều thời gian. Bạn có thể kiểm tra trang chi tiết đơn hàng để cập nhật.
             </p>
             <div className="flex justify-center mt-6">
               <button 
                 onClick={() => navigate(`/orders/${orderId}`)} 
                 className="btn-primary"
               >
-                Check Order Status
+                Kiểm tra trạng thái đơn hàng
               </button>
             </div>
           </div>
@@ -130,16 +130,16 @@ export default function CheckoutSuccess() {
             <div className="flex justify-center">
               <FiAlertCircle className="text-red-500 w-16 h-16" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800">Payment Unsuccessful</h2>
+            <h2 className="text-2xl font-bold text-gray-800">Thanh toán không thành công</h2>
             <p className="text-gray-600">
-              There was an issue processing your payment, or the order was not found. Please try again or contact support if the issue persists.
+              Đã xảy ra sự cố khi xử lý thanh toán của bạn, hoặc không tìm thấy đơn hàng. Vui lòng thử lại hoặc liên hệ hỗ trợ nếu sự cố vẫn tiếp diễn.
             </p>
             <div className="flex justify-center mt-6">
               <button 
                 onClick={() => navigate(`/orders/${orderId}`)} 
                 className="btn-primary"
               >
-                Back to Order
+                Quay lại đơn hàng
               </button>
             </div>
           </div>

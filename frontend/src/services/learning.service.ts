@@ -326,6 +326,11 @@ export const learningService = {
     return response.data.data;
   },
 
+  async getQuizAttempts(quizId: string): Promise<any[]> {
+    const response = await learningApi.get(`/api/learning/quiz/${quizId}/attempts/me`);
+    return response.data.data;
+  },
+
   // Assignments
   async getAssignmentByLesson(lessonId: string): Promise<Assignment> {
     const response = await learningApi.get(`/api/learning/assignment/lesson/${lessonId}`);
@@ -355,6 +360,11 @@ export const learningService = {
 
   async getPendingTasks(): Promise<TaskItem[]> {
     const response = await learningApi.get('/api/learning/tasks/pending');
+    return response.data.data;
+  },
+
+  async getTaskDetail(taskId: string, type: 'QUIZ' | 'ASSIGNMENT'): Promise<any> {
+    const response = await learningApi.get(`/api/learning/tasks/${taskId}/detail?type=${type}`);
     return response.data.data;
   },
 

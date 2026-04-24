@@ -30,15 +30,15 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
   const getStatusText = (status: Order['status']) => {
     switch (status) {
       case 'COMPLETED':
-        return 'Order Completed';
+        return 'Đơn hàng hoàn thành';
       case 'PENDING':
-        return 'Pending Payment';
+        return 'Chờ thanh toán';
       case 'PROCESSING':
-        return 'Processing';
+        return 'Đang xử lý';
       case 'CANCELLED':
-        return 'Cancelled';
+        return 'Đã hủy';
       case 'FAILED':
-        return 'Payment Failed';
+        return 'Thanh toán thất bại';
       default:
         return status;
     }
@@ -50,9 +50,9 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
       <div className="card">
         <div className="flex justify-between items-start mb-4">
           <div>
-            <h1 className="text-2xl font-bold">Order #{order.orderNumber}</h1>
+            <h1 className="text-2xl font-bold">Đơn hàng #{order.orderNumber}</h1>
             <p className="text-gray-500 mt-1">
-              Placed on {format(new Date(order.createdAt), 'MMMM dd, yyyy')}
+              Đặt ngày {format(new Date(order.createdAt), 'dd/MM/yyyy')}
             </p>
           </div>
           <div className="text-right">
@@ -61,14 +61,14 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
               <span className="font-semibold">{getStatusText(order.status)}</span>
             </div>
             {order.paymentStatus === 'PAID' && (
-              <p className="text-sm text-green-600 mt-1">Payment Confirmed</p>
+              <p className="text-sm text-green-600 mt-1">Đã xác nhận thanh toán</p>
             )}
           </div>
         </div>
 
         {/* Order Items */}
         <div className="border-t pt-4">
-          <h3 className="font-semibold mb-3">Order Items</h3>
+          <h3 className="font-semibold mb-3">Các mục trong đơn hàng</h3>
           <div className="space-y-3">
             {order.items.map((item, index) => (
               <div key={index} className="flex justify-between items-center">
@@ -95,17 +95,17 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
         <div className="border-t mt-4 pt-4">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-gray-600">Subtotal</span>
+              <span className="text-gray-600">Tạm tính</span>
               <span>{formatVND(order.subtotal)}</span>
             </div>
             {order.discount > 0 && (
               <div className="flex justify-between text-green-600">
-                <span>Discount</span>
+                <span>Giảm giá</span>
                 <span>-{formatVND(order.discount)}</span>
               </div>
             )}
             <div className="flex justify-between font-bold text-lg pt-2 border-t">
-              <span>Total</span>
+              <span>Tổng cộng</span>
               <span className="text-primary-600">{formatVND(order.totalPrice)}</span>
             </div>
           </div>
@@ -116,17 +116,17 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
           <div className="border-t pt-4">
             <div className="flex items-center space-x-2 mb-2">
               <FiCreditCard className="text-gray-500" />
-              <h3 className="font-semibold">Payment Information</h3>
+              <h3 className="font-semibold">Thông tin thanh toán</h3>
             </div>
-            <p className="text-sm text-gray-600">Payment ID: {order.paymentId}</p>
-            <p className="text-sm text-gray-600">Status: {order.paymentStatus}</p>
+            <p className="text-sm text-gray-600">Mã thanh toán: {order.paymentId}</p>
+            <p className="text-sm text-gray-600">Trạng thái: {order.paymentStatus}</p>
           </div>
         )}
 
         {/* Notes */}
         {order.notes && (
           <div className="border-t pt-4">
-            <h3 className="font-semibold mb-2">Order Notes</h3>
+            <h3 className="font-semibold mb-2">Ghi chú đơn hàng</h3>
             <p className="text-gray-600">{order.notes}</p>
           </div>
         )}
@@ -134,7 +134,7 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
         {/* Cancel Reason */}
         {order.cancelledReason && (
           <div className="border-t pt-4">
-            <h3 className="font-semibold mb-2 text-red-600">Cancellation Reason</h3>
+            <h3 className="font-semibold mb-2 text-red-600">Lý do hủy</h3>
             <p className="text-gray-600">{order.cancelledReason}</p>
           </div>
         )}

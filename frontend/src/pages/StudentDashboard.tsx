@@ -221,7 +221,7 @@ export default function StudentDashboard() {
             {pendingTasks.length > 0 ? (
               <div className="space-y-3">
                 {pendingTasks.slice(0, 3).map((task) => (
-                  <Link key={task.id} to={`/learning/${task.courseId}?lessonId=${task.lessonId}`} className="block p-3 bg-gray-50 rounded-lg hover:bg-primary-50 transition">
+                  <Link key={task.id} to={task.type === 'QUIZ' ? `/tasks/${task.id}/quiz` : `/tasks/${task.id}/assignment`} className="block p-3 bg-gray-50 rounded-lg hover:bg-primary-50 transition">
                     <p className="font-medium text-sm text-gray-900 truncate">{task.title}</p>
                     <div className="flex justify-between items-center mt-1">
                       <span className="text-xs text-gray-500 font-semibold">{task.type === 'QUIZ' ? 'Trắc nghiệm' : 'Bài tập'}</span>

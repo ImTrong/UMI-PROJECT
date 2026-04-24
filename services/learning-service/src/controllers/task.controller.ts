@@ -28,4 +28,22 @@ export class TaskController {
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Lỗi lấy danh sách nhiệm vụ của bạn' });
     }
   }
+
+  static async getTaskDetail(req: AuthRequest, res: Response) {
+    try {
+      const { taskId } = req.params;
+      const type = (req.query.type as string)?.toUpperCase();
+      if (type !== 'QUIZ' && type !== 'ASSIGNMENT') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'type must be QUIZ or ASSIGNMENT' });
+      }
+      const detail = await TaskService.getTaskDetail(taskId, type);
+      res.status(HTTP_STATUS.OK).json({ data: detail });
+    } catch (error: any) {
+      console.error('Error fetching task detail:', error);
+      if (error.message?.includes('not found')) {
+        return res.status(404).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Lỗi lấy thông tin chi tiết nhiệm vụ' });
+    }
+  }
 }

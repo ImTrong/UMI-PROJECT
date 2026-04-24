@@ -38,6 +38,10 @@ export const validateUpdateUser = [
     .optional()
     .isIn(['STUDENT', 'INSTRUCTOR', 'ADMIN'])
     .withMessage('Invalid role'),
+  body('isActive')
+    .optional()
+    .isBoolean()
+    .withMessage('isActive must be a boolean'),
 ];
 
 export const validateEducation = [
