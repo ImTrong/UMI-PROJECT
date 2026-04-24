@@ -239,16 +239,16 @@ app.delete(
   async (req: express.Request, res: express.Response) => {
     try {
       const { userId } = req.params;
-      await UserService.deleteUserProfile(userId);
+      await UserService.softDeleteUserProfile(userId);
       res.status(200).json({
-        message: 'User deleted successfully',
+        message: 'User deactivated successfully',
       });
     } catch (error: any) {
-      logger.error('Admin delete user error:', error);
+      logger.error('Admin soft-delete user error:', error);
       if (error.message === ERROR_MESSAGES.USER_NOT_FOUND) {
         return res.status(404).json({ error: error.message });
       }
-      res.status(500).json({ error: 'Failed to delete user' });
+      res.status(500).json({ error: 'Failed to deactivate user' });
     }
   }
 );

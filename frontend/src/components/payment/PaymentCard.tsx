@@ -55,7 +55,7 @@ export const PaymentCard = ({ payment, onRefund }: PaymentCardProps) => {
             </span>
           </div>
           <p className="text-sm text-gray-500 mt-1">
-            Order #{payment.orderNumber}
+            Đơn hàng #{payment.orderNumber}
           </p>
         </div>
         <div className="text-right">
@@ -69,9 +69,9 @@ export const PaymentCard = ({ payment, onRefund }: PaymentCardProps) => {
       </div>
 
       <div className="text-sm text-gray-600 space-y-1">
-        <p>Payment ID: {payment.stripePaymentIntentId?.slice(-8) || payment.id.slice(-8)}</p>
+        <p>Mã thanh toán: {payment.stripePaymentIntentId?.slice(-8) || payment.id.slice(-8)}</p>
         {payment.paymentMethodId && (
-          <p>Method: {payment.paymentMethodId.slice(-4)}</p>
+          <p>Phương thức: {payment.paymentMethodId.slice(-4)}</p>
         )}
         {payment.errorMessage && (
           <p className="text-red-600 text-xs mt-2">{payment.errorMessage}</p>
@@ -84,7 +84,7 @@ export const PaymentCard = ({ payment, onRefund }: PaymentCardProps) => {
             onClick={() => onRefund(payment.id)}
             className="text-sm text-red-600 hover:text-red-700"
           >
-            Request Refund
+            Yêu cầu hoàn tiền
           </button>
         </div>
       )}

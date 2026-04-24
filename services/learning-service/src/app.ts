@@ -91,6 +91,7 @@ app.put('/api/learning/assignment/submission/:submissionId/grade', authenticateT
 // ==================== Task Routes ====================
 app.get('/api/learning/course/:courseId/tasks', authenticateToken, TaskController.getCourseTasks);
 app.get('/api/learning/tasks/pending', authenticateToken, TaskController.getUserTasks);
+app.get('/api/learning/tasks/:taskId/detail', authenticateToken, TaskController.getTaskDetail);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });

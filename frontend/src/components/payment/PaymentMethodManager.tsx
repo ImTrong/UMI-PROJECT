@@ -24,7 +24,7 @@ const AddPaymentMethodForm = ({ onSuccess }: { onSuccess: () => void }) => {
         const intent = await paymentService.createSetupIntent();
         setSetupIntent(intent);
       } catch (error) {
-        toast.error('Failed to initialize');
+        toast.error('Không thể khởi tạo');
       }
     };
     createSetupIntent();
@@ -52,11 +52,11 @@ const AddPaymentMethodForm = ({ onSuccess }: { onSuccess: () => void }) => {
     );
 
     if (error) {
-      toast.error(error.message || 'Failed to save payment method');
+      toast.error(error.message || 'Lưu phương thức thanh toán thất bại');
       setProcessing(false);
     } else if (confirmedIntent) {
       await paymentService.savePaymentMethod(confirmedIntent.payment_method as string);
-      toast.success('Payment method saved successfully');
+      toast.success('Lưu phương thức thanh toán thành công');
       onSuccess();
       setProcessing(false);
     }
@@ -82,7 +82,7 @@ const AddPaymentMethodForm = ({ onSuccess }: { onSuccess: () => void }) => {
         disabled={!stripe || processing}
         className="w-full btn-primary"
       >
-        {processing ? 'Saving...' : 'Add Payment Method'}
+        {processing ? 'Đang lưu...' : 'Thêm phương thức thanh toán'}
       </button>
     </form>
   );
@@ -114,15 +114,15 @@ export const PaymentMethodManager = ({ onMethodSelected, selectedMethodId }: Pay
   }, []);
 
   if (loading) {
-    return <div className="text-center py-4">Loading payment methods...</div>;
+    return <div className="text-center py-4">Đang tải phương thức thanh toán...</div>;
   }
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold">Payment Methods</h3>
+      <h3 className="font-semibold">Phương thức thanh toán</h3>
 
       {methods.length === 0 ? (
-        <p className="text-gray-500 text-sm">No saved payment methods</p>
+        <p className="text-gray-500 text-sm">Chưa có phương thức thanh toán nào</p>
       ) : (
         <div className="space-y-2">
           {methods.map((method) => (
@@ -140,12 +140,12 @@ export const PaymentMethodManager = ({ onMethodSelected, selectedMethodId }: Pay
                     {method.card.brand} •••• {method.card.last4}
                   </p>
                   <p className="text-sm text-gray-500">
-                    Expires {method.card.expMonth}/{method.card.expYear}
+                    Hết hạn {method.card.expMonth}/{method.card.expYear}
                   </p>
                 </div>
                 {method.isDefault && (
                   <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                    Default
+                    Mặc định
                   </span>
                 )}
               </div>
@@ -162,11 +162,11 @@ export const PaymentMethodManager = ({ onMethodSelected, selectedMethodId }: Pay
           onClick={() => setShowAddForm(true)}
           className="text-primary-600 hover:text-primary-700 text-sm"
         >
-          + Add new payment method
+          + Thêm phương thức thanh toán mới
         </button>
       ) : (
         <div className="border rounded-lg p-4 mt-2">
-          <h4 className="font-medium mb-3">Add New Card</h4>
+          <h4 className="font-medium mb-3">Thêm thẻ mới</h4>
           <Elements stripe={stripePromise}>
             <AddPaymentMethodForm onSuccess={() => {
               setShowAddForm(false);
@@ -177,7 +177,7 @@ export const PaymentMethodManager = ({ onMethodSelected, selectedMethodId }: Pay
             onClick={() => setShowAddForm(false)}
             className="mt-2 text-sm text-gray-500 hover:text-gray-700"
           >
-            Cancel
+            Hủy
           </button>
         </div>
       )}

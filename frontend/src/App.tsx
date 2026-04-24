@@ -31,6 +31,8 @@ import Certificates from './pages/Certificates'
 import Badges from './pages/Badges'
 import Activity from './pages/Activity'
 import MyTasks from './pages/MyTasks'
+import QuizPage from './pages/QuizPage'
+import AssignmentPage from './pages/AssignmentPage'
 import AssignmentSubmissions from './pages/instructor/AssignmentSubmissions'
 import CourseStudents from './pages/instructor/CourseStudents'
 import CourseStudentDetail from './pages/instructor/CourseStudentDetail'
@@ -169,6 +171,16 @@ function App() {
           <Route path="/tasks" element={
             <ProtectedRoute>
               <MyTasks />
+            </ProtectedRoute>
+          } />
+          <Route path="/tasks/:taskId/quiz" element={
+            <ProtectedRoute>
+              <QuizPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/tasks/:taskId/assignment" element={
+            <ProtectedRoute>
+              <AssignmentPage />
             </ProtectedRoute>
           } />
           

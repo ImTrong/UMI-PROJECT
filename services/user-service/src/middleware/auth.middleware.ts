@@ -1,7 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
 import axios from 'axios';
+import { PrismaClient } from '@prisma/client';
 import { HTTP_STATUS, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+
+const prisma = new PrismaClient();
 
 export interface AuthRequest extends Request {
   user?: {
@@ -43,6 +46,7 @@ export const authenticateToken = async (
       userId: response.data.user.userId,
       email: response.data.user.email,
       fullName: response.data.user.fullName,
+      role: response.data.user.role,
     };
 
     next();
@@ -62,11 +66,18 @@ export const requireRole = (roles: string[]) => {
       });
     }
 
-    // Get user role from database or token
-    // For now, we'll assume role is in token or fetch from user service
     try {
-      // This is a simplified check - in production, you'd get role from user profile
-      const userRole = req.user.role || 'STUDENT';
+      let userRole = req.user.role;
+
+      // If role is not in the token, fetch from user profile DB
+      if (!userRole) {
+        const profile = await prisma.userProfile.findUnique({
+          where: { userId: req.user.userId },
+          select: { role: true },
+        });
+        userRole = profile?.role || 'STUDENT';
+        req.user.role = userRole;
+      }
       
       if (!roles.includes(userRole)) {
         return res.status(HTTP_STATUS.FORBIDDEN).json({

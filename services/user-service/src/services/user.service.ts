@@ -19,6 +19,8 @@ export interface UpdateUserData {
   address?: string;
   dateOfBirth?: Date;
   preferences?: any;
+  role?: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
+  isActive?: boolean;
 }
 
 export interface EducationData {
@@ -230,6 +232,30 @@ export class UserService {
 
     logger.info(`User profile deleted: ${userId}`);
     return { success: true };
+  }
+
+  /**
+   * Soft delete — deactivate user instead of removing from DB
+   */
+  static async softDeleteUserProfile(userId: string) {
+    const existingUser = await prisma.userProfile.findUnique({
+      where: { userId },
+    });
+
+    if (!existingUser) {
+      throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    const updatedUser = await prisma.userProfile.update({
+      where: { userId },
+      data: {
+        isActive: false,
+        updatedAt: new Date(),
+      },
+    });
+
+    logger.info(`User soft-deleted (deactivated): ${userId}`);
+    return updatedUser;
   }
 
   // Education Management

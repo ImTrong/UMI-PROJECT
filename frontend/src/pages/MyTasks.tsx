@@ -2,7 +2,17 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { learningService, TaskItem } from '../services/learning.service';
 import { useAuth } from '../hooks/useAuth';
-import { FiCheckSquare, FiFileText, FiClock, FiCheckCircle, FiAlertCircle, FiArrowRight } from 'react-icons/fi';
+import {
+  FiCheckSquare,
+  FiFileText,
+  FiClock,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiArrowRight,
+  FiTarget,
+  FiAward,
+  FiBookOpen,
+} from 'react-icons/fi';
 
 export default function MyTasks() {
   const { isAuthenticated } = useAuth();
@@ -31,21 +41,57 @@ export default function MyTasks() {
   const filteredTasks = tasks.filter((task) => {
     if (filter === 'ALL') return true;
     if (filter === 'COMPLETED') return task.status === 'COMPLETED';
-    return task.status !== 'COMPLETED'; // PENDING includes NOT_STARTED, IN_PROGRESS, LATE
+    return task.status !== 'COMPLETED';
   });
 
   const getStatusBadge = (status: TaskItem['status']) => {
     switch (status) {
       case 'COMPLETED':
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-green-100 text-green-700 flex items-center gap-1.5"><FiCheckCircle /> Đã hoàn thành</span>;
+        return (
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-700 flex items-center gap-1.5">
+            <FiCheckCircle size={12} /> Đã hoàn thành
+          </span>
+        );
       case 'LATE':
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-red-100 text-red-700 flex items-center gap-1.5"><FiAlertCircle /> Trễ hạn</span>;
+        return (
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-700 flex items-center gap-1.5">
+            <FiAlertCircle size={12} /> Trễ hạn
+          </span>
+        );
       case 'IN_PROGRESS':
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-blue-100 text-blue-700 flex items-center gap-1.5"><FiClock /> Đang làm</span>;
+        return (
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 flex items-center gap-1.5">
+            <FiClock size={12} /> Đang làm
+          </span>
+        );
       default:
-        return <span className="px-2.5 py-1 text-xs font-semibold rounded-md bg-gray-100 text-gray-700 flex items-center gap-1.5"><FiClock /> Chưa làm</span>;
+        return (
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600 flex items-center gap-1.5">
+            <FiClock size={12} /> Chưa làm
+          </span>
+        );
     }
   };
+
+  const getTaskLink = (task: TaskItem) => {
+    if (task.type === 'QUIZ') {
+      return `/tasks/${task.id}/quiz`;
+    }
+    return `/tasks/${task.id}/assignment`;
+  };
+
+  const getActionLabel = (task: TaskItem) => {
+    if (task.status === 'COMPLETED') {
+      return task.type === 'QUIZ' ? 'Xem kết quả' : 'Xem bài nộp';
+    }
+    if (task.status === 'IN_PROGRESS') {
+      return 'Tiếp tục làm';
+    }
+    return task.type === 'QUIZ' ? 'Làm bài ngay' : 'Nộp bài ngay';
+  };
+
+  const pendingCount = tasks.filter((t) => t.status !== 'COMPLETED').length;
+  const completedCount = tasks.filter((t) => t.status === 'COMPLETED').length;
 
   if (loading && tasks.length === 0) {
     return (
@@ -61,19 +107,32 @@ export default function MyTasks() {
   return (
     <div className="min-h-screen bg-gray-50/50 pt-8 pb-20">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         {/* Header Hero */}
         <div className="relative mb-10 p-8 rounded-3xl overflow-hidden bg-gradient-to-br from-primary-700 to-indigo-900 shadow-xl group">
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/10 blur-3xl group-hover:scale-110 transition-transform duration-1000"></div>
-          
-          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center">
+          <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-48 h-48 rounded-full bg-purple-400/10 blur-2xl"></div>
+
+          <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
               <h1 className="text-3xl font-extrabold text-white mb-2 flex items-center">
                 <FiCheckSquare className="mr-3 text-amber-400" /> Bài tập & Trắc nghiệm
               </h1>
               <p className="text-primary-100 text-base max-w-xl font-medium">
-                Quản lý tiến độ hoàn thành các nhiệm vụ khóa học. Đừng bỏ lỡ bất kỳ bài kiểm tra hay bài thực hành nào nhé!
+                Quản lý tiến độ hoàn thành các nhiệm vụ khóa học. Nhấn vào nút để làm bài trực tiếp!
               </p>
+            </div>
+
+            {/* Quick stats */}
+            <div className="flex gap-4">
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-5 py-3 text-center">
+                <p className="text-2xl font-bold text-white">{pendingCount}</p>
+                <p className="text-xs text-primary-200 font-medium">Cần làm</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl px-5 py-3 text-center">
+                <p className="text-2xl font-bold text-green-300">{completedCount}</p>
+                <p className="text-xs text-primary-200 font-medium">Hoàn thành</p>
+              </div>
             </div>
           </div>
         </div>
@@ -94,7 +153,7 @@ export default function MyTasks() {
               filter === 'PENDING' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
-            Cần làm ({tasks.filter(t => t.status !== 'COMPLETED').length})
+            Cần làm ({pendingCount})
           </button>
           <button
             onClick={() => setFilter('COMPLETED')}
@@ -102,7 +161,7 @@ export default function MyTasks() {
               filter === 'COMPLETED' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'
             }`}
           >
-            Đã hoàn thành ({tasks.filter(t => t.status === 'COMPLETED').length})
+            Đã hoàn thành ({completedCount})
           </button>
         </div>
 
@@ -118,48 +177,87 @@ export default function MyTasks() {
             </div>
           ) : (
             filteredTasks.map((task) => (
-              <div key={task.id} className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-shadow flex flex-col md:flex-row items-start md:items-center justify-between gap-5 group">
-                <div className="flex items-start gap-4">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    task.type === 'QUIZ' ? 'bg-purple-100 text-purple-600' : 'bg-amber-100 text-amber-600'
-                  }`}>
-                    {task.type === 'QUIZ' ? <FiCheckSquare size={24} /> : <FiFileText size={24} />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
-                        {task.courseTitle || 'Khóa học'}
-                      </span>
-                      {getStatusBadge(task.status)}
+              <div
+                key={task.id}
+                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-200 group overflow-hidden"
+              >
+                <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+                  <div className="flex items-start gap-4 flex-1 min-w-0">
+                    {/* Icon */}
+                    <div
+                      className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110 ${
+                        task.type === 'QUIZ'
+                          ? 'bg-purple-100 text-purple-600'
+                          : 'bg-amber-100 text-amber-600'
+                      }`}
+                    >
+                      {task.type === 'QUIZ' ? <FiCheckSquare size={24} /> : <FiFileText size={24} />}
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors">
-                      {task.title}
-                    </h3>
-                    <div className="mt-2 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-500 font-medium">
-                      <span className="flex items-center gap-1.5"><strong className="text-gray-700">Loại:</strong> {task.type === 'QUIZ' ? 'Trắc nghiệm' : 'Thực hành (Bài tập)'}</span>
-                      {task.dueDate && (
-                        <span className="flex items-center gap-1.5"><FiClock className={new Date(task.dueDate) < new Date() ? 'text-red-500' : ''} /> <strong className="text-gray-700">Hạn nộp:</strong> {new Date(task.dueDate).toLocaleString()}</span>
-                      )}
-                      {(task.score !== undefined && task.score !== null) && (
-                        <span className="flex items-center gap-1.5">
-                          <strong className="text-green-600">Điểm số:</strong> {task.score} / {task.passingScore || task.maxScore || 100}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
 
-                <Link
-                  to={`/learning/${task.courseId}?lessonId=${task.lessonId}`}
-                  className={`flex-shrink-0 px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all ${
-                    task.status === 'COMPLETED' 
-                      ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' 
-                      : 'bg-primary-50 text-primary-600 hover:bg-primary-600 hover:text-white'
-                  }`}
-                >
-                  {task.status === 'COMPLETED' ? 'Xem lại kết quả' : 'Làm bài ngay'}
-                  <FiArrowRight />
-                </Link>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-gray-400">
+                          <FiBookOpen size={11} />
+                          {task.courseTitle || 'Khóa học'}
+                        </span>
+                        {getStatusBadge(task.status)}
+                      </div>
+                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors truncate">
+                        {task.title}
+                      </h3>
+                      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-gray-500">
+                        <span className="flex items-center gap-1.5">
+                          {task.type === 'QUIZ' ? (
+                            <FiTarget size={13} className="text-purple-500" />
+                          ) : (
+                            <FiAward size={13} className="text-amber-500" />
+                          )}
+                          <span className="font-medium text-gray-600">
+                            {task.type === 'QUIZ' ? 'Trắc nghiệm' : 'Bài tập nộp'}
+                          </span>
+                        </span>
+                        {task.dueDate && (
+                          <span
+                            className={`flex items-center gap-1.5 ${
+                              new Date(task.dueDate) < new Date() ? 'text-red-500 font-semibold' : ''
+                            }`}
+                          >
+                            <FiClock size={13} />
+                            Hạn nộp: {new Date(task.dueDate).toLocaleDateString('vi-VN')}{' '}
+                            {new Date(task.dueDate).toLocaleTimeString('vi-VN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                        )}
+                        {task.score !== undefined && task.score !== null && (
+                          <span className="flex items-center gap-1.5">
+                            <FiAward size={13} className="text-green-500" />
+                            <span className="font-semibold text-green-600">
+                              Điểm: {task.score} / {task.passingScore || task.maxScore || 100}
+                            </span>
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Button — Links to standalone pages */}
+                  <Link
+                    to={getTaskLink(task)}
+                    className={`flex-shrink-0 px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all text-sm ${
+                      task.status === 'COMPLETED'
+                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        : task.type === 'QUIZ'
+                        ? 'bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white shadow-sm hover:shadow-md hover:shadow-purple-500/20'
+                        : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white shadow-sm hover:shadow-md hover:shadow-amber-500/20'
+                    }`}
+                  >
+                    {getActionLabel(task)}
+                    <FiArrowRight className="group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                </div>
               </div>
             ))
           )}

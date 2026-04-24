@@ -189,6 +189,7 @@ services:
         condition: service_healthy
     networks:
       - elearning-network
+    command: sh -c "npx prisma db push && node dist-seed/prisma/seed.js && node dist/index.js"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3003/api/courses/health"]
       interval: 10s

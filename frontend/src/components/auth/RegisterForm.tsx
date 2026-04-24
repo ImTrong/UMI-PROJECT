@@ -56,7 +56,7 @@ export const RegisterForm = () => {
                 value={formData.fullName}
                 onChange={handleChange}
                 className="input-field pl-10"
-                placeholder="John Doe"
+                placeholder="Nguyễn Văn A"
                 required
               />
             </div>

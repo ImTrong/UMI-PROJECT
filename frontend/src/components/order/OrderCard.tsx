@@ -48,7 +48,7 @@ export const OrderCard = ({ order, onCancel, canCancel }: OrderCardProps) => {
       <div className="flex justify-between items-start mb-4">
         <div>
           <Link to={`/orders/${order.id}`} className="text-primary-600 hover:underline">
-            <h3 className="font-semibold">Order #{order.orderNumber}</h3>
+            <h3 className="font-semibold">Đơn hàng #{order.orderNumber}</h3>
           </Link>
           <p className="text-sm text-gray-500">
             {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
@@ -79,7 +79,7 @@ export const OrderCard = ({ order, onCancel, canCancel }: OrderCardProps) => {
         ))}
         {order.items.length > 3 && (
           <p className="text-sm text-gray-500">
-            +{order.items.length - 3} more items
+            +{order.items.length - 3} mục khác
           </p>
         )}
       </div>
@@ -90,14 +90,14 @@ export const OrderCard = ({ order, onCancel, canCancel }: OrderCardProps) => {
           to={`/orders/${order.id}`}
           className="text-sm text-primary-600 hover:text-primary-700"
         >
-          View Details
+          Xem chi tiết
         </Link>
         {canCancel && order.status === 'PENDING' && onCancel && (
           <button
             onClick={() => onCancel(order.id)}
             className="text-sm text-red-600 hover:text-red-700"
           >
-            Cancel Order
+            Hủy đơn hàng
           </button>
         )}
       </div>

@@ -152,4 +152,61 @@ export class TaskService {
       courseTitle: courseTitleMap.get(t.courseId) || 'Khóa học của bạn'
     }));
   }
+
+  /**
+   * Get detailed info for a single task (quiz or assignment) by its ID
+   */
+  static async getTaskDetail(taskId: string, type: 'QUIZ' | 'ASSIGNMENT') {
+    if (type === 'QUIZ') {
+      const quiz = await prisma.quiz.findUnique({
+        where: { id: taskId },
+      });
+      if (!quiz) throw new Error('Quiz not found');
+
+      // Try to get course title from CourseProgress
+      const courseTitle = await prisma.courseProgress.findFirst({
+        where: { courseId: quiz.courseId },
+        select: { courseTitle: true },
+      }).then(cp => cp?.courseTitle || 'Khóa học');
+
+      return {
+        id: quiz.id,
+        type: 'QUIZ' as const,
+        title: quiz.title,
+        description: quiz.description,
+        courseId: quiz.courseId,
+        lessonId: quiz.lessonId,
+        courseTitle,
+        passingScore: quiz.passingScore,
+        timeLimitMinutes: quiz.timeLimitMinutes,
+        maxAttempts: quiz.maxAttempts,
+      };
+    } else {
+      const assignment = await prisma.assignment.findUnique({
+        where: { id: taskId },
+      });
+      if (!assignment) throw new Error('Assignment not found');
+
+      const courseTitle = await prisma.courseProgress.findFirst({
+        where: { courseId: assignment.courseId },
+        select: { courseTitle: true },
+      }).then(cp => cp?.courseTitle || 'Khóa học');
+
+      return {
+        id: assignment.id,
+        type: 'ASSIGNMENT' as const,
+        title: assignment.title,
+        description: assignment.description,
+        instructions: assignment.instructions,
+        courseId: assignment.courseId,
+        lessonId: assignment.lessonId,
+        courseTitle,
+        dueDate: assignment.dueDate,
+        maxScore: assignment.maxScore,
+        allowLateSubmission: assignment.allowLateSubmission,
+        allowedFileTypes: assignment.allowedFileTypes,
+        maxFileSizeMB: assignment.maxFileSizeMB,
+      };
+    }
+  }
 }
