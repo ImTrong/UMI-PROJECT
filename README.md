@@ -20,10 +20,12 @@ This project implements a **pure microservices architecture** with the following
 | Layer | Technology |
 |-------|-----------|
 | **Frontend** | React 18 + Vite + Tailwind CSS |
+| **Admin Frontend** | React + Vite |
 | **API Gateway** | Nginx (Reverse Proxy) |
 | **Backend** | Node.js 18 + Express + TypeScript |
 | **ORM** | Prisma |
-| **Database** | MongoDB (Shared container, separate logical DBs) |
+| **Database** | MongoDB (Shared container, separate logical DBs, Replica Set enabled) |
+| **Storage** | MinIO (S3-compatible Object Storage) |
 | **Containerization** | Docker & Docker Compose |
 | **Payment Integration** | Stripe (Sandbox stub) |
 
@@ -36,6 +38,7 @@ UMI-PROJECT/
 ├── docker-compose.yml              # Orchestrate all services
 ├── nginx/
 │   └── nginx.conf                  # API Gateway configuration
+├── scripts/                        # Utility scripts
 ├── services/
 │   ├── auth-service/               # Authentication (Port 3001)
 │   ├── user-service/               # User profiles (Port 3002)
@@ -43,7 +46,9 @@ UMI-PROJECT/
 │   ├── order-service/              # Order & cart (Port 3004)
 │   ├── payment-service/            # Payment processing (Port 3005)
 │   └── learning-service/           # Progress & certificates (Port 3006)
+├── shared/                          # Shared libraries and types
 ├── frontend/                        # React + Vite frontend (Port 3000)
+├── admin-frontend/                  # React admin frontend (Port 4000)
 └── README.md                        # This file
 ```
 
@@ -81,15 +86,13 @@ docker-compose logs -f
 
 ### Option 2: Local Development
 
-#### 1. Start MongoDB
+#### 1. Start Infrastructure (MongoDB & MinIO)
 
 ```bash
-docker run -d \
-  --name elearning-mongo \
-  -e MONGO_INITDB_ROOT_USERNAME=admin \
-  -e MONGO_INITDB_ROOT_PASSWORD=securepassword123 \
-  -p 27017:27017 \
-  mongo:7.0-alpine
+# It is strongly recommended to use docker-compose for infrastructure 
+# as MongoDB requires replica set initialization for Prisma transactions,
+# and MinIO needs bucket initialization.
+docker-compose up -d mongodb minio minio-init
 ```
 
 #### 2. Start Each Service
@@ -128,7 +131,12 @@ npm run dev    # Runs on localhost:3006
 # Terminal 7: Frontend
 cd frontend
 npm install
-npm run dev    # Runs on localhost:5173
+npm run dev    # Runs on localhost:3000
+
+# Terminal 8: Admin Frontend
+cd admin-frontend
+npm install
+npm run dev    # Runs on localhost:4000
 ```
 
 ---
@@ -339,17 +347,23 @@ limit_req_zone $binary_remote_addr zone=general:10m rate=100r/s;
 
 ---
 
-## 🎨 Frontend Dashboard
+## 🎨 Frontend Applications
 
-The React frontend provides:
-
-1. **Real-time Service Health Monitoring**: Displays status of all 6 microservices
-2. **Health Check Status**: Shows which services are active/down
-3. **Auto-refresh**: Refreshes every 5 seconds
-4. **Service Information**: Displays uptime, database status
-5. **Architecture Overview**: Visual explanation of the system
+### 1. Main Frontend (Port 3000)
+The React frontend for students provides:
+1. **Course Browsing & Enrollment**: Explore and purchase courses
+2. **Learning Progress**: Track learning activities
+3. **User Profile**: Manage account settings
 
 **Access**: http://localhost:3000
+
+### 2. Admin Frontend (Port 4000)
+The React frontend for administrators provides:
+1. **Real-time Service Health Monitoring**: Displays status of all 6 microservices
+2. **System Architecture**: Visual explanation of the system
+3. **Data Management**: Manage users, courses, and orders (WIP)
+
+**Access**: http://localhost:4000
 
 ---
 
@@ -396,30 +410,32 @@ Response Format:
 ## 📦 Docker Compose Services
 
 ### MongoDB
-- **Image**: mongo:7.0-alpine
+- **Image**: mongo:7.0-jammy
 - **Port**: 27017 (internal), exposed to host
-- **Username**: admin
-- **Password**: securepassword123
+- **Credentials**: admin / securepassword123
+- **Configuration**: Replica Set (`rs0`) initialized for Prisma transactions
 - **Volume**: mongo-data (persistent)
-- **Health Check**: MongoDB ping
+
+### MinIO (Object Storage)
+- **Image**: minio/minio:latest
+- **Ports**: 9000 (API), 9001 (Console)
+- **Credentials**: minioadmin / minioadmin123
+- **Buckets**: assignments, quiz-attachments, courses (public)
+- **Volume**: minio-data (persistent)
 
 ### Nginx Gateway
 - **Image**: nginx:alpine
 - **Port**: 8080 (exposed to host)
-- **Configuration**: ./nginx/nginx.conf
 - **Routes**: All `/api/*` requests to microservices
-- **Health Check**: HTTP GET /health
 
 ### Backend Services
-- **Image**: Built from ./services/{service-name}/Dockerfile
+- **Image**: Built from `./services/{service-name}/Dockerfile`
 - **Node**: 18-alpine (multi-stage build)
-- **Optimization**: Production dependencies only
-- **Health Checks**: HTTP GET /{service_path}/health
+- **Health Checks**: HTTP GET `/{service_path}/health`
 
-### Frontend
-- **Image**: Built from ./frontend/Dockerfile
-- **Port**: 3000 (exposed to host)
-- **Target**: Development mode (dev) or production (prod)
+### Frontend Apps
+- **Main Frontend**: Built from `./frontend/Dockerfile` (Port 3000)
+- **Admin Frontend**: Built from `./admin-frontend/Dockerfile` (Port 4000)
 - **Framework**: React + Vite
 
 ---

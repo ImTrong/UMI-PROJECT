@@ -39,6 +39,12 @@ export class ReviewController {
         });
       }
 
+      if (error.message === 'Bạn phải tham gia khóa học này mới có thể đánh giá.') {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({
+          error: error.message,
+        });
+      }
+
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to create review',
       });
