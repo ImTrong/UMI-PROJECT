@@ -356,7 +356,8 @@ export default function Profile() {
 
     setIsUploadingAvatar(true);
     try {
-      const { uploadUrl, publicUrl } = await userService.getAvatarUploadUrl(file.name, file.type);
+      const uniqueFileName = `${Date.now()}_${file.name}`;
+      const { uploadUrl, publicUrl } = await userService.getAvatarUploadUrl(uniqueFileName, file.type);
       
       const uploadResponse = await fetch(uploadUrl, {
         method: 'PUT',

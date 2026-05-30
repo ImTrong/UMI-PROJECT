@@ -1,5 +1,9 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
+import { useEffect } from 'react'
+import { useDispatch } from 'react-redux'
+import { AppDispatch } from './store'
+import { fetchProfile } from './store/userSlice'
 import Header from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
@@ -46,6 +50,13 @@ import AIAssistant from './pages/AIAssistant'
 
 function App() {
   const { isAuthenticated, loading } = useAuth()
+  const dispatch = useDispatch<AppDispatch>()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      dispatch(fetchProfile())
+    }
+  }, [isAuthenticated, dispatch])
 
   if (loading) {
     return (
