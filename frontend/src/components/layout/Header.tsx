@@ -26,12 +26,16 @@ import { useNavigate } from 'react-router-dom';
 
 export default function Header() {
   const { user, logout, isAuthenticated } = useAuth();
+  const { profile } = useSelector((state: RootState) => state.user);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const cartItems = useSelector((state: RootState) => state.cart.items);
   const navigate = useNavigate();
+
+  const displayAvatar = profile?.avatar || user?.avatar;
+  const displayName = profile?.fullName || user?.fullName;
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -188,14 +192,14 @@ export default function Header() {
                   onClick={() => setOpenDropdown(openDropdown === 'user' ? null : 'user')}
                   className="flex items-center gap-2 px-3 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-xl transition-all"
                 >
-                  {user?.avatar ? (
-                    <img src={user.avatar} alt="Avatar" className="w-8 h-8 rounded-full object-cover shadow-sm border border-slate-200" />
+                  {displayAvatar ? (
+                    <img src={displayAvatar} alt="Avatar" className="w-8 h-8 rounded-full object-cover shadow-sm border border-slate-200" />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-white text-sm font-semibold shadow-sm">
-                      {user?.fullName?.charAt(0).toUpperCase() || 'U'}
+                      {displayName?.charAt(0).toUpperCase() || 'U'}
                     </div>
                   )}
-                  <span className="text-sm font-medium max-w-[120px] truncate">{user?.fullName}</span>
+                  <span className="text-sm font-medium max-w-[120px] truncate">{displayName}</span>
                   <FiChevronDown className={`w-4 h-4 transition-transform duration-200 ${openDropdown === 'user' ? 'rotate-180' : ''}`} />
                 </button>
                 {openDropdown === 'user' && (
