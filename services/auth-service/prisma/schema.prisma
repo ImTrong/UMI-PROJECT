@@ -19,9 +19,28 @@ model User {
   updatedAt     DateTime  @updatedAt
   
   refreshTokens RefreshToken[]
+  deviceSessions DeviceSession[]
   
   @@map("users")
 }
+
+
+model DeviceSession {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId       String   @db.ObjectId
+  sessionId    String   @unique
+  deviceId     String?
+  userAgent    String?
+  ipAddress    String?
+  lastActivity DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_sessions")
+}
+
 
 model RefreshToken {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId

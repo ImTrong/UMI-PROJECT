@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { FiArrowLeft, FiUser, FiCheckCircle, FiClock, FiPlayCircle, FiCircle } from 'react-icons/fi';
+import { FiArrowLeft, FiUser, FiCheckCircle, FiClock, FiPlayCircle, FiCircle, FiMessageCircle } from 'react-icons/fi';
 import { courseService, InstructorStudentDetail } from '../../services/course.service';
 import toast from 'react-hot-toast';
 
@@ -46,8 +46,8 @@ export default function CourseStudentDetail() {
 
   const getLessonStatusIcon = (status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED') => {
     if (status === 'COMPLETED') return <FiCheckCircle className="text-green-500" />;
-    if (status === 'IN_PROGRESS') return <FiPlayCircle className="text-blue-500" />;
-    return <FiCircle className="text-gray-300" />;
+    if (status === 'IN_PROGRESS') return <FiPlayCircle className="text-cyan-500" />;
+    return <FiCircle className="text-slate-300" />;
   };
 
   if (loading) {
@@ -61,7 +61,7 @@ export default function CourseStudentDetail() {
   if (!detail) {
     return (
       <div className="max-w-5xl mx-auto px-4 py-8">
-        <p className="text-gray-600">Không tìm thấy thông tin học viên.</p>
+        <p className="text-slate-600">Không tìm thấy thông tin học viên.</p>
       </div>
     );
   }
@@ -72,57 +72,75 @@ export default function CourseStudentDetail() {
         <FiArrowLeft className="mr-2" /> Quay lại danh sách học viên
       </Link>
 
-      <div className="bg-white rounded-lg shadow-sm p-6 border border-gray-200 mb-6">
-        <p className="text-sm text-gray-500 mb-1">Khóa học</p>
-        <h1 className="text-2xl font-bold text-gray-900">{detail.course.title}</h1>
+      <div className="bg-white rounded-xl shadow-sm p-6 border border-slate-100 mb-6">
+        <p className="text-sm text-slate-500 mb-1">Khóa học</p>
+        <h1 className="text-2xl font-bold text-slate-900">{detail.course.title}</h1>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-        <div className="flex items-center">
-          <div className="h-14 w-14 rounded-full overflow-hidden bg-primary-100 flex items-center justify-center">
-            {detail.student.avatar ? (
-              <img src={detail.student.avatar} alt={detail.student.fullName} className="h-full w-full object-cover" />
-            ) : (
-              <FiUser className="text-primary-700 text-2xl" />
-            )}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 mb-6">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center">
+            <div className="h-14 w-14 rounded-full overflow-hidden bg-primary-100 flex items-center justify-center">
+              {detail.student.avatar ? (
+                <img src={detail.student.avatar} alt={detail.student.fullName} className="h-full w-full object-cover" />
+              ) : (
+                <FiUser className="text-primary-700 text-2xl" />
+              )}
+            </div>
+            <div className="ml-4">
+              <p className="text-sm text-slate-500">Học viên</p>
+              <h2 className="text-lg font-semibold text-slate-900">{detail.student.fullName}</h2>
+            </div>
           </div>
-          <div className="ml-4">
-            <p className="text-sm text-gray-500">Học viên</p>
-            <h2 className="text-lg font-semibold text-gray-900">{detail.student.fullName}</h2>
-          </div>
+          <button
+            onClick={() => {
+              const event = new CustomEvent('open-chat-session', {
+                detail: {
+                  participantId: detail.student.userId,
+                  courseId: courseId,
+                  courseTitle: detail.course.title
+                }
+              });
+              window.dispatchEvent(event);
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 border border-primary-600 text-primary-600 hover:bg-primary-50 rounded-xl font-semibold text-sm transition-all shadow-sm cursor-pointer"
+          >
+            <FiMessageCircle size={16} />
+            <span>Nhắn tin cho học viên</span>
+          </button>
         </div>
 
         <div className="mt-5">
           <div className="flex justify-between text-sm mb-1">
-            <span className="font-medium text-gray-800">Tiến độ hoàn thành</span>
+            <span className="font-medium text-slate-800">Tiến độ hoàn thành</span>
             <span className="font-semibold text-primary-700">{Math.round(detail.progress.progressPercentage)}%</span>
           </div>
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
+          <div className="w-full bg-slate-200 rounded-full h-2.5">
             <div
               className={`h-2.5 rounded-full ${detail.progress.progressPercentage >= 100 ? 'bg-green-500' : 'bg-primary-600'}`}
               style={{ width: `${Math.max(0, Math.min(100, detail.progress.progressPercentage))}%` }}
             />
           </div>
-          <div className="text-xs text-gray-500 mt-2">
+          <div className="text-xs text-slate-500 mt-2">
             {detail.progress.completedLessons}/{detail.progress.totalLessons} bài học hoàn thành
           </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-4 mt-5 text-sm">
-          <div className="flex items-center text-gray-600">
+          <div className="flex items-center text-slate-600">
             <FiClock className="mr-2" />
             Ngày tham gia: {formatDate(detail.progress.enrolledAt)}
           </div>
-          <div className="flex items-center text-gray-600">
+          <div className="flex items-center text-slate-600">
             <FiClock className="mr-2" />
             Lần học gần nhất: {formatDate(detail.progress.lastAccessedAt)}
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-4 border-b bg-gray-50">
-          <h3 className="font-semibold text-gray-900">Chi tiết tiến độ từng bài học</h3>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-4 border-b bg-slate-50">
+          <h3 className="font-semibold text-slate-900">Chi tiết tiến độ từng bài học</h3>
         </div>
 
         <div className="divide-y">
@@ -131,13 +149,13 @@ export default function CourseStudentDetail() {
               <div className="flex items-start">
                 <div className="mt-1 mr-3">{getLessonStatusIcon(lesson.status)}</div>
                 <div>
-                  <p className="font-medium text-gray-900">
+                  <p className="font-medium text-slate-900">
                     Bài {lesson.order}: {lesson.title}
                   </p>
-                  <p className="text-sm text-gray-600 mt-1">{getLessonStatusLabel(lesson.status)}</p>
+                  <p className="text-sm text-slate-600 mt-1">{getLessonStatusLabel(lesson.status)}</p>
                 </div>
               </div>
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-slate-500">
                 {lesson.lastWatchedAt ? `Học gần nhất: ${formatDate(lesson.lastWatchedAt)}` : 'Chưa học'}
               </div>
             </div>

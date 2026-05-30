@@ -63,10 +63,10 @@ export default function Orders() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Đơn hàng của tôi</h1>
+        <h1 className="text-3xl font-bold text-slate-900">Đơn hàng của tôi</h1>
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center space-x-2 text-gray-600 hover:text-gray-800"
+          className="flex items-center space-x-2 text-slate-600 hover:text-slate-800"
         >
           <FiFilter />
           <span>Lọc</span>
@@ -95,9 +95,9 @@ export default function Orders() {
 
       {orders.length === 0 ? (
         <div className="card text-center py-12">
-          <FiPackage className="mx-auto text-4xl text-gray-400 mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Chưa có đơn hàng nào</h2>
-          <p className="text-gray-600 mb-6">Bạn chưa thực hiện đơn hàng nào.</p>
+          <FiPackage className="mx-auto text-4xl text-slate-400 mb-4" />
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">Chưa có đơn hàng nào</h2>
+          <p className="text-slate-600 mb-6">Bạn chưa thực hiện đơn hàng nào.</p>
           <Link to="/courses" className="btn-primary">
             Khám phá Khóa học
           </Link>
@@ -121,7 +121,7 @@ export default function Orders() {
               <button
                 onClick={() => loadOrders(pagination.page - 1)}
                 disabled={!pagination.hasPrevPage}
-                className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
               >
                 Trước
               </button>
@@ -131,7 +131,7 @@ export default function Orders() {
               <button
                 onClick={() => loadOrders(pagination.page + 1)}
                 disabled={!pagination.hasNextPage}
-                className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
               >
                 Tiếp
               </button>

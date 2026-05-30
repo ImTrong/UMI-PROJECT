@@ -17,13 +17,13 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
       case 'PENDING':
         return <FiClock className="text-yellow-500" size={24} />;
       case 'PROCESSING':
-        return <FiPackage className="text-blue-500" size={24} />;
+        return <FiPackage className="text-cyan-500" size={24} />;
       case 'CANCELLED':
-        return <FiXCircle className="text-gray-500" size={24} />;
+        return <FiXCircle className="text-slate-500" size={24} />;
       case 'FAILED':
         return <FiXCircle className="text-red-500" size={24} />;
       default:
-        return <FiPackage className="text-gray-500" size={24} />;
+        return <FiPackage className="text-slate-500" size={24} />;
     }
   };
 
@@ -51,7 +51,7 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
         <div className="flex justify-between items-start mb-4">
           <div>
             <h1 className="text-2xl font-bold">Đơn hàng #{order.orderNumber}</h1>
-            <p className="text-gray-500 mt-1">
+            <p className="text-slate-500 mt-1">
               Đặt ngày {format(new Date(order.createdAt), 'dd/MM/yyyy')}
             </p>
           </div>
@@ -81,7 +81,7 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
                 <div className="text-right">
                   <p className="font-medium">{formatVND(item.finalPrice)}</p>
                   {item.discount > 0 && (
-                    <p className="text-sm text-gray-500 line-through">
+                    <p className="text-sm text-slate-500 line-through">
                       {formatVND(item.price)}
                     </p>
                   )}
@@ -95,7 +95,7 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
         <div className="border-t mt-4 pt-4">
           <div className="space-y-2">
             <div className="flex justify-between">
-              <span className="text-gray-600">Tạm tính</span>
+              <span className="text-slate-600">Tạm tính</span>
               <span>{formatVND(order.subtotal)}</span>
             </div>
             {order.discount > 0 && (
@@ -115,11 +115,11 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
         {order.paymentId && (
           <div className="border-t pt-4">
             <div className="flex items-center space-x-2 mb-2">
-              <FiCreditCard className="text-gray-500" />
+              <FiCreditCard className="text-slate-500" />
               <h3 className="font-semibold">Thông tin thanh toán</h3>
             </div>
-            <p className="text-sm text-gray-600">Mã thanh toán: {order.paymentId}</p>
-            <p className="text-sm text-gray-600">Trạng thái: {order.paymentStatus}</p>
+            <p className="text-sm text-slate-600">Mã thanh toán: {order.paymentId}</p>
+            <p className="text-sm text-slate-600">Trạng thái: {order.paymentStatus}</p>
           </div>
         )}
 
@@ -127,7 +127,7 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
         {order.notes && (
           <div className="border-t pt-4">
             <h3 className="font-semibold mb-2">Ghi chú đơn hàng</h3>
-            <p className="text-gray-600">{order.notes}</p>
+            <p className="text-slate-600">{order.notes}</p>
           </div>
         )}
 
@@ -135,7 +135,7 @@ export const OrderDetail = ({ order, onCancel, onPay }: OrderDetailProps) => {
         {order.cancelledReason && (
           <div className="border-t pt-4">
             <h3 className="font-semibold mb-2 text-red-600">Lý do hủy</h3>
-            <p className="text-gray-600">{order.cancelledReason}</p>
+            <p className="text-slate-600">{order.cancelledReason}</p>
           </div>
         )}
 

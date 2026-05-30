@@ -11,12 +11,13 @@ const createSlug = (text: string) => {
 async function main() {
   console.log('Bắt đầu quá trình seed dữ liệu cho course-service...');
 
-  // 1. Dọn dẹp dữ liệu cũ
-  console.log('Đang xóa dữ liệu cũ...');
-  await prisma.review.deleteMany({});
-  await prisma.lesson.deleteMany({});
-  await prisma.course.deleteMany({});
-  await prisma.category.deleteMany({});
+  // 1. Kiểm tra xem dữ liệu đã tồn tại chưa
+  console.log('Kiểm tra dữ liệu cũ...');
+  const courseCount = await prisma.course.count();
+  if (courseCount > 0) {
+    console.log(`Đã tồn tại ${courseCount} khóa học. Bỏ qua quá trình seed để bảo toàn dữ liệu.`);
+    return;
+  }
 
   // 2. Tạo danh mục (Categories)
   console.log('Đang tạo các danh mục...');

@@ -28,14 +28,14 @@ export default function ForgotPassword() {
     <div className="py-8 max-w-md mx-auto">
       <div className="card">
         <h2 className="text-2xl font-bold text-center mb-6">Quên mật khẩu</h2>
-        {message && <div className="p-3 mb-4 text-sm text-green-700 bg-green-100 rounded-md">{message}</div>}
-        {error && <div className="p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-md">{error}</div>}
+        {message && <div className="p-3 mb-4 text-sm text-green-700 bg-green-100 rounded-lg">{message}</div>}
+        {error && <div className="p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-lg">{error}</div>}
         
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ Email</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Địa chỉ Email</label>
             <div className="relative">
-              <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
               <input
                 type="email"
                 value={email}
@@ -50,7 +50,7 @@ export default function ForgotPassword() {
             {loading ? 'Đang gửi...' : 'Gửi đường dẫn'}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-4 text-center text-sm text-slate-600">
           Đã nhớ lại mật khẩu? <Link to="/login" className="text-primary-600 hover:underline">Đăng nhập tại đây</Link>
         </p>
       </div>

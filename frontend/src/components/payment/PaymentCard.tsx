@@ -16,15 +16,15 @@ export const PaymentCard = ({ payment, onRefund }: PaymentCardProps) => {
       case 'PENDING':
         return 'bg-yellow-100 text-yellow-700';
       case 'PROCESSING':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-cyan-100 text-cyan-700';
       case 'FAILED':
         return 'bg-red-100 text-red-700';
       case 'REFUNDED':
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-slate-100 text-slate-700';
       case 'CANCELLED':
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-slate-100 text-slate-700';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-slate-100 text-slate-700';
     }
   };
 
@@ -38,14 +38,14 @@ export const PaymentCard = ({ payment, onRefund }: PaymentCardProps) => {
       case 'FAILED':
         return <FiXCircle className="text-red-500" />;
       case 'REFUNDED':
-        return <FiRefreshCw className="text-gray-500" />;
+        return <FiRefreshCw className="text-slate-500" />;
       default:
-        return <FiCreditCard className="text-gray-500" />;
+        return <FiCreditCard className="text-slate-500" />;
     }
   };
 
   return (
-    <div className="card hover:shadow-md transition-shadow">
+    <div className="card hover:shadow-sm transition-shadow">
       <div className="flex justify-between items-start mb-3">
         <div>
           <div className="flex items-center space-x-2">
@@ -54,7 +54,7 @@ export const PaymentCard = ({ payment, onRefund }: PaymentCardProps) => {
               {payment.status}
             </span>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-slate-500 mt-1">
             Đơn hàng #{payment.orderNumber}
           </p>
         </div>
@@ -62,13 +62,13 @@ export const PaymentCard = ({ payment, onRefund }: PaymentCardProps) => {
           <p className="text-xl font-bold text-primary-600">
             {formatVND(payment.amount)}
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-slate-500">
             {format(new Date(payment.createdAt), 'MMM dd, yyyy')}
           </p>
         </div>
       </div>
 
-      <div className="text-sm text-gray-600 space-y-1">
+      <div className="text-sm text-slate-600 space-y-1">
         <p>Mã thanh toán: {payment.stripePaymentIntentId?.slice(-8) || payment.id.slice(-8)}</p>
         {payment.paymentMethodId && (
           <p>Phương thức: {payment.paymentMethodId.slice(-4)}</p>

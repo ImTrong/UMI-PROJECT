@@ -17,13 +17,13 @@ export const OrderCard = ({ order, onCancel, canCancel }: OrderCardProps) => {
       case 'PENDING':
         return 'bg-yellow-100 text-yellow-700';
       case 'PROCESSING':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-cyan-100 text-cyan-700';
       case 'CANCELLED':
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-slate-100 text-slate-700';
       case 'FAILED':
         return 'bg-red-100 text-red-700';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-slate-100 text-slate-700';
     }
   };
 
@@ -34,23 +34,23 @@ export const OrderCard = ({ order, onCancel, canCancel }: OrderCardProps) => {
       case 'UNPAID':
         return 'bg-yellow-100 text-yellow-700';
       case 'REFUNDED':
-        return 'bg-blue-100 text-blue-700';
+        return 'bg-cyan-100 text-cyan-700';
       case 'FAILED':
         return 'bg-red-100 text-red-700';
       default:
-        return 'bg-gray-100 text-gray-700';
+        return 'bg-slate-100 text-slate-700';
     }
   };
 
   return (
-    <div className="card hover:shadow-md transition-shadow">
+    <div className="card hover:shadow-sm transition-shadow">
       {/* Header */}
       <div className="flex justify-between items-start mb-4">
         <div>
           <Link to={`/orders/${order.id}`} className="text-primary-600 hover:underline">
             <h3 className="font-semibold">Đơn hàng #{order.orderNumber}</h3>
           </Link>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-500">
             {formatDistanceToNow(new Date(order.createdAt), { addSuffix: true })}
           </p>
         </div>
@@ -73,19 +73,19 @@ export const OrderCard = ({ order, onCancel, canCancel }: OrderCardProps) => {
       <div className="space-y-2 mb-4">
         {order.items.slice(0, 3).map((item, index) => (
           <div key={index} className="flex justify-between text-sm">
-            <span className="text-gray-600">{item.courseTitle}</span>
-            <span className="text-gray-900">{formatVND(item.finalPrice)}</span>
+            <span className="text-slate-600">{item.courseTitle}</span>
+            <span className="text-slate-900">{formatVND(item.finalPrice)}</span>
           </div>
         ))}
         {order.items.length > 3 && (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-500">
             +{order.items.length - 3} mục khác
           </p>
         )}
       </div>
 
       {/* Actions */}
-      <div className="flex justify-end space-x-3 pt-3 border-t border-gray-100">
+      <div className="flex justify-end space-x-3 pt-3 border-t border-slate-100">
         <Link
           to={`/orders/${order.id}`}
           className="text-sm text-primary-600 hover:text-primary-700"

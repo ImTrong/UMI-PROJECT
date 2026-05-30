@@ -72,7 +72,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6">
       {/* Basic Information */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
           Tiêu đề Khóa học *
         </label>
         <input
@@ -86,7 +86,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
           Mô tả *
         </label>
         <textarea
@@ -102,7 +102,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Giá tiền *
           </label>
           <input
@@ -122,7 +122,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Cấp độ
           </label>
           <select {...register('level')} className="input-field">
@@ -133,7 +133,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Danh mục
           </label>
           <select {...register('categoryId')} className="input-field">
@@ -145,7 +145,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             Ảnh thu nhỏ (Thumbnail)
           </label>
           <div className="space-y-3">
@@ -173,7 +173,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
               placeholder="Hoặc dán URL ảnh: https://example.com/image.jpg"
             />
             {thumbnailPreview && (
-              <div className="border rounded-lg p-2 bg-gray-50">
+              <div className="border rounded-xl p-2 bg-slate-50">
                 <img
                   src={thumbnailPreview}
                   alt="Thumbnail preview"
@@ -186,7 +186,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
           Bạn sẽ học được gì
         </label>
         <textarea
@@ -199,7 +199,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
 
       {/* Requirements */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
           Yêu cầu
         </label>
         <div className="flex space-x-2 mb-2">
@@ -221,7 +221,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
         </div>
         <div className="space-y-1">
           {requirements.map((req, index) => (
-            <div key={index} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
+            <div key={index} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded">
               <span className="text-sm">{req}</span>
               <button
                 type="button"
@@ -237,7 +237,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
 
       {/* Target Audience */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
           Đối tượng mục tiêu
         </label>
         <div className="flex space-x-2 mb-2">
@@ -259,7 +259,7 @@ export const CourseForm = ({ initialData, onSubmit, isLoading }: CourseFormProps
         </div>
         <div className="space-y-1">
           {targetAudience.map((audience, index) => (
-            <div key={index} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded">
+            <div key={index} className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded">
               <span className="text-sm">{audience}</span>
               <button
                 type="button"

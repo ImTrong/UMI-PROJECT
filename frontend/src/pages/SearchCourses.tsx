@@ -259,10 +259,10 @@ export default function SearchCourses() {
         <div className="space-y-1">
           <button
             onClick={() => updateFilter('categoryId', '')}
-            className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+            className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all duration-200 ${
               !filters.categoryId
                 ? 'bg-primary-50 text-primary-700 font-medium'
-                : 'text-gray-600 hover:bg-gray-50'
+                : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
             Tất cả danh mục
@@ -271,10 +271,10 @@ export default function SearchCourses() {
             <button
               key={cat.id}
               onClick={() => updateFilter('categoryId', cat.id)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 flex items-center justify-between ${
+              className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all duration-200 flex items-center justify-between ${
                 filters.categoryId === cat.id
                   ? 'bg-primary-50 text-primary-700 font-medium'
-                  : 'text-gray-600 hover:bg-gray-50'
+                  : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
               <span>{cat.name}</span>
@@ -283,7 +283,7 @@ export default function SearchCourses() {
                   className={`text-xs px-2 py-0.5 rounded-full ${
                     filters.categoryId === cat.id
                       ? 'bg-primary-100 text-primary-700'
-                      : 'bg-gray-100 text-gray-500'
+                      : 'bg-slate-100 text-slate-500'
                   }`}
                 >
                   {cat._count.courses}
@@ -306,10 +306,10 @@ export default function SearchCourses() {
             <button
               key={opt.value}
               onClick={() => updateFilter('level', opt.value)}
-              className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-all duration-200 ${
+              className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-all duration-200 ${
                 filters.level === opt.value
                   ? opt.color || 'bg-primary-50 text-primary-700 font-medium'
-                  : 'text-gray-600 hover:bg-gray-50'
+                  : 'text-slate-600 hover:bg-slate-50'
               }`}
             >
               {opt.label}
@@ -344,7 +344,7 @@ export default function SearchCourses() {
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all duration-200 ${
                     isActive
                       ? 'bg-primary-50 border-primary-300 text-primary-700'
-                      : 'bg-white border-gray-200 text-gray-600 hover:border-primary-200 hover:bg-primary-50/50'
+                      : 'bg-white border-slate-100 text-slate-600 hover:border-primary-200 hover:bg-primary-50/50'
                   }`}
                 >
                   {preset.label}
@@ -358,15 +358,15 @@ export default function SearchCourses() {
               placeholder="Min"
               value={filters.minPrice}
               onChange={(e) => updateFilter('minPrice', e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
             />
-            <span className="text-gray-400">—</span>
+            <span className="text-slate-400">—</span>
             <input
               type="number"
               placeholder="Max"
               value={filters.maxPrice}
               onChange={(e) => updateFilter('maxPrice', e.target.value)}
-              className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
+              className="w-full px-3 py-2 text-sm border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent"
             />
           </div>
         </div>
@@ -375,7 +375,7 @@ export default function SearchCourses() {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {/* ═══ Search Hero Area ═══ */}
       <div className="bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 relative overflow-hidden">
         {/* Decorative elements */}
@@ -396,7 +396,7 @@ export default function SearchCourses() {
           {/* Search Input */}
           <div className="relative max-w-3xl mx-auto">
             <div className="relative group">
-              <FiSearch className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5 group-focus-within:text-primary-500 transition-colors" />
+              <FiSearch className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5 group-focus-within:text-primary-500 transition-colors" />
               <input
                 ref={searchInputRef}
                 type="text"
@@ -406,13 +406,13 @@ export default function SearchCourses() {
                   setPagination((prev) => ({ ...prev, page: 1 }));
                 }}
                 placeholder="Nhập tên khóa học, từ khóa, hoặc chủ đề bạn muốn tìm..."
-                className="w-full pl-14 pr-14 py-4 md:py-5 text-base md:text-lg bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-transparent shadow-xl shadow-primary-900/20 focus:outline-none focus:border-primary-300 focus:bg-white focus:shadow-2xl focus:shadow-primary-900/30 transition-all duration-300 placeholder:text-gray-400"
+                className="w-full pl-14 pr-14 py-4 md:py-5 text-base md:text-lg bg-white/95 backdrop-blur-sm rounded-2xl border-2 border-transparent shadow-sm shadow-primary-900/20 focus:outline-none focus:border-primary-300 focus:bg-white focus:shadow-sm focus:shadow-primary-900/30 transition-all duration-300 placeholder:text-slate-400"
                 autoFocus
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-5 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-all"
+                  className="absolute right-5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
                 >
                   <FiX className="w-5 h-5" />
                 </button>
@@ -428,7 +428,7 @@ export default function SearchCourses() {
                     onClick={() => updateFilter('categoryId', cat.id)}
                     className={`px-4 py-1.5 rounded-full text-sm font-medium border transition-all duration-200 ${
                       filters.categoryId === cat.id
-                        ? 'bg-white text-primary-700 border-white shadow-md'
+                        ? 'bg-white text-primary-700 border-white shadow-sm'
                         : 'bg-white/10 text-white/90 border-white/20 hover:bg-white/20 hover:border-white/30'
                     }`}
                   >
@@ -448,7 +448,7 @@ export default function SearchCourses() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowMobileFilters(!showMobileFilters)}
-              className="md:hidden flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-primary-300 hover:bg-primary-50/50 transition-all shadow-sm"
+              className="md:hidden flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-100 rounded-xl text-sm font-medium text-slate-700 hover:border-primary-300 hover:bg-primary-50/50 transition-all shadow-sm"
             >
               <FiSliders className="w-4 h-4" />
               Bộ lọc
@@ -460,12 +460,12 @@ export default function SearchCourses() {
             </button>
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-primary-300 hover:bg-primary-50/50 transition-all shadow-sm"
+              className="hidden md:flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-100 rounded-xl text-sm font-medium text-slate-700 hover:border-primary-300 hover:bg-primary-50/50 transition-all shadow-sm"
             >
               <FiFilter className="w-4 h-4" />
               {showFilters ? 'Ẩn' : 'Hiện'} bộ lọc
             </button>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-slate-500">
               {loading ? (
                 <span className="inline-flex items-center gap-1.5">
                   <span className="w-4 h-4 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
@@ -474,7 +474,7 @@ export default function SearchCourses() {
               ) : (
                 <>
                   Tìm thấy{' '}
-                  <span className="font-semibold text-gray-900">{pagination.total}</span> khóa học
+                  <span className="font-semibold text-slate-900">{pagination.total}</span> khóa học
                   {debouncedSearch && (
                     <>
                       {' '}
@@ -491,7 +491,7 @@ export default function SearchCourses() {
             <select
               value={filters.sortBy}
               onChange={(e) => updateFilter('sortBy', e.target.value)}
-              className="px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent shadow-sm cursor-pointer"
+              className="px-4 py-2.5 bg-white border border-slate-100 rounded-xl text-sm font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-400 focus:border-transparent shadow-sm cursor-pointer"
             >
               {SORT_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -501,13 +501,13 @@ export default function SearchCourses() {
             </select>
 
             {/* View Mode Toggle */}
-            <div className="hidden md:flex items-center bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="hidden md:flex items-center bg-white border border-slate-100 rounded-xl overflow-hidden shadow-sm">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-2.5 transition-all ${
                   viewMode === 'grid'
                     ? 'bg-primary-50 text-primary-600'
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <FiGrid className="w-4 h-4" />
@@ -517,7 +517,7 @@ export default function SearchCourses() {
                 className={`p-2.5 transition-all ${
                   viewMode === 'list'
                     ? 'bg-primary-50 text-primary-600'
-                    : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                    : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'
                 }`}
               >
                 <FiList className="w-4 h-4" />
@@ -533,12 +533,12 @@ export default function SearchCourses() {
               className="absolute inset-0 bg-black/50 backdrop-blur-sm"
               onClick={() => setShowMobileFilters(false)}
             />
-            <div className="absolute right-0 top-0 bottom-0 w-80 bg-white shadow-2xl overflow-y-auto animate-slideIn">
-              <div className="sticky top-0 bg-white z-10 px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="absolute right-0 top-0 bottom-0 w-80 bg-white shadow-sm overflow-y-auto animate-slideIn">
+              <div className="sticky top-0 bg-white z-10 px-5 py-4 border-b border-slate-100 flex items-center justify-between">
                 <h2 className="font-semibold text-lg">Bộ lọc</h2>
                 <button
                   onClick={() => setShowMobileFilters(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                  className="p-2 hover:bg-slate-100 rounded-xl transition"
                 >
                   <FiX className="w-5 h-5" />
                 </button>
@@ -555,7 +555,7 @@ export default function SearchCourses() {
           {/* Desktop Filter Sidebar */}
           {showFilters && (
             <aside className="hidden md:block w-72 flex-shrink-0">
-              <div className="sticky top-24 bg-white rounded-2xl shadow-sm border border-gray-100 p-5 max-h-[calc(100vh-120px)] overflow-y-auto">
+              <div className="sticky top-24 bg-white rounded-2xl shadow-sm border border-slate-100 p-5 max-h-[calc(100vh-120px)] overflow-y-auto">
                 <FilterContent />
               </div>
             </aside>
@@ -640,10 +640,10 @@ function FilterSection({
   children: React.ReactNode;
 }) {
   return (
-    <div className="border-b border-gray-100 pb-4 mb-4 last:border-0 last:pb-0 last:mb-0">
+    <div className="border-b border-slate-100 pb-4 mb-4 last:border-0 last:pb-0 last:mb-0">
       <button
         onClick={toggle}
-        className="w-full flex items-center justify-between py-2 text-sm font-semibold text-gray-800 hover:text-primary-600 transition"
+        className="w-full flex items-center justify-between py-2 text-sm font-semibold text-slate-800 hover:text-primary-600 transition"
       >
         <span className="flex items-center gap-2">
           {icon}
@@ -687,13 +687,13 @@ function CourseGridCard({ course, search }: { course: Course; search: string }) 
       case 'ADVANCED':
         return 'bg-rose-50 text-rose-700 border border-rose-200';
       default:
-        return 'bg-gray-50 text-gray-700';
+        return 'bg-slate-50 text-slate-700';
     }
   };
 
   return (
     <Link to={`/courses/${course.slug}`} className="group block">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg hover:border-primary-100 hover:-translate-y-1 transition-all duration-300">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-sm hover:border-primary-100 hover:-translate-y-1 transition-all duration-300">
         {/* Thumbnail */}
         <div className="relative h-44 bg-gradient-to-br from-primary-100 to-primary-50 overflow-hidden">
           {course.thumbnail ? (
@@ -709,7 +709,7 @@ function CourseGridCard({ course, search }: { course: Course; search: string }) 
           )}
           {/* Price Badge */}
           <div className="absolute top-3 right-3">
-            <span className="bg-white/95 backdrop-blur-sm text-primary-700 font-bold px-3 py-1.5 rounded-full text-sm shadow-lg">
+            <span className="bg-white/95 backdrop-blur-sm text-primary-700 font-bold px-3 py-1.5 rounded-full text-sm shadow-sm">
               {course.price === 0 ? 'Miễn phí' : formatVND(course.price)}
             </span>
           </div>
@@ -731,27 +731,27 @@ function CourseGridCard({ course, search }: { course: Course; search: string }) 
                 : 'Nâng cao'}
             </span>
             {course.category && (
-              <span className="text-xs text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full">
+              <span className="text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full">
                 {course.category.name}
               </span>
             )}
           </div>
 
-          <h3 className="font-semibold text-gray-900 line-clamp-2 group-hover:text-primary-600 transition-colors mb-2 leading-snug">
+          <h3 className="font-semibold text-slate-900 line-clamp-2 group-hover:text-primary-600 transition-colors mb-2 leading-snug">
             {highlightText(course.title, search)}
           </h3>
 
-          <p className="text-sm text-gray-500 line-clamp-2 mb-4 leading-relaxed">
+          <p className="text-sm text-slate-500 line-clamp-2 mb-4 leading-relaxed">
             {highlightText(course.description, search)}
           </p>
 
-          <div className="flex items-center justify-between text-sm pt-3 border-t border-gray-50">
+          <div className="flex items-center justify-between text-sm pt-3 border-t border-slate-50">
             <div className="flex items-center gap-1 text-amber-500">
               <FiStar className="w-4 h-4 fill-current" />
-              <span className="font-semibold text-gray-700">{course.rating.toFixed(1)}</span>
-              <span className="text-gray-400 text-xs">({course.totalReviews})</span>
+              <span className="font-semibold text-slate-700">{course.rating.toFixed(1)}</span>
+              <span className="text-slate-400 text-xs">({course.totalReviews})</span>
             </div>
-            <div className="flex items-center gap-1 text-gray-400">
+            <div className="flex items-center gap-1 text-slate-400">
               <FiUsers className="w-4 h-4" />
               <span className="text-xs">{course.enrolledCount}</span>
             </div>
@@ -772,13 +772,13 @@ function CourseListCard({ course, search }: { course: Course; search: string }) 
       case 'ADVANCED':
         return 'bg-rose-50 text-rose-700 border border-rose-200';
       default:
-        return 'bg-gray-50 text-gray-700';
+        return 'bg-slate-50 text-slate-700';
     }
   };
 
   return (
     <Link to={`/courses/${course.slug}`} className="group block">
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg hover:border-primary-100 transition-all duration-300 flex">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-sm hover:border-primary-100 transition-all duration-300 flex">
         {/* Thumbnail */}
         <div className="relative w-64 flex-shrink-0 bg-gradient-to-br from-primary-100 to-primary-50">
           {course.thumbnail ? (
@@ -806,29 +806,29 @@ function CourseListCard({ course, search }: { course: Course; search: string }) 
                   : 'Nâng cao'}
               </span>
               {course.category && (
-                <span className="text-xs text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full">
+                <span className="text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full">
                   {course.category.name}
                 </span>
               )}
             </div>
 
-            <h3 className="font-semibold text-lg text-gray-900 group-hover:text-primary-600 transition-colors mb-2">
+            <h3 className="font-semibold text-lg text-slate-900 group-hover:text-primary-600 transition-colors mb-2">
               {highlightText(course.title, search)}
             </h3>
 
-            <p className="text-sm text-gray-500 line-clamp-2 leading-relaxed">
+            <p className="text-sm text-slate-500 line-clamp-2 leading-relaxed">
               {highlightText(course.description, search)}
             </p>
           </div>
 
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-50">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-1 text-amber-500">
                 <FiStar className="w-4 h-4 fill-current" />
-                <span className="font-semibold text-gray-700">{course.rating.toFixed(1)}</span>
-                <span className="text-gray-400 text-xs">({course.totalReviews} đánh giá)</span>
+                <span className="font-semibold text-slate-700">{course.rating.toFixed(1)}</span>
+                <span className="text-slate-400 text-xs">({course.totalReviews} đánh giá)</span>
               </div>
-              <div className="flex items-center gap-1 text-gray-400">
+              <div className="flex items-center gap-1 text-slate-400">
                 <FiUsers className="w-4 h-4" />
                 <span className="text-sm">{course.enrolledCount} học viên</span>
               </div>
@@ -857,8 +857,8 @@ function EmptyState({
       <div className="w-24 h-24 bg-primary-50 rounded-full flex items-center justify-center mx-auto mb-6">
         <FiSearch className="w-10 h-10 text-primary-300" />
       </div>
-      <h3 className="text-xl font-semibold text-gray-900 mb-2">Không tìm thấy khóa học</h3>
-      <p className="text-gray-500 max-w-md mx-auto mb-6">
+      <h3 className="text-xl font-semibold text-slate-900 mb-2">Không tìm thấy khóa học</h3>
+      <p className="text-slate-500 max-w-md mx-auto mb-6">
         {search
           ? `Không có khóa học nào phù hợp với từ khóa "${search}". Hãy thử tìm kiếm với từ khóa khác.`
           : 'Không có khóa học nào phù hợp với bộ lọc hiện tại.'}
@@ -878,16 +878,16 @@ function LoadingSkeleton({ viewMode }: { viewMode: ViewMode }) {
     return (
       <div className="space-y-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden flex animate-pulse">
-            <div className="w-64 bg-gray-200" />
+          <div key={i} className="bg-white rounded-2xl border border-slate-100 overflow-hidden flex animate-pulse">
+            <div className="w-64 bg-slate-200" />
             <div className="flex-1 p-6 space-y-3">
               <div className="flex gap-2">
-                <div className="w-16 h-6 bg-gray-200 rounded-full" />
-                <div className="w-20 h-6 bg-gray-200 rounded-full" />
+                <div className="w-16 h-6 bg-slate-200 rounded-full" />
+                <div className="w-20 h-6 bg-slate-200 rounded-full" />
               </div>
-              <div className="h-5 bg-gray-200 rounded w-3/4" />
-              <div className="h-4 bg-gray-200 rounded w-full" />
-              <div className="h-4 bg-gray-200 rounded w-2/3" />
+              <div className="h-5 bg-slate-200 rounded w-3/4" />
+              <div className="h-4 bg-slate-200 rounded w-full" />
+              <div className="h-4 bg-slate-200 rounded w-2/3" />
             </div>
           </div>
         ))}
@@ -898,18 +898,18 @@ function LoadingSkeleton({ viewMode }: { viewMode: ViewMode }) {
   return (
     <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="bg-white rounded-2xl border border-gray-100 overflow-hidden animate-pulse">
-          <div className="h-44 bg-gray-200" />
+        <div key={i} className="bg-white rounded-2xl border border-slate-100 overflow-hidden animate-pulse">
+          <div className="h-44 bg-slate-200" />
           <div className="p-5 space-y-3">
             <div className="flex gap-2">
-              <div className="w-16 h-6 bg-gray-200 rounded-full" />
-              <div className="w-20 h-6 bg-gray-200 rounded-full" />
+              <div className="w-16 h-6 bg-slate-200 rounded-full" />
+              <div className="w-20 h-6 bg-slate-200 rounded-full" />
             </div>
-            <div className="h-5 bg-gray-200 rounded w-3/4" />
-            <div className="h-4 bg-gray-200 rounded w-full" />
-            <div className="flex justify-between mt-4 pt-3 border-t border-gray-50">
-              <div className="w-20 h-4 bg-gray-200 rounded" />
-              <div className="w-16 h-4 bg-gray-200 rounded" />
+            <div className="h-5 bg-slate-200 rounded w-3/4" />
+            <div className="h-4 bg-slate-200 rounded w-full" />
+            <div className="flex justify-between mt-4 pt-3 border-t border-slate-50">
+              <div className="w-20 h-4 bg-slate-200 rounded" />
+              <div className="w-16 h-4 bg-slate-200 rounded" />
             </div>
           </div>
         </div>
@@ -943,18 +943,18 @@ function Pagination({
   };
 
   return (
-    <nav className="inline-flex items-center gap-1 bg-white rounded-2xl shadow-sm border border-gray-100 p-1.5">
+    <nav className="inline-flex items-center gap-1 bg-white rounded-2xl shadow-sm border border-slate-100 p-1.5">
       <button
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="p-2.5 rounded-xl text-gray-500 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+        className="p-2.5 rounded-xl text-slate-500 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
       >
         <FiArrowLeft className="w-4 h-4" />
       </button>
 
       {getVisiblePages().map((p, idx) =>
         p === '...' ? (
-          <span key={`dots-${idx}`} className="px-2 text-gray-400">
+          <span key={`dots-${idx}`} className="px-2 text-slate-400">
             ···
           </span>
         ) : (
@@ -963,8 +963,8 @@ function Pagination({
             onClick={() => onPageChange(p as number)}
             className={`min-w-[40px] h-10 rounded-xl text-sm font-medium transition-all ${
               page === p
-                ? 'bg-primary-600 text-white shadow-md shadow-primary-600/30'
-                : 'text-gray-600 hover:bg-primary-50 hover:text-primary-600'
+                ? 'bg-primary-600 text-white shadow-sm shadow-primary-600/30'
+                : 'text-slate-600 hover:bg-primary-50 hover:text-primary-600'
             }`}
           >
             {p}
@@ -975,7 +975,7 @@ function Pagination({
       <button
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="p-2.5 rounded-xl text-gray-500 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+        className="p-2.5 rounded-xl text-slate-500 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
       >
         <FiArrowRight className="w-4 h-4" />
       </button>

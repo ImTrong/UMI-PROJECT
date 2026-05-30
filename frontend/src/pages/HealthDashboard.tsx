@@ -34,10 +34,10 @@ export default function HealthDashboard() {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+        <h1 className="text-3xl font-bold text-slate-900 mb-2">
           Bảng điều khiển Tình trạng Dịch vụ
         </h1>
-        <p className="text-gray-600">
+        <p className="text-slate-600">
           Giám sát thời gian thực tất cả các microservices
         </p>
       </div>
@@ -55,7 +55,7 @@ export default function HealthDashboard() {
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Trạng thái:</span>
+                <span className="text-slate-500">Trạng thái:</span>
                 <span
                   className={`font-medium ${
                     status.status === 'active'
@@ -67,7 +67,7 @@ export default function HealthDashboard() {
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Cơ sở dữ liệu:</span>
+                <span className="text-slate-500">Cơ sở dữ liệu:</span>
                 <span
                   className={`font-medium ${
                     status.database === 'connected'
@@ -80,16 +80,16 @@ export default function HealthDashboard() {
               </div>
               {status.uptime && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Thời gian hoạt động:</span>
-                  <span className="text-gray-700">
+                  <span className="text-slate-500">Thời gian hoạt động:</span>
+                  <span className="text-slate-700">
                     {Math.floor(status.uptime / 3600)}h{' '}
                     {Math.floor((status.uptime % 3600) / 60)}m
                   </span>
                 </div>
               )}
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Kiểm tra cuối:</span>
-                <span className="text-gray-700">
+                <span className="text-slate-500">Kiểm tra cuối:</span>
+                <span className="text-slate-700">
                   {new Date(status.timestamp).toLocaleTimeString()}
                 </span>
               </div>
@@ -102,10 +102,10 @@ export default function HealthDashboard() {
         <div className="flex items-center space-x-3">
           <FiActivity className="text-primary-600 text-xl" />
           <div>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-slate-600">
               Các dịch vụ được kiểm tra tự động mỗi 10 giây
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               API Gateway: http://localhost:8080
             </p>
           </div>

@@ -64,13 +64,13 @@ export default function Certificates() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">Chứng chỉ của tôi</h1>
+      <h1 className="text-3xl font-bold text-slate-900 mb-6">Chứng chỉ của tôi</h1>
 
       {certificates.length === 0 ? (
         <div className="card text-center py-12">
-          <FiAward className="mx-auto text-4xl text-gray-400 mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Chưa có chứng chỉ nào</h2>
-          <p className="text-gray-600 mb-6">Hoàn thành khóa học để nhận chứng chỉ</p>
+          <FiAward className="mx-auto text-4xl text-slate-400 mb-4" />
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">Chưa có chứng chỉ nào</h2>
+          <p className="text-slate-600 mb-6">Hoàn thành khóa học để nhận chứng chỉ</p>
           <Link to="/courses" className="btn-primary">
             Khám phá khóa học
           </Link>

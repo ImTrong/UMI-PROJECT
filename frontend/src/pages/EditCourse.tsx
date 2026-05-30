@@ -91,7 +91,7 @@ export default function EditCourse() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-12">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Sửa khóa học</h1>
+        <h1 className="text-3xl font-bold text-slate-900">Sửa khóa học</h1>
         <button
           onClick={() => navigate(`/courses/${course.slug}`)}
           className="btn-secondary"
@@ -127,10 +127,10 @@ export default function EditCourse() {
             <h2 className="text-xl font-semibold mb-4">Trạng thái Khóa học</h2>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-gray-600 font-medium">Trạng thái</span>
+                <span className="text-slate-600 font-medium">Trạng thái</span>
                 <span className={`px-2 py-1 rounded text-sm font-bold ${
                   course.published ? 'bg-green-100 text-green-700' :
-                  course.approvalStatus === 'PENDING_REVIEW' ? 'bg-blue-100 text-blue-700' :
+                  course.approvalStatus === 'PENDING_REVIEW' ? 'bg-cyan-100 text-cyan-700' :
                   course.approvalStatus === 'REJECTED' ? 'bg-red-100 text-red-700' :
                   'bg-yellow-100 text-yellow-700'
                 }`}>
@@ -141,24 +141,24 @@ export default function EditCourse() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600 font-medium">Học viên</span>
+                <span className="text-slate-600 font-medium">Học viên</span>
                 <span className="font-bold">{course.enrolledCount} học viên</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600 font-medium">Đánh giá</span>
+                <span className="text-slate-600 font-medium">Đánh giá</span>
                 <span className="font-bold">{course.rating.toFixed(1)} / 5.0</span>
               </div>
 
               {course.approvalStatus === 'REJECTED' && course.rejectionReason && (
-                <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <div className="p-3 bg-red-50 border border-red-200 rounded-xl">
                   <p className="text-sm font-semibold text-red-700 mb-1">Lý do từ chối:</p>
                   <p className="text-sm text-red-600">{course.rejectionReason}</p>
                 </div>
               )}
 
               {course.approvalStatus === 'PENDING_REVIEW' && (
-                <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                  <p className="text-sm text-blue-700">
+                <div className="p-3 bg-cyan-50 border border-cyan-200 rounded-xl">
+                  <p className="text-sm text-cyan-700">
                     ⏳ Khóa học đang chờ Admin xét duyệt. Bạn sẽ được thông báo khi có kết quả.
                   </p>
                 </div>
@@ -185,7 +185,7 @@ export default function EditCourse() {
 
               {!course.published && course.approvalStatus !== 'PENDING_REVIEW' && (
                 <div className="pt-4 border-t">
-                  <p className="text-sm text-gray-500 mb-3">
+                  <p className="text-sm text-slate-500 mb-3">
                     Khóa học cần có ít nhất một bài học và mô tả đủ dài. Sau khi gửi, Admin sẽ xét duyệt.
                   </p>
                   <button

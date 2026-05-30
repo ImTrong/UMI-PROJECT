@@ -72,7 +72,7 @@ export default function MyCourses() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Khóa học của tôi</h1>
+        <h1 className="text-3xl font-bold text-slate-900">Khóa học của tôi</h1>
         <Link to="/courses/create" className="btn-primary">
           Tạo Khóa học mới
         </Link>
@@ -80,7 +80,7 @@ export default function MyCourses() {
 
       {courses.length === 0 ? (
         <div className="card text-center py-12">
-          <p className="text-gray-500 mb-4">Bạn chưa tạo khóa học nào.</p>
+          <p className="text-slate-500 mb-4">Bạn chưa tạo khóa học nào.</p>
           <Link to="/courses/create" className="btn-primary">
             Tạo khóa học đầu tiên của bạn
           </Link>
@@ -94,21 +94,21 @@ export default function MyCourses() {
                 <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <Link
                     to={`/courses/${course.slug}/edit`}
-                    className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
+                    className="p-2 bg-white rounded-full shadow hover:bg-slate-100"
                     title="Sửa Khóa học"
                   >
-                    <FiEdit2 size={16} className="text-gray-600" />
+                    <FiEdit2 size={16} className="text-slate-600" />
                   </Link>
                   {(course as any).approvalStatus !== 'PENDING_REVIEW' && (
                     <button
                       onClick={() => handlePublish(course.id, course.published)}
-                      className="p-2 bg-white rounded-full shadow hover:bg-gray-100"
+                      className="p-2 bg-white rounded-full shadow hover:bg-slate-100"
                       title={course.published ? "Ngừng xuất bản" : "Gửi duyệt"}
                     >
                       {course.published ? (
-                        <FiEyeOff size={16} className="text-gray-600" />
+                        <FiEyeOff size={16} className="text-slate-600" />
                       ) : (
-                        <FiEye size={16} className="text-gray-600" />
+                        <FiEye size={16} className="text-slate-600" />
                       )}
                     </button>
                   )}
@@ -130,7 +130,7 @@ export default function MyCourses() {
               <button
                 onClick={() => loadCourses(pagination.page - 1)}
                 disabled={!pagination.hasPrevPage}
-                className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
               >
                 Trước
               </button>
@@ -140,7 +140,7 @@ export default function MyCourses() {
               <button
                 onClick={() => loadCourses(pagination.page + 1)}
                 disabled={!pagination.hasNextPage}
-                className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
               >
                 Tiếp
               </button>

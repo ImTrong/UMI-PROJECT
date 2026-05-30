@@ -83,17 +83,17 @@ const PaymentForm = ({ amount, paymentIntent, onSuccess, onError }: InstructorPa
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-gray-50 rounded-lg p-4 shadow-inner">
-        <div className="flex items-center space-x-2 mb-3 text-gray-700">
+      <div className="bg-slate-50 rounded-xl p-4 shadow-inner">
+        <div className="flex items-center space-x-2 mb-3 text-slate-700">
           <FiCreditCard className="text-primary-600" />
           <span className="font-semibold">Chi tiết thẻ thanh toán</span>
         </div>
-        <div className="p-3 bg-white rounded border border-gray-200 focus-within:border-primary-500 transition-colors">
+        <div className="p-3 bg-white rounded border border-slate-100 focus-within:border-primary-500 transition-colors">
           <CardElement options={cardElementOptions} />
         </div>
       </div>
 
-      <div className="flex items-center space-x-2 text-sm text-gray-500 justify-center">
+      <div className="flex items-center space-x-2 text-sm text-slate-500 justify-center">
         <FiLock className="text-green-500" />
         <span>Thông tin thanh toán của bạn được bảo mật tuyệt đối</span>
       </div>
@@ -101,7 +101,7 @@ const PaymentForm = ({ amount, paymentIntent, onSuccess, onError }: InstructorPa
       <button
         type="submit"
         disabled={!stripe || !paymentIntent || processing}
-        className="w-full btn-primary py-3 text-lg font-bold shadow-lg transform hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
+        className="w-full btn-primary py-3 text-lg font-bold shadow-sm transform hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:hover:scale-100"
       >
         {processing ? 'Đang xử lý...' : `Thanh toán ${formatVND(amount)}`}
       </button>

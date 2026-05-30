@@ -187,7 +187,7 @@ services:
       MINIO_PORT: "9000"
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin123
-      MINIO_PUBLIC_URL: "http://127.0.0.1:9000"
+      MINIO_PUBLIC_URL: "http://localhost:9000"
       LEARNING_SERVICE_URL: "http://learning-service:3006"
     depends_on:
       mongodb:
@@ -292,14 +292,59 @@ services:
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin123
       MINIO_PUBLIC_URL: "http://localhost:9000"
+      MINIO_VIDEO_BUCKET: "course-videos"
+      PRESIGNED_URL_EXPIRY: "60"
+      HLS_TEMP_DIR: "/tmp/hls-processing"
+      VIDEO_UPLOAD_DIR: "/tmp/video-uploads"
+      MAX_VIDEO_SIZE_MB: "2048"
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
       - elearning-network
     restart: unless-stopped
+    command: sh -c "npx prisma db push && node dist-seed/prisma/seed-paths.js && node dist/index.js"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3006/api/learning/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # ============================================
+  # Microservice 7: AI Service
+  # Port: 3007
+  # Database: ai_db
+  # ============================================
+  ai-service:
+    build:
+      context: .
+      dockerfile: ./services/ai-service/Dockerfile
+    container_name: elearning-ai-service
+    ports:
+      - "3007:3007"
+    environment:
+      PORT: 3007
+      NODE_ENV: development
+      DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/ai_db?authSource=admin"
+      AUTH_SERVICE_URL: "http://auth-service:3001"
+      CORS_ORIGIN: "http://localhost:3000,http://localhost:5173"
+      GEMINI_API_KEY: "${GEMINI_API_KEY}"
+      GEMINI_MODEL: "gemini-3.1-flash-lite"
+      MAX_CONTEXT_MESSAGES: "20"
+      LEARNING_SERVICE_URL: "http://learning-service:3006"
+      COURSE_SERVICE_URL: "http://course-service:3003"
+      USER_SERVICE_URL: "http://user-service:3002"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+    networks:
+      - elearning-network
+    restart: unless-stopped
+    command: sh -c "npx prisma db push && node dist/index.js"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3007/api/ai/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -316,7 +361,7 @@ services:
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin123
-      MINIO_DEFAULT_BUCKETS: assignments:public,quiz-attachments:public,courses:public
+      MINIO_DEFAULT_BUCKETS: assignments,quiz-attachments,courses
       MINIO_API_CORS_ALLOW_ORIGIN: "*"
     volumes:
       - minio-data:/data
@@ -345,10 +390,8 @@ services:
       mc mb myminio/assignments --ignore-existing;
       mc mb myminio/quiz-attachments --ignore-existing;
       mc mb myminio/courses --ignore-existing;
-      mc anonymous set download myminio/assignments;
-      mc anonymous set download myminio/quiz-attachments;
-      mc anonymous set download myminio/courses;
-      echo 'MinIO buckets initialized';
+      mc mb myminio/course-videos --ignore-existing;
+      echo 'MinIO buckets initialized and set to PRIVATE';
       exit 0;
       "
     networks:

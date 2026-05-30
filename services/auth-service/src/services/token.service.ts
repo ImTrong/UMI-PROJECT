@@ -6,15 +6,15 @@ import logger from '../utils/logger';
 const prisma = new PrismaClient();
 
 export class TokenService {
-  static generateTokens(userId: string, email: string) {
+  static generateTokens(userId: string, email: string, sessionId: string) {
     const accessToken = jwt.sign(
-      { userId, email },
+      { userId, email, sessionId, jti: crypto.randomUUID() },
       process.env.JWT_SECRET!,
       { expiresIn: (process.env.JWT_EXPIRES_IN || '15m') as any }
     );
 
     const refreshToken = jwt.sign(
-      { userId, email },
+      { userId, email, sessionId, jti: crypto.randomUUID() },
       process.env.JWT_REFRESH_SECRET!,
       { expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN || '7d') as any }
     );
@@ -26,9 +26,12 @@ export class TokenService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 days
 
-    // Delete old refresh tokens
+    // Delete expired refresh tokens to clean up
     await prisma.refreshToken.deleteMany({
-      where: { userId },
+      where: { 
+        userId,
+        expiresAt: { lt: new Date() }
+      },
     });
 
     // Save new refresh token
@@ -48,6 +51,7 @@ export class TokenService {
       const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET!) as {
         userId: string;
         email: string;
+        sessionId: string;
       };
 
       const refreshToken = await prisma.refreshToken.findUnique({

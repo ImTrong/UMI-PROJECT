@@ -69,46 +69,46 @@ export default function CertificateDetail() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       {/* Back button */}
-      <Link to="/certificates" className="inline-flex items-center gap-2 text-gray-600 hover:text-primary-600 mb-6 transition-colors font-medium text-sm">
+      <Link to="/certificates" className="inline-flex items-center gap-2 text-slate-600 hover:text-primary-600 mb-6 transition-colors font-medium text-sm">
         <FiArrowLeft /> Quay lại danh sách chứng chỉ
       </Link>
 
       {/* Certificate Visual */}
-      <div className="relative bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100">
+      <div className="relative bg-white rounded-3xl shadow-sm overflow-hidden border border-slate-100">
         {/* Decorative top border */}
-        <div className="h-2 bg-gradient-to-r from-primary-500 via-blue-500 to-purple-500"></div>
+        <div className="h-2 bg-gradient-to-r from-primary-500 via-cyan-500 to-teal-500"></div>
         
         {/* Certificate body */}
         <div className="relative px-8 md:px-16 py-12 md:py-16">
           {/* Background decorations */}
           <div className="absolute top-0 left-0 w-64 h-64 bg-primary-50 rounded-full -translate-x-1/2 -translate-y-1/2 opacity-50"></div>
-          <div className="absolute bottom-0 right-0 w-48 h-48 bg-blue-50 rounded-full translate-x-1/4 translate-y-1/4 opacity-50"></div>
+          <div className="absolute bottom-0 right-0 w-48 h-48 bg-cyan-50 rounded-full translate-x-1/4 translate-y-1/4 opacity-50"></div>
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] border border-primary-100/30 rounded-full pointer-events-none"></div>
 
           {/* Content */}
           <div className="relative z-10 text-center">
             {/* Badge icon */}
-            <div className="mx-auto w-20 h-20 bg-gradient-to-br from-primary-500 to-blue-600 rounded-full flex items-center justify-center shadow-xl shadow-primary-500/30 mb-6">
+            <div className="mx-auto w-20 h-20 bg-gradient-to-br from-primary-500 to-cyan-600 rounded-full flex items-center justify-center shadow-sm shadow-primary-500/30 mb-6">
               <FiAward className="text-white" size={36} />
             </div>
 
-            <p className="text-xs tracking-[0.4em] uppercase text-gray-400 font-bold mb-2">Chứng nhận hoàn thành</p>
+            <p className="text-xs tracking-[0.4em] uppercase text-slate-400 font-bold mb-2">Chứng nhận hoàn thành</p>
             <h1 className="text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-gray-800 to-gray-600 mb-3">
               CERTIFICATE OF COMPLETION
             </h1>
 
-            <div className="w-24 h-0.5 bg-gradient-to-r from-primary-400 to-blue-400 mx-auto my-6"></div>
+            <div className="w-24 h-0.5 bg-gradient-to-r from-primary-400 to-cyan-400 mx-auto my-6"></div>
 
-            <p className="text-gray-500 text-sm mb-2">Chứng nhận rằng</p>
+            <p className="text-slate-500 text-sm mb-2">Chứng nhận rằng</p>
             <h2 className="text-2xl md:text-3xl font-bold text-primary-600 mb-4">{certificate.userName}</h2>
 
-            <p className="text-gray-500 text-sm mb-2">đã hoàn thành xuất sắc khóa học</p>
-            <h3 className="text-xl md:text-2xl font-bold text-gray-800 mb-8 max-w-2xl mx-auto">{certificate.courseTitle}</h3>
+            <p className="text-slate-500 text-sm mb-2">đã hoàn thành xuất sắc khóa học</p>
+            <h3 className="text-xl md:text-2xl font-bold text-slate-800 mb-8 max-w-2xl mx-auto">{certificate.courseTitle}</h3>
 
             {/* Details grid */}
             <div className="flex flex-wrap justify-center gap-6 mb-8">
-              <div className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-full">
-                <FiClock size={14} className="text-gray-400" />
+              <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 px-4 py-2 rounded-full">
+                <FiClock size={14} className="text-slate-400" />
                 <span>Ngày cấp: <strong>{format(new Date(certificate.issueDate), 'dd/MM/yyyy')}</strong></span>
               </div>
               {certificate.expiresAt && (
@@ -123,12 +123,12 @@ export default function CertificateDetail() {
               </div>
             </div>
 
-            <p className="text-xs text-gray-400 font-mono">Mã chứng chỉ: {certificate.certificateNumber}</p>
+            <p className="text-xs text-slate-400 font-mono">Mã chứng chỉ: {certificate.certificateNumber}</p>
           </div>
         </div>
 
         {/* Bottom decorative border */}
-        <div className="h-1 bg-gradient-to-r from-primary-500 via-blue-500 to-purple-500"></div>
+        <div className="h-1 bg-gradient-to-r from-primary-500 via-cyan-500 to-teal-500"></div>
       </div>
 
       {/* Action buttons */}
@@ -136,7 +136,7 @@ export default function CertificateDetail() {
         <button
           onClick={handleDownload}
           disabled={downloading}
-          className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-primary-600 to-blue-600 text-white font-semibold rounded-xl shadow-lg shadow-primary-500/30 hover:shadow-xl hover:shadow-primary-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-primary-600 to-cyan-600 text-white font-semibold rounded-xl shadow-sm shadow-primary-500/30 hover:shadow-sm hover:shadow-primary-500/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <FiDownload size={18} />
           {downloading ? 'Đang tải...' : 'Tải về PDF'}
@@ -144,7 +144,7 @@ export default function CertificateDetail() {
 
         <button
           onClick={handleShare}
-          className="flex items-center gap-2 px-8 py-3 bg-white text-gray-700 font-semibold rounded-xl border border-gray-200 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition-all"
+          className="flex items-center gap-2 px-8 py-3 bg-white text-slate-700 font-semibold rounded-xl border border-slate-100 shadow-sm hover:bg-slate-50 hover:border-slate-200 transition-all"
         >
           <FiShare2 size={18} />
           Chia sẻ liên kết xác minh

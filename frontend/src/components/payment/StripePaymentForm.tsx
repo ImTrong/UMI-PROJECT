@@ -120,15 +120,15 @@ const PaymentForm = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="bg-gray-50 rounded-lg p-4">
+      <div className="bg-slate-50 rounded-xl p-4">
         <div className="flex items-center space-x-2 mb-3">
-          <FiCreditCard className="text-gray-500" />
+          <FiCreditCard className="text-slate-500" />
           <span className="font-medium">Thông tin thẻ</span>
         </div>
         <CardElement options={cardElementOptions} className="p-3 bg-white rounded border" />
       </div>
 
-      <div className="flex items-center space-x-2 text-sm text-gray-500">
+      <div className="flex items-center space-x-2 text-sm text-slate-500">
         <FiLock size={14} />
         <span>Thông tin thanh toán của bạn được bảo mật</span>
       </div>

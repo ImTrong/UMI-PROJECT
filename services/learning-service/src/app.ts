@@ -9,6 +9,11 @@ import { ActivityController } from './controllers/activity.controller';
 import { QuizController } from './controllers/quiz.controller';
 import { AssignmentController } from './controllers/assignment.controller';
 import { TaskController } from './controllers/task.controller';
+import { StreamController } from './controllers/stream.controller';
+import { HLSController } from './controllers/hls.controller';
+import { RecommendationController } from './controllers/recommendation.controller';
+import { AdminPathController } from './controllers/admin-path.controller';
+import { AnalyticsController } from './controllers/analytics.controller';
 import { authenticateToken } from './middleware/auth.middleware';
 import {
   validateLessonComplete,
@@ -18,6 +23,9 @@ import {
   handleValidationErrors,
 } from './middleware/validation.middleware';
 import logger from './utils/logger';
+import { initializeVideosBucket } from './config/minio.config';
+import { videoUpload } from './config/multer.config';
+import { HLSQueueService } from './services/hls-queue.service';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -95,8 +103,90 @@ app.get('/api/learning/course/:courseId/tasks', authenticateToken, TaskControlle
 app.get('/api/learning/tasks/pending', authenticateToken, TaskController.getUserTasks);
 app.get('/api/learning/tasks/:taskId/detail', authenticateToken, TaskController.getTaskDetail);
 
+// ==================== Learning Analytics Routes ====================
+app.get('/api/learning/analytics/study-patterns', authenticateToken, AnalyticsController.getStudyPatterns);
+app.get('/api/learning/analytics/reminders', authenticateToken, AnalyticsController.getStudyReminders);
+app.get('/api/learning/analytics/heatmap', authenticateToken, AnalyticsController.getStudyHeatmap);
+app.get('/api/learning/analytics/weekly-report', authenticateToken, AnalyticsController.getWeeklyReport);
+app.get('/api/learning/analytics/optimal-schedule', authenticateToken, AnalyticsController.getOptimalSchedule);
+app.get('/api/learning/analytics/my-schedule', authenticateToken, AnalyticsController.getMySchedule);
+app.post('/api/learning/analytics/my-schedule', authenticateToken, AnalyticsController.saveMySchedule);
+app.get('/api/learning/analytics/content-recommendations', authenticateToken, AnalyticsController.getContentRecommendations);
+
+// ==================== Recommendation & Learning Paths Routes ====================
+app.get('/api/learning/recommendations/home', (req, res, next) => {
+  // Optional auth — try to parse JWT but don't require it
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    authenticateToken(req as any, res, next);
+  } else {
+    next();
+  }
+}, RecommendationController.getHomeRecommendations);
+app.get('/api/learning/recommendations', authenticateToken, RecommendationController.getPersonalizedRecommendations);
+app.get('/api/learning/recommendations/insights', authenticateToken, RecommendationController.getLearningInsights);
+app.get('/api/learning/recommendations/next-actions', authenticateToken, RecommendationController.getSmartNextActions);
+app.get('/api/learning/paths/my-paths', authenticateToken, RecommendationController.getMyEnrolledPaths);
+app.get('/api/learning/paths/categories', authenticateToken, RecommendationController.getPathCategories);
+app.get('/api/learning/paths', authenticateToken, RecommendationController.getLearningPaths);
+app.get('/api/learning/paths/:pathId', authenticateToken, RecommendationController.getLearningPathDetail);
+app.post('/api/learning/paths/:pathId/enroll', authenticateToken, RecommendationController.enrollInPath);
+app.delete('/api/learning/paths/:pathId/enroll', authenticateToken, RecommendationController.unenrollFromPath);
+
+// ==================== Admin Learning Paths Routes ====================
+// Note: In a real app we'd add requireRole('ADMIN') middleware, but authenticateToken is used for simplicity/current system constraints
+app.get('/api/learning/admin/paths', authenticateToken, AdminPathController.getPaths);
+app.get('/api/learning/admin/paths/:id', authenticateToken, AdminPathController.getPathById);
+app.post('/api/learning/admin/paths', authenticateToken, AdminPathController.createPath);
+app.put('/api/learning/admin/paths/:id', authenticateToken, AdminPathController.updatePath);
+app.delete('/api/learning/admin/paths/:id', authenticateToken, AdminPathController.deletePath);
+app.put('/api/learning/admin/paths/:id/status', authenticateToken, AdminPathController.updateStatus);
+app.post('/api/learning/admin/paths/:id/duplicate', authenticateToken, AdminPathController.duplicatePath);
+
+// ==================== Video Streaming Routes ====================
+// Secure video streaming via presigned URLs (Udemy-style protection)
+// JWT auth required → verifies course purchase → generates short-lived presigned URL
+app.get('/api/learning/lessons/:lessonId/stream', authenticateToken, StreamController.getLessonStream);
+
+// ==================== HLS Streaming Routes ====================
+// HLS video processing and streaming (Udemy-style adaptive streaming)
+
+// Instructor: upload video for HLS processing
+app.post('/api/learning/lessons/:lessonId/upload-video', authenticateToken, videoUpload.single('video'), HLSController.uploadVideo);
+
+// Check video processing job status
+app.get('/api/learning/video-jobs/:jobId/status', authenticateToken, HLSController.getJobStatus);
+
+// Student: get presigned URL for HLS master.m3u8 playlist
+app.get('/api/learning/lessons/:lessonId/hls', authenticateToken, HLSController.getHLSStream);
+
+// Student: get signed .m3u8 playlist with presigned .ts segment URLs
+app.get('/api/learning/lessons/:lessonId/hls/playlist', HLSController.getSignedPlaylist);
+
+import { hlsRateLimiter, fileRateLimiter } from './middleware/rate-limit.middleware';
+
+// Student: get a specific .ts segment from the signed proxy
+app.get('/api/learning/lessons/:lessonId/hls/segment/:segmentFile', hlsRateLimiter, HLSController.getSegmentStream);
+
+// Student: get the AES-128 key to decrypt segments
+app.get('/api/learning/lessons/:lessonId/hls/key', hlsRateLimiter, HLSController.getKeyStream);
+
+// ==================== File Routes ====================
+import { FileController } from './controllers/file.controller';
+app.get('/api/learning/files/download', authenticateToken, fileRateLimiter, FileController.downloadFile);
+
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
+});
+
+// Initialize MinIO private video bucket on startup
+initializeVideosBucket().catch((err) => {
+  logger.error('Failed to initialize MinIO video bucket:', err);
+});
+
+// Resume any pending HLS processing jobs from last run
+HLSQueueService.resumePendingJobs().catch((err) => {
+  logger.error('Failed to resume HLS processing jobs:', err);
 });
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {

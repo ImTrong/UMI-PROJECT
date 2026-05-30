@@ -2,18 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { courseService, Course } from '../services/course.service';
-import { 
-  FiBookOpen, 
-  FiUsers, 
-  FiDollarSign, 
-  FiTrendingUp,
-  FiEdit2,
-  FiEye,
-  FiEyeOff,
-  FiTrash2,
-  FiPlus,
-  FiBarChart2
-} from 'react-icons/fi';
+import { FiBookOpen, FiUsers, FiDollarSign, FiTrendingUp, FiEdit2, FiEye, FiEyeOff, FiTrash2, FiPlus, FiBarChart2, FiBook } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { formatVND } from '../utils/currency';
 
@@ -96,7 +85,7 @@ export default function InstructorDashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Bảng điều khiển Giảng viên</h1>
+        <h1 className="text-3xl font-bold text-slate-900">Bảng điều khiển Giảng viên</h1>
         <Link to="/courses/create" className="btn-primary flex items-center space-x-2">
           <FiPlus size={18} />
           <span>Tạo Khóa học mới</span>
@@ -108,7 +97,7 @@ export default function InstructorDashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Tổng số Khóa học</p>
+              <p className="text-sm text-slate-500">Tổng số Khóa học</p>
               <p className="text-2xl font-bold">{stats.totalCourses}</p>
             </div>
             <FiBookOpen className="text-3xl text-primary-500" />
@@ -118,7 +107,7 @@ export default function InstructorDashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Tổng số Học viên</p>
+              <p className="text-sm text-slate-500">Tổng số Học viên</p>
               <p className="text-2xl font-bold">{stats.totalStudents}</p>
             </div>
             <FiUsers className="text-3xl text-primary-500" />
@@ -128,7 +117,7 @@ export default function InstructorDashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Tổng doanh thu</p>
+              <p className="text-sm text-slate-500">Tổng doanh thu</p>
               <p className="text-2xl font-bold">{formatVND(stats.totalRevenue)}</p>
             </div>
             <FiDollarSign className="text-3xl text-primary-500" />
@@ -138,7 +127,7 @@ export default function InstructorDashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-500">Đánh giá trung bình</p>
+              <p className="text-sm text-slate-500">Đánh giá trung bình</p>
               <p className="text-2xl font-bold">{stats.averageRating.toFixed(1)}</p>
             </div>
             <FiTrendingUp className="text-3xl text-primary-500" />
@@ -152,7 +141,7 @@ export default function InstructorDashboard() {
         
         {courses.length === 0 ? (
           <div className="text-center py-12">
-            <p className="text-gray-500 mb-4">Bạn chưa tạo khóa học nào.</p>
+            <p className="text-slate-500 mb-4">Bạn chưa tạo khóa học nào.</p>
             <Link to="/courses/create" className="btn-primary">
               Tạo khóa học đầu tiên của bạn
             </Link>
@@ -161,7 +150,7 @@ export default function InstructorDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200">
+                <tr className="border-b border-slate-100">
                   <th className="text-left py-3 px-4">Khóa học</th>
                   <th className="text-left py-3 px-4">Học viên</th>
                   <th className="text-left py-3 px-4">Giá tiền</th>
@@ -172,11 +161,11 @@ export default function InstructorDashboard() {
               </thead>
               <tbody>
                 {courses.map((course) => (
-                  <tr key={course.id} className="border-b border-gray-100 hover:bg-gray-50">
+                  <tr key={course.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="py-3 px-4">
                       <div>
                         <p className="font-medium">{course.title}</p>
-                        <p className="text-xs text-gray-500">{course.slug}</p>
+                        <p className="text-xs text-slate-500">{course.slug}</p>
                       </div>
                     </td>
                     <td className="py-3 px-4">{course.enrolledCount}</td>
@@ -185,13 +174,13 @@ export default function InstructorDashboard() {
                       <div className="flex items-center">
                         <span className="mr-1">{course.rating.toFixed(1)}</span>
                         <span className="text-yellow-400">★</span>
-                        <span className="text-xs text-gray-500 ml-1">({course.totalReviews})</span>
+                        <span className="text-xs text-slate-500 ml-1">({course.totalReviews})</span>
                       </div>
                     </td>
                     <td className="py-3 px-4">
                       <span className={`text-xs px-2 py-1 rounded-full ${
                         course.published ? 'bg-green-100 text-green-700' :
-                        (course as any).approvalStatus === 'PENDING_REVIEW' ? 'bg-blue-100 text-blue-700' :
+                        (course as any).approvalStatus === 'PENDING_REVIEW' ? 'bg-cyan-100 text-cyan-700' :
                         (course as any).approvalStatus === 'REJECTED' ? 'bg-red-100 text-red-700' :
                         'bg-yellow-100 text-yellow-700'
                       }`}>
@@ -205,14 +194,14 @@ export default function InstructorDashboard() {
                       <div className="flex space-x-2">
                         <Link
                           to={`/courses/${course.slug}/edit`}
-                          className="p-1 text-gray-500 hover:text-primary-600"
+                          className="p-1 text-slate-500 hover:text-primary-600"
                           title="Sửa"
                         >
                           <FiEdit2 size={16} />
                         </Link>
                         <Link
                           to={`/courses/${course.slug}`}
-                          className="p-1 text-gray-500 hover:text-primary-600"
+                          className="p-1 text-slate-500 hover:text-primary-600"
                           title="Xem"
                         >
                           <FiEye size={16} />
@@ -220,7 +209,7 @@ export default function InstructorDashboard() {
                         {(course as any).approvalStatus !== 'PENDING_REVIEW' && (
                           <button
                             onClick={() => handlePublish(course.id, course.published)}
-                            className="p-1 text-gray-500 hover:text-green-600"
+                            className="p-1 text-slate-500 hover:text-green-600"
                             title={course.published ? "Ngừng xuất bản" : "Gửi duyệt"}
                           >
                             {course.published ? <FiEyeOff size={16} /> : <FiEye size={16} />}
@@ -228,21 +217,21 @@ export default function InstructorDashboard() {
                         )}
                         <button
                           onClick={() => handleDelete(course.id, course.title)}
-                          className="p-1 text-gray-500 hover:text-red-600"
+                          className="p-1 text-slate-500 hover:text-red-600"
                           title="Xóa"
                         >
                           <FiTrash2 size={16} />
                         </button>
                         <Link
                           to={`/analytics/course/${course.id}`}
-                          className="p-1 text-gray-500 hover:text-primary-600"
+                          className="p-1 text-slate-500 hover:text-primary-600"
                           title="Phân tích"
                         >
                           <FiBarChart2 size={16} />
                         </Link>
                         <Link
                           to={`/instructor/course/${course.id}/students`}
-                          className="p-1 text-gray-500 hover:text-blue-600"
+                          className="p-1 text-slate-500 hover:text-cyan-600"
                           title="Quản lý học viên"
                         >
                           <FiUsers size={16} />
@@ -259,17 +248,17 @@ export default function InstructorDashboard() {
 
       {/* Quick Tips */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-8">
-        <div className="bg-blue-50 rounded-lg p-4">
-          <h3 className="font-semibold text-blue-800 mb-2">📚 Tạo nội dung chất lượng</h3>
-          <p className="text-sm text-blue-600">Video chất lượng cao và nội dung hấp dẫn sẽ thu hút nhiều học viên hơn.</p>
+        <div className="bg-cyan-50 rounded-xl p-4">
+          <h3 className="font-semibold text-cyan-800 mb-2"><FiBook className="inline mr-1" /> Tạo nội dung chất lượng</h3>
+          <p className="text-sm text-cyan-600">Video chất lượng cao và nội dung hấp dẫn sẽ thu hút nhiều học viên hơn.</p>
         </div>
-        <div className="bg-green-50 rounded-lg p-4">
+        <div className="bg-green-50 rounded-xl p-4">
           <h3 className="font-semibold text-green-800 mb-2">💬 Tương tác với học viên</h3>
           <p className="text-sm text-green-600">Trả lời câu hỏi và bình luận để xây dựng cộng đồng lớp học.</p>
         </div>
-        <div className="bg-purple-50 rounded-lg p-4">
-          <h3 className="font-semibold text-purple-800 mb-2">📊 Theo dõi số liệu</h3>
-          <p className="text-sm text-purple-600">Theo dõi tiến độ học tập và tỷ lệ hoàn thành khóa học của học viên.</p>
+        <div className="bg-teal-50 rounded-xl p-4">
+          <h3 className="font-semibold text-teal-800 mb-2">📊 Theo dõi số liệu</h3>
+          <p className="text-sm text-teal-600">Theo dõi tiến độ học tập và tỷ lệ hoàn thành khóa học của học viên.</p>
         </div>
       </div>
     </div>

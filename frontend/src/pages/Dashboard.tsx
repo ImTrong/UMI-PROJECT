@@ -9,8 +9,8 @@ export default function Dashboard() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center p-8 bg-white rounded-xl shadow-sm max-w-md">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Khu vực Quản trị</h2>
-          <p className="text-gray-600">Giao diện Admin đã được tách ra một ứng dụng riêng biệt. Vui lòng truy cập trực tiếp vào hệ thống đường dẫn Admin để làm việc.</p>
+          <h2 className="text-2xl font-bold text-slate-900 mb-4">Khu vực Quản trị</h2>
+          <p className="text-slate-600">Giao diện Admin đã được tách ra một ứng dụng riêng biệt. Vui lòng truy cập trực tiếp vào hệ thống đường dẫn Admin để làm việc.</p>
         </div>
       </div>
     );

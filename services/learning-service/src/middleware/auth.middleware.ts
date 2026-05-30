@@ -18,7 +18,12 @@ export const authenticateToken = async (
 ): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
-    const token = authHeader?.split(' ')[1];
+    let token = authHeader?.split(' ')[1];
+    
+    // Fallback to query param token (used for video streaming)
+    if (!token && req.query.token) {
+      token = req.query.token as string;
+    }
 
     if (!token) {
       res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
@@ -41,9 +46,9 @@ export const authenticateToken = async (
 
     // Fetch role from user-service so controllers can check req.user.role
     try {
-      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
       const userResponse = await axios.get(`${userServiceUrl}/api/users/${req.user.userId}`, {
-        headers: { Authorization: authHeader! },
+        headers: { Authorization: authHeader || `Bearer ${token}` },
       });
       req.user.role = userResponse.data.data?.role || userResponse.data.role;
     } catch (roleErr: any) {
@@ -65,11 +70,12 @@ export const requireRole = (roles: string[]) => {
     }
 
     try {
-      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
       const authHeader = req.headers.authorization;
+      const token = authHeader?.split(' ')[1] || req.query.token;
       const response: AxiosResponse<{ data: { role: string } }> = 
         await axios.get(`${userServiceUrl}/api/users/${req.user.userId}`, {
-          headers: authHeader ? { Authorization: authHeader } : {},
+          headers: { Authorization: authHeader || `Bearer ${token}` },
         });
       const userRole = response.data.data.role;
 

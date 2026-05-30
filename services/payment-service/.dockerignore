@@ -1,7 +1,6 @@
 node_modules
 dist
-dist-seed
 .env
-npm-debug.log
+*.log
 prisma/dev.db
 prisma/migrations

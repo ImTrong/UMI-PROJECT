@@ -111,6 +111,13 @@ export const userService = {
     return response.data.data;
   },
 
+  async getAvatarUploadUrl(fileName: string, mimeType: string): Promise<{ uploadUrl: string; fileKey: string; publicUrl: string }> {
+    const response = await api.get('/api/users/profile/avatar/upload-url', {
+      params: { fileName, mimeType },
+    });
+    return response.data.data;
+  },
+
   async updateProfile(data: UpdateProfileData): Promise<UserProfile> {
     const response = await api.put('/api/users/me', data);
     return response.data.data;

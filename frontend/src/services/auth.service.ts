@@ -1,5 +1,14 @@
 import { authApi as api } from './api';
 
+const getDeviceId = () => {
+  let deviceId = localStorage.getItem('deviceId');
+  if (!deviceId) {
+    deviceId = 'device-' + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    localStorage.setItem('deviceId', deviceId);
+  }
+  return deviceId;
+};
+
 export interface LoginData {
   email: string;
   password: string;
@@ -19,6 +28,7 @@ export interface AuthResponse {
     fullName: string;
     emailVerified: boolean;
     role: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
+    avatar?: string;
   };
   accessToken: string;
   refreshToken: string;
@@ -35,12 +45,14 @@ export interface VerifyTokenResponse {
 
 export const authService = {
   async login(data: LoginData): Promise<AuthResponse> {
-    const response = await api.post('/api/auth/login', data);
+    const payload = { ...data, deviceId: getDeviceId() };
+    const response = await api.post('/api/auth/login', payload);
     return response.data;
   },
 
   async register(data: RegisterData): Promise<AuthResponse> {
-    const response = await api.post('/api/auth/register', data);
+    const payload = { ...data, deviceId: getDeviceId() };
+    const response = await api.post('/api/auth/register', payload);
     return response.data;
   },
 

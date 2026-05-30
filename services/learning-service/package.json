@@ -5,36 +5,45 @@
   "main": "dist/index.js",
   "scripts": {
     "dev": "nodemon --exec ts-node src/index.ts",
-    "build": "tsc",
+    "build": "tsc && tsc prisma/seed-paths.ts --outDir dist-seed --rootDir . --esModuleInterop --module CommonJS --target ES2020 --moduleResolution node",
     "start": "node dist/index.js",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "node dist-seed/prisma/seed-paths.js"
   },
   "dependencies": {
-    "express": "^4.18.2",
-    "cors": "^2.8.5",
-    "helmet": "^7.1.0",
-    "express-rate-limit": "^7.1.5",
-    "dotenv": "^16.3.1",
     "@prisma/client": "^5.9.0",
+    "@umi/file-storage": "file:../../shared/file-storage",
     "axios": "^1.6.5",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
-    "winston": "^3.11.0",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "minio": "^7.1.3",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^4.2.1",
     "pdfkit": "^0.14.0",
     "qrcode": "^1.5.3",
-    "@umi/file-storage": "file:../../shared/file-storage",
-    "minio": "^7.1.3"
+    "uuid": "^9.0.0",
+    "winston": "^3.11.0"
   },
   "devDependencies": {
-    "@types/node": "^20.11.0",
-    "@types/express": "^4.17.21",
     "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.11.0",
+    "@types/node-cron": "^3.0.11",
     "@types/pdfkit": "^0.13.3",
     "@types/qrcode": "^1.5.5",
-    "typescript": "^5.3.3",
+    "@types/uuid": "^9.0.7",
     "nodemon": "^3.0.3",
+    "prisma": "^5.9.0",
     "ts-node": "^10.9.2",
-    "prisma": "^5.9.0"
+    "typescript": "^5.3.3"
   }
 }

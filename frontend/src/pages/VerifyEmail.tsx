@@ -43,7 +43,7 @@ export default function VerifyEmail() {
           <div>
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
             <h2 className="text-xl font-bold mb-2">Xác thực Email</h2>
-            <p className="text-gray-600">{message}</p>
+            <p className="text-slate-600">{message}</p>
           </div>
         )}
         
@@ -55,8 +55,8 @@ export default function VerifyEmail() {
               </svg>
             </div>
             <h2 className="text-xl font-bold text-green-700 mb-2">Thành công!</h2>
-            <p className="text-gray-600 mb-4">{message}</p>
-            <p className="text-sm text-gray-500">Đang chuyển hướng đến trang đăng nhập...</p>
+            <p className="text-slate-600 mb-4">{message}</p>
+            <p className="text-sm text-slate-500">Đang chuyển hướng đến trang đăng nhập...</p>
           </div>
         )}
 
@@ -68,7 +68,7 @@ export default function VerifyEmail() {
               </svg>
             </div>
             <h2 className="text-xl font-bold text-red-700 mb-2">Xác thực Thất bại</h2>
-            <p className="text-gray-600 mb-6">{message}</p>
+            <p className="text-slate-600 mb-6">{message}</p>
             <Link to="/login" className="btn-primary w-full inline-block">
               Quay lại Đăng nhập
             </Link>

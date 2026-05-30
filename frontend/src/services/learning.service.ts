@@ -431,4 +431,68 @@ export const learningService = {
     const response = await learningApi.put(`/api/learning/assignment/submission/${submissionId}/grade`, data);
     return response.data.data;
   },
+
+  // ---------------------------------------------------------------------------
+  // HLS VIDEO STREAMING
+  // ---------------------------------------------------------------------------
+
+  /** Get presigned URL for HLS master.m3u8 playlist (student) */
+  async getHLSStream(lessonId: string): Promise<{
+    streamUrl: string;
+    expiresIn: number;
+    lesson: { id: string; title: string; duration: number; order: number };
+    hls: { ready: boolean; segmentCount?: number };
+  }> {
+    const response = await learningApi.get(`/api/learning/lessons/${lessonId}/hls`);
+    return response.data;
+  },
+
+  /** Get signed .m3u8 playlist with presigned segment URLs (student) */
+  async getSignedPlaylist(lessonId: string): Promise<string> {
+    const response = await learningApi.get(`/api/learning/lessons/${lessonId}/hls/playlist`, {
+      responseType: 'text',
+    });
+    return response.data;
+  },
+
+  /** Upload a video file for HLS processing (instructor) */
+  async uploadVideo(
+    lessonId: string,
+    courseId: string,
+    videoFile: File,
+    onProgress?: (percent: number) => void
+  ): Promise<{ message: string; jobId: string; status: string }> {
+    const formData = new FormData();
+    formData.append('video', videoFile);
+    formData.append('courseId', courseId);
+
+    const response = await learningApi.post(
+      `/api/learning/lessons/${lessonId}/upload-video?courseId=${courseId}`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        onUploadProgress: (e) => {
+          if (e.total && onProgress) {
+            onProgress(Math.round((e.loaded / e.total) * 100));
+          }
+        },
+      }
+    );
+    return response.data;
+  },
+
+  /** Check video processing job status (instructor) */
+  async getVideoJobStatus(jobId: string): Promise<{
+    jobId: string;
+    status: string;
+    hlsPath?: string;
+    segmentCount?: number;
+    durationSeconds?: number;
+    error?: string;
+    createdAt: string;
+    updatedAt: string;
+  }> {
+    const response = await learningApi.get(`/api/learning/video-jobs/${jobId}/status`);
+    return response.data;
+  },
 };

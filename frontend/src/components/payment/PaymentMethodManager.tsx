@@ -122,24 +122,24 @@ export const PaymentMethodManager = ({ onMethodSelected, selectedMethodId }: Pay
       <h3 className="font-semibold">Phương thức thanh toán</h3>
 
       {methods.length === 0 ? (
-        <p className="text-gray-500 text-sm">Chưa có phương thức thanh toán nào</p>
+        <p className="text-slate-500 text-sm">Chưa có phương thức thanh toán nào</p>
       ) : (
         <div className="space-y-2">
           {methods.map((method) => (
             <div
               key={method.id}
-              className={`flex items-center justify-between p-3 border rounded-lg cursor-pointer transition ${
-                selectedMethodId === method.id ? 'border-primary-500 bg-primary-50' : 'hover:bg-gray-50'
+              className={`flex items-center justify-between p-3 border rounded-xl cursor-pointer transition ${
+                selectedMethodId === method.id ? 'border-primary-500 bg-primary-50' : 'hover:bg-slate-50'
               }`}
               onClick={() => onMethodSelected?.(method.id)}
             >
               <div className="flex items-center space-x-3">
-                <FiCreditCard className="text-gray-500" />
+                <FiCreditCard className="text-slate-500" />
                 <div>
                   <p className="font-medium">
                     {method.card.brand} •••• {method.card.last4}
                   </p>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-slate-500">
                     Hết hạn {method.card.expMonth}/{method.card.expYear}
                   </p>
                 </div>
@@ -165,7 +165,7 @@ export const PaymentMethodManager = ({ onMethodSelected, selectedMethodId }: Pay
           + Thêm phương thức thanh toán mới
         </button>
       ) : (
-        <div className="border rounded-lg p-4 mt-2">
+        <div className="border rounded-xl p-4 mt-2">
           <h4 className="font-medium mb-3">Thêm thẻ mới</h4>
           <Elements stripe={stripePromise}>
             <AddPaymentMethodForm onSuccess={() => {
@@ -175,7 +175,7 @@ export const PaymentMethodManager = ({ onMethodSelected, selectedMethodId }: Pay
           </Elements>
           <button
             onClick={() => setShowAddForm(false)}
-            className="mt-2 text-sm text-gray-500 hover:text-gray-700"
+            className="mt-2 text-sm text-slate-500 hover:text-slate-700"
           >
             Hủy
           </button>

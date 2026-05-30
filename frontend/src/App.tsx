@@ -3,6 +3,8 @@ import { useAuth } from './hooks/useAuth'
 import Header from './components/layout/Header'
 import { Footer } from './components/layout/Footer'
 import { ProtectedRoute } from './components/auth/ProtectedRoute'
+import { SocketProvider } from './contexts/SocketContext'
+import ChatWidget from './components/realtime/ChatWidget'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -38,6 +40,9 @@ import AssignmentPage from './pages/AssignmentPage'
 import AssignmentSubmissions from './pages/instructor/AssignmentSubmissions'
 import CourseStudents from './pages/instructor/CourseStudents'
 import CourseStudentDetail from './pages/instructor/CourseStudentDetail'
+import LearningPaths from './pages/LearningPaths'
+import LearningAnalytics from './pages/LearningAnalytics'
+import AIAssistant from './pages/AIAssistant'
 
 function App() {
   const { isAuthenticated, loading } = useAuth()
@@ -51,6 +56,7 @@ function App() {
   }
 
   return (
+    <SocketProvider>
     <div className="min-h-screen flex flex-col">
       <Header />
       <main className="flex-grow">
@@ -150,6 +156,21 @@ function App() {
               <MyLearning />
             </ProtectedRoute>
           } />
+          <Route path="/learning-paths" element={
+            <ProtectedRoute>
+              <LearningPaths />
+            </ProtectedRoute>
+          } />
+          <Route path="/learning-analytics" element={
+            <ProtectedRoute>
+              <LearningAnalytics />
+            </ProtectedRoute>
+          } />
+          <Route path="/ai-assistant" element={
+            <ProtectedRoute>
+              <AIAssistant />
+            </ProtectedRoute>
+          } />
           <Route path="/purchased-courses" element={
             <ProtectedRoute>
               <PurchasedCourses />
@@ -209,10 +230,13 @@ function App() {
               <CourseStudentDetail />
             </ProtectedRoute>
           } />
+
         </Routes>
       </main>
       <Footer />
+      {isAuthenticated && <ChatWidget />}
     </div>
+    </SocketProvider>
   )
 }
 

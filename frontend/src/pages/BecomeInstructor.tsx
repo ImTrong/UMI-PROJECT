@@ -45,14 +45,14 @@ export default function BecomeInstructor() {
   // If already instructor, redirect
   if (user?.role === 'INSTRUCTOR') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-16 px-4">
+      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 py-16 px-4">
         <div className="max-w-2xl mx-auto text-center">
-          <div className="bg-white rounded-3xl shadow-xl p-12">
+          <div className="bg-white rounded-3xl shadow-sm p-12">
             <div className="bg-green-100 text-green-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
               <FiCheckCircle size={40} />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Bạn đã là Giảng viên!</h2>
-            <p className="text-gray-600 mb-8">
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">Bạn đã là Giảng viên!</h2>
+            <p className="text-slate-600 mb-8">
               Tài khoản của bạn đã có quyền giảng viên. Hãy bắt đầu tạo khóa học ngay.
             </p>
             <button
@@ -138,13 +138,13 @@ export default function BecomeInstructor() {
         return (
           <div className="space-y-8 animate-fadeIn">
             <div className="text-center">
-              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary-500 to-purple-600 rounded-2xl text-white mb-6 shadow-lg">
+              <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-primary-500 to-teal-600 rounded-2xl text-white mb-6 shadow-sm">
                 <FiAward size={36} />
               </div>
-              <h2 className="text-3xl font-extrabold text-gray-900 mb-3">
+              <h2 className="text-3xl font-extrabold text-slate-900 mb-3">
                 Chia sẻ kiến thức, Xây dựng tương lai
               </h2>
-              <p className="text-gray-500 text-lg max-w-2xl mx-auto">
+              <p className="text-slate-500 text-lg max-w-2xl mx-auto">
                 Trở thành giảng viên của UMI và giúp hàng ngàn người thay đổi cuộc sống thông qua giáo dục trực tuyến.
               </p>
             </div>
@@ -155,9 +155,9 @@ export default function BecomeInstructor() {
                   icon: FiBookOpen,
                   title: 'Giảng dạy theo cách của bạn',
                   desc: 'Tự do sáng tạo nội dung và lịch trình giảng dạy phù hợp với phong cách của bạn.',
-                  color: 'from-blue-500 to-cyan-500',
-                  bg: 'bg-blue-50',
-                  border: 'border-blue-100',
+                  color: 'from-cyan-500 to-cyan-500',
+                  bg: 'bg-cyan-50',
+                  border: 'border-cyan-100',
                 },
                 {
                   icon: FiBriefcase,
@@ -179,21 +179,21 @@ export default function BecomeInstructor() {
                   icon: FiShield,
                   title: 'Hỗ trợ kỹ thuật toàn diện',
                   desc: 'Đội ngũ UMI luôn sẵn sàng hỗ trợ bạn về mặt kỹ thuật và vận hành.',
-                  color: 'from-purple-500 to-pink-500',
-                  bg: 'bg-purple-50',
-                  border: 'border-purple-100',
+                  color: 'from-teal-500 to-pink-500',
+                  bg: 'bg-teal-50',
+                  border: 'border-teal-100',
                 },
               ].map((item, idx) => (
                 <div
                   key={idx}
-                  className={`flex items-start space-x-4 p-5 rounded-2xl ${item.bg} border ${item.border} hover:shadow-md transition-all duration-300 hover:-translate-y-0.5`}
+                  className={`flex items-start space-x-4 p-5 rounded-2xl ${item.bg} border ${item.border} hover:shadow-sm transition-all duration-300 hover:-translate-y-0.5`}
                 >
-                  <div className={`bg-gradient-to-br ${item.color} p-3 rounded-xl text-white flex-shrink-0 shadow-md`}>
+                  <div className={`bg-gradient-to-br ${item.color} p-3 rounded-xl text-white flex-shrink-0 shadow-sm`}>
                     <item.icon size={22} />
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 text-lg mb-1">{item.title}</h3>
-                    <p className="text-gray-600 text-sm leading-relaxed">{item.desc}</p>
+                    <h3 className="font-bold text-slate-900 text-lg mb-1">{item.title}</h3>
+                    <p className="text-slate-600 text-sm leading-relaxed">{item.desc}</p>
                   </div>
                 </div>
               ))}
@@ -202,7 +202,7 @@ export default function BecomeInstructor() {
             <div className="text-center pt-4">
               <button
                 onClick={handleNextStep}
-                className="btn-primary px-10 py-4 text-lg rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-300 inline-flex items-center space-x-2 font-bold"
+                className="btn-primary px-10 py-4 text-lg rounded-2xl shadow-sm hover:shadow-sm transition-all duration-300 inline-flex items-center space-x-2 font-bold"
               >
                 <span>Bắt đầu đăng ký</span>
                 <FiArrowRight size={20} />
@@ -216,16 +216,16 @@ export default function BecomeInstructor() {
         return (
           <form onSubmit={handleInfoSubmit} className="space-y-6 animate-fadeIn">
             <div className="text-center mb-2">
-              <h3 className="text-2xl font-bold text-gray-900 flex items-center justify-center">
+              <h3 className="text-2xl font-bold text-slate-900 flex items-center justify-center">
                 <FiUser className="mr-2 text-primary-600" /> Thông tin của bạn
               </h3>
-              <p className="text-gray-500 mt-1">Vui lòng cung cấp thông tin để hoàn tất đăng ký</p>
+              <p className="text-slate-500 mt-1">Vui lòng cung cấp thông tin để hoàn tất đăng ký</p>
             </div>
 
             <div className="space-y-5">
               {/* Bio */}
               <div>
-                <label className="flex items-center text-sm font-semibold text-gray-700 mb-2">
+                <label className="flex items-center text-sm font-semibold text-slate-700 mb-2">
                   <FiFileText className="mr-2 text-primary-500" />
                   Giới thiệu bản thân <span className="text-red-500 ml-1">*</span>
                 </label>
@@ -245,7 +245,7 @@ export default function BecomeInstructor() {
                     {errors.bio}
                   </p>
                 )}
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="text-xs text-slate-400 mt-1">
                   {formData.bio.length}/20 ký tự tối thiểu
                 </p>
               </div>
@@ -253,7 +253,7 @@ export default function BecomeInstructor() {
               {/* Phone + Expertise */}
               <div className="grid md:grid-cols-2 gap-5">
                 <div>
-                  <label className="flex items-center text-sm font-semibold text-gray-700 mb-2">
+                  <label className="flex items-center text-sm font-semibold text-slate-700 mb-2">
                     <FiPhone className="mr-2 text-primary-500" />
                     Số điện thoại <span className="text-red-500 ml-1">*</span>
                   </label>
@@ -275,7 +275,7 @@ export default function BecomeInstructor() {
                   )}
                 </div>
                 <div>
-                  <label className="flex items-center text-sm font-semibold text-gray-700 mb-2">
+                  <label className="flex items-center text-sm font-semibold text-slate-700 mb-2">
                     <FiStar className="mr-2 text-primary-500" />
                     Lĩnh vực chuyên môn <span className="text-red-500 ml-1">*</span>
                   </label>
@@ -300,9 +300,9 @@ export default function BecomeInstructor() {
 
               {/* Address */}
               <div>
-                <label className="flex items-center text-sm font-semibold text-gray-700 mb-2">
+                <label className="flex items-center text-sm font-semibold text-slate-700 mb-2">
                   <FiMapPin className="mr-2 text-primary-500" />
-                  Địa chỉ <span className="text-gray-400 text-xs ml-1">(không bắt buộc)</span>
+                  Địa chỉ <span className="text-slate-400 text-xs ml-1">(không bắt buộc)</span>
                 </label>
                 <input
                   type="text"
@@ -318,14 +318,14 @@ export default function BecomeInstructor() {
               <button
                 type="button"
                 onClick={handlePrevStep}
-                className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all font-medium"
+                className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl border-2 border-slate-100 text-slate-600 hover:bg-slate-50 hover:border-slate-200 transition-all font-medium"
               >
                 <FiArrowLeft size={18} />
                 <span>Quay lại</span>
               </button>
               <button
                 type="submit"
-                className="btn-primary px-8 py-3 rounded-xl inline-flex items-center space-x-2 font-semibold shadow-lg hover:shadow-xl transition-all"
+                className="btn-primary px-8 py-3 rounded-xl inline-flex items-center space-x-2 font-semibold shadow-sm hover:shadow-sm transition-all"
               >
                 <span>Tiếp tục</span>
                 <FiArrowRight size={18} />
@@ -339,46 +339,46 @@ export default function BecomeInstructor() {
         return (
           <div className="space-y-6 animate-fadeIn">
             <div className="text-center mb-2">
-              <h3 className="text-2xl font-bold text-gray-900 flex items-center justify-center">
+              <h3 className="text-2xl font-bold text-slate-900 flex items-center justify-center">
                 <FiShield className="mr-2 text-primary-600" /> Xác nhận thông tin
               </h3>
-              <p className="text-gray-500 mt-1">Vui lòng kiểm tra lại thông tin trước khi hoàn tất đăng ký</p>
+              <p className="text-slate-500 mt-1">Vui lòng kiểm tra lại thông tin trước khi hoàn tất đăng ký</p>
             </div>
 
             {/* Review Card */}
-            <div className="bg-gradient-to-br from-gray-50 to-blue-50 rounded-2xl border border-gray-200 overflow-hidden">
-              <div className="bg-gradient-to-r from-primary-600 to-purple-600 px-6 py-4">
+            <div className="bg-gradient-to-br from-gray-50 to-cyan-50 rounded-2xl border border-slate-100 overflow-hidden">
+              <div className="bg-gradient-to-r from-primary-600 to-teal-600 px-6 py-4">
                 <h4 className="text-white font-bold text-lg">Thông tin đăng ký giảng viên</h4>
               </div>
               <div className="p-6 space-y-4">
                 <div className="flex items-start">
-                  <div className="w-36 flex-shrink-0 flex items-center text-gray-500 text-sm font-medium">
+                  <div className="w-36 flex-shrink-0 flex items-center text-slate-500 text-sm font-medium">
                     <FiFileText className="mr-2" /> Giới thiệu:
                   </div>
-                  <p className="text-gray-900 leading-relaxed">{formData.bio}</p>
+                  <p className="text-slate-900 leading-relaxed">{formData.bio}</p>
                 </div>
-                <hr className="border-gray-200" />
+                <hr className="border-slate-100" />
                 <div className="flex items-center">
-                  <div className="w-36 flex-shrink-0 flex items-center text-gray-500 text-sm font-medium">
+                  <div className="w-36 flex-shrink-0 flex items-center text-slate-500 text-sm font-medium">
                     <FiPhone className="mr-2" /> Số điện thoại:
                   </div>
-                  <p className="text-gray-900 font-medium">{formData.phoneNumber}</p>
+                  <p className="text-slate-900 font-medium">{formData.phoneNumber}</p>
                 </div>
-                <hr className="border-gray-200" />
+                <hr className="border-slate-100" />
                 <div className="flex items-center">
-                  <div className="w-36 flex-shrink-0 flex items-center text-gray-500 text-sm font-medium">
+                  <div className="w-36 flex-shrink-0 flex items-center text-slate-500 text-sm font-medium">
                     <FiStar className="mr-2" /> Chuyên môn:
                   </div>
-                  <p className="text-gray-900 font-medium">{formData.expertise}</p>
+                  <p className="text-slate-900 font-medium">{formData.expertise}</p>
                 </div>
                 {formData.address && (
                   <>
-                    <hr className="border-gray-200" />
+                    <hr className="border-slate-100" />
                     <div className="flex items-center">
-                      <div className="w-36 flex-shrink-0 flex items-center text-gray-500 text-sm font-medium">
+                      <div className="w-36 flex-shrink-0 flex items-center text-slate-500 text-sm font-medium">
                         <FiMapPin className="mr-2" /> Địa chỉ:
                       </div>
-                      <p className="text-gray-900">{formData.address}</p>
+                      <p className="text-slate-900">{formData.address}</p>
                     </div>
                   </>
                 )}
@@ -399,7 +399,7 @@ export default function BecomeInstructor() {
                 type="button"
                 onClick={handlePrevStep}
                 disabled={loading}
-                className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl border-2 border-gray-200 text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition-all font-medium disabled:opacity-50"
+                className="inline-flex items-center space-x-2 px-6 py-3 rounded-xl border-2 border-slate-100 text-slate-600 hover:bg-slate-50 hover:border-slate-200 transition-all font-medium disabled:opacity-50"
               >
                 <FiArrowLeft size={18} />
                 <span>Chỉnh sửa</span>
@@ -407,7 +407,7 @@ export default function BecomeInstructor() {
               <button
                 onClick={handleConfirmSubmit}
                 disabled={loading}
-                className="btn-primary px-10 py-3 rounded-xl inline-flex items-center space-x-2 font-bold text-lg shadow-xl hover:shadow-2xl transition-all disabled:opacity-60"
+                className="btn-primary px-10 py-3 rounded-xl inline-flex items-center space-x-2 font-bold text-lg shadow-sm hover:shadow-sm transition-all disabled:opacity-60"
               >
                 {loading ? (
                   <>
@@ -431,20 +431,20 @@ export default function BecomeInstructor() {
           <div className="text-center py-8 space-y-8 animate-fadeIn">
             <div className="flex justify-center">
               <div className="relative">
-                <div className="bg-gradient-to-br from-green-400 to-emerald-500 text-white p-7 rounded-full shadow-2xl">
+                <div className="bg-gradient-to-br from-green-400 to-emerald-500 text-white p-7 rounded-full shadow-sm">
                   <FiCheckCircle size={64} />
                 </div>
-                <div className="absolute -top-1 -right-1 bg-yellow-400 text-yellow-900 w-8 h-8 rounded-full flex items-center justify-center shadow-lg">
+                <div className="absolute -top-1 -right-1 bg-yellow-400 text-yellow-900 w-8 h-8 rounded-full flex items-center justify-center shadow-sm">
                   <FiStar size={16} />
                 </div>
               </div>
             </div>
 
             <div>
-              <h2 className="text-4xl font-extrabold text-gray-900 mb-3">
+              <h2 className="text-4xl font-extrabold text-slate-900 mb-3">
                 🎉 Xin chúc mừng!
               </h2>
-              <p className="text-xl text-gray-600 max-w-lg mx-auto leading-relaxed">
+              <p className="text-xl text-slate-600 max-w-lg mx-auto leading-relaxed">
                 Bạn đã chính thức trở thành <strong className="text-primary-700">Giảng viên UMI</strong>.
                 Hãy bắt đầu tạo khóa học đầu tiên và chia sẻ kiến thức của bạn với cộng đồng!
               </p>
@@ -453,14 +453,14 @@ export default function BecomeInstructor() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
               <button
                 onClick={() => navigate('/instructor/courses')}
-                className="btn-primary px-8 py-4 text-lg rounded-2xl shadow-xl hover:shadow-2xl transition-all inline-flex items-center justify-center space-x-2 font-bold"
+                className="btn-primary px-8 py-4 text-lg rounded-2xl shadow-sm hover:shadow-sm transition-all inline-flex items-center justify-center space-x-2 font-bold"
               >
                 <FiBookOpen size={22} />
                 <span>Quản lý Khóa học</span>
               </button>
               <button
                 onClick={() => navigate('/profile')}
-                className="px-8 py-4 text-lg rounded-2xl border-2 border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all inline-flex items-center justify-center space-x-2 font-medium"
+                className="px-8 py-4 text-lg rounded-2xl border-2 border-slate-100 text-slate-700 hover:bg-slate-50 hover:border-slate-200 transition-all inline-flex items-center justify-center space-x-2 font-medium"
               >
                 <FiUser size={22} />
                 <span>Xem Hồ sơ</span>
@@ -475,22 +475,22 @@ export default function BecomeInstructor() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="text-4xl font-extrabold text-gray-900 mb-2">Đăng ký trở thành Giảng viên</h1>
-          <p className="text-gray-500 text-lg">Hành trình chia sẻ kiến thức bắt đầu từ đây</p>
+          <h1 className="text-4xl font-extrabold text-slate-900 mb-2">Đăng ký trở thành Giảng viên</h1>
+          <p className="text-slate-500 text-lg">Hành trình chia sẻ kiến thức bắt đầu từ đây</p>
         </div>
 
         {/* Progress Tracker */}
         <div className="mb-10">
           <div className="flex justify-between relative">
             {/* Background line */}
-            <div className="absolute top-6 left-0 w-full h-0.5 bg-gray-200 z-0"></div>
+            <div className="absolute top-6 left-0 w-full h-0.5 bg-slate-200 z-0"></div>
             {/* Active line */}
             <div
-              className="absolute top-6 left-0 h-0.5 bg-gradient-to-r from-primary-500 to-purple-500 z-0 transition-all duration-700 ease-out"
+              className="absolute top-6 left-0 h-0.5 bg-gradient-to-r from-primary-500 to-teal-500 z-0 transition-all duration-700 ease-out"
               style={{ width: `${(currentStep / (STEPS.length - 1)) * 100}%` }}
             ></div>
 
@@ -505,17 +505,17 @@ export default function BecomeInstructor() {
                   <div
                     className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 
                       ${isCompleted
-                        ? 'bg-gradient-to-br from-green-400 to-emerald-500 text-white shadow-lg'
+                        ? 'bg-gradient-to-br from-green-400 to-emerald-500 text-white shadow-sm'
                         : isCurrent
-                          ? 'bg-gradient-to-br from-primary-500 to-purple-600 text-white shadow-xl scale-110 ring-4 ring-primary-100'
-                          : 'bg-white text-gray-400 border-2 border-gray-200'
+                          ? 'bg-gradient-to-br from-primary-500 to-teal-600 text-white shadow-sm scale-110 ring-4 ring-primary-100'
+                          : 'bg-white text-slate-400 border-2 border-slate-100'
                       }`}
                   >
                     {isCompleted ? <FiCheckCircle size={20} /> : <Icon size={20} />}
                   </div>
                   <span
                     className={`mt-2 text-xs font-bold transition-colors duration-300 ${
-                      isActive ? 'text-primary-700' : 'text-gray-400'
+                      isActive ? 'text-primary-700' : 'text-slate-400'
                     }`}
                   >
                     {step.title}
@@ -527,7 +527,7 @@ export default function BecomeInstructor() {
         </div>
 
         {/* Content Card */}
-        <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12 relative overflow-hidden">
+        <div className="bg-white rounded-3xl shadow-sm p-8 md:p-12 relative overflow-hidden">
           {/* Decorative gradient corner */}
           <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl from-primary-50 to-transparent rounded-bl-full opacity-60"></div>
 
@@ -537,7 +537,7 @@ export default function BecomeInstructor() {
               <div className="flex flex-col items-center">
                 <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary-200 border-t-primary-600 mb-4"></div>
                 <p className="text-primary-800 font-bold text-lg">Đang hoàn tất đăng ký...</p>
-                <p className="text-gray-500 text-sm mt-1">Vui lòng đợi trong giây lát</p>
+                <p className="text-slate-500 text-sm mt-1">Vui lòng đợi trong giây lát</p>
               </div>
             </div>
           )}
@@ -547,7 +547,7 @@ export default function BecomeInstructor() {
 
         {/* Footer note */}
         {currentStep < 3 && (
-          <div className="mt-8 text-center text-gray-400 text-sm">
+          <div className="mt-8 text-center text-slate-400 text-sm">
             Tham gia cùng cộng đồng giảng viên trên toàn quốc tại UMI
           </div>
         )}

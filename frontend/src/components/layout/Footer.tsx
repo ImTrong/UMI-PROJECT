@@ -46,24 +46,24 @@ export const Footer = () => {
   return (
     <footer className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white mt-auto">
       {/* Newsletter Section */}
-      <div className="border-b border-gray-700/50">
+      <div className="border-b border-slate-700/50">
         <div className="container mx-auto px-4 py-12">
           <div className="max-w-4xl mx-auto text-center">
             <h3 className="text-2xl md:text-3xl font-bold mb-3 bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent">
               Đăng ký nhận tin
             </h3>
-            <p className="text-gray-400 mb-6">
+            <p className="text-slate-400 mb-6">
               Nhận thông tin về khóa học mới và ưu đãi đặc biệt
             </p>
             <form className="flex flex-col sm:flex-row gap-3 max-w-md mx-auto">
               <input
                 type="email"
                 placeholder="Email của bạn"
-                className="flex-1 px-5 py-3 bg-gray-800/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+                className="flex-1 px-5 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
               />
               <button
                 type="submit"
-                className="px-6 py-3 bg-gradient-to-r from-primary-600 to-primary-500 text-white rounded-xl hover:from-primary-700 hover:to-primary-600 transition-all duration-300 font-medium flex items-center justify-center gap-2 group"
+                className="px-6 py-3 bg-emerald-600 text-white rounded-xl hover:from-primary-700 hover:to-primary-600 transition-all duration-300 font-medium flex items-center justify-center gap-2 group"
               >
                 <span>Đăng ký</span>
                 <FiSend className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
@@ -83,7 +83,7 @@ export const Footer = () => {
                 UMI
               </span>
             </Link>
-            <p className="text-gray-400 text-sm leading-relaxed">
+            <p className="text-slate-400 text-sm leading-relaxed">
               Hệ thống học tập trực tuyến tiên tiến, xây dựng trên kiến trúc microservices, 
               mang đến trải nghiệm học tập tốt nhất cho học viên.
             </p>
@@ -94,7 +94,7 @@ export const Footer = () => {
                   href={social.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={`w-9 h-9 rounded-full bg-gray-800 flex items-center justify-center text-gray-400 hover:text-white transition-all duration-300 ${social.color}`}
+                  className={`w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-slate-400 hover:text-white transition-all duration-300 ${social.color}`}
                 >
                   <social.icon className="w-4 h-4" />
                 </a>
@@ -106,16 +106,16 @@ export const Footer = () => {
           <div>
             <h4 className="text-lg font-semibold mb-5 relative inline-block">
               Liên kết nhanh
-              <span className="absolute -bottom-2 left-0 w-8 h-0.5 bg-primary-500 rounded-full"></span>
+              <span className="absolute -bottom-2 left-0 w-8 h-0.5 bg-slate-1000 rounded-full"></span>
             </h4>
             <ul className="space-y-3">
               {quickLinks.map((link, index) => (
                 <li key={index}>
                   <Link
                     to={link.href}
-                    className="text-gray-400 hover:text-primary-400 transition-colors duration-200 text-sm flex items-center gap-2 group"
+                    className="text-slate-400 hover:text-primary-400 transition-colors duration-200 text-sm flex items-center gap-2 group"
                   >
-                    <span className="w-1 h-1 bg-primary-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    <span className="w-1 h-1 bg-slate-1000 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
                     {link.name}
                   </Link>
                 </li>
@@ -127,16 +127,16 @@ export const Footer = () => {
           <div>
             <h4 className="text-lg font-semibold mb-5 relative inline-block">
               Hỗ trợ
-              <span className="absolute -bottom-2 left-0 w-8 h-0.5 bg-primary-500 rounded-full"></span>
+              <span className="absolute -bottom-2 left-0 w-8 h-0.5 bg-slate-1000 rounded-full"></span>
             </h4>
             <ul className="space-y-3">
               {supportLinks.map((link, index) => (
                 <li key={index}>
                   <Link
                     to={link.href}
-                    className="text-gray-400 hover:text-primary-400 transition-colors duration-200 text-sm flex items-center gap-2 group"
+                    className="text-slate-400 hover:text-primary-400 transition-colors duration-200 text-sm flex items-center gap-2 group"
                   >
-                    <span className="w-1 h-1 bg-primary-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                    <span className="w-1 h-1 bg-slate-1000 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"></span>
                     {link.name}
                   </Link>
                 </li>
@@ -148,27 +148,27 @@ export const Footer = () => {
           <div>
             <h4 className="text-lg font-semibold mb-5 relative inline-block">
               Thông tin liên hệ
-              <span className="absolute -bottom-2 left-0 w-8 h-0.5 bg-primary-500 rounded-full"></span>
+              <span className="absolute -bottom-2 left-0 w-8 h-0.5 bg-slate-1000 rounded-full"></span>
             </h4>
             <ul className="space-y-4">
               {contactInfo.map((item, index) => (
-                <li key={index} className="flex items-start gap-3 text-gray-400 text-sm">
+                <li key={index} className="flex items-start gap-3 text-slate-400 text-sm">
                   <item.icon className="w-5 h-5 text-primary-400 mt-0.5 flex-shrink-0" />
                   <span className="leading-relaxed">{item.text}</span>
                 </li>
               ))}
             </ul>
             {/* Trust Badge */}
-            <div className="mt-6 pt-4 border-t border-gray-800">
+            <div className="mt-6 pt-4 border-t border-slate-800">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-primary-500/20 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-full bg-slate-1000/20 flex items-center justify-center">
                   <svg className="w-5 h-5 text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                   </svg>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500">Được chứng nhận bởi</p>
-                  <p className="text-sm font-semibold text-gray-300">Bộ Giáo dục & Đào tạo</p>
+                  <p className="text-xs text-slate-400">Được chứng nhận bởi</p>
+                  <p className="text-sm font-semibold text-slate-300">Bộ Giáo dục & Đào tạo</p>
                 </div>
               </div>
             </div>
@@ -177,22 +177,22 @@ export const Footer = () => {
       </div>
 
       {/* Bottom Bar */}
-      <div className="border-t border-gray-800/50">
+      <div className="border-t border-slate-800/50">
         <div className="container mx-auto px-4 py-6">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
-            <p className="text-gray-500 text-sm">
+            <p className="text-slate-400 text-sm">
               © {currentYear} Nền tảng E-Learning UMI. Tất cả các quyền được bảo lưu.
             </p>
             <div className="flex flex-wrap justify-center gap-4 text-xs">
-              <Link to="/privacy" className="text-gray-500 hover:text-gray-400 transition-colors">
+              <Link to="/privacy" className="text-slate-400 hover:text-slate-400 transition-colors">
                 Chính sách bảo mật
               </Link>
-              <span className="text-gray-700">|</span>
-              <Link to="/terms" className="text-gray-500 hover:text-gray-400 transition-colors">
+              <span className="text-slate-700">|</span>
+              <Link to="/terms" className="text-slate-400 hover:text-slate-400 transition-colors">
                 Điều khoản sử dụng
               </Link>
-              <span className="text-gray-700">|</span>
-              <Link to="/cookies" className="text-gray-500 hover:text-gray-400 transition-colors">
+              <span className="text-slate-700">|</span>
+              <Link to="/cookies" className="text-slate-400 hover:text-slate-400 transition-colors">
                 Chính sách Cookie
               </Link>
             </div>

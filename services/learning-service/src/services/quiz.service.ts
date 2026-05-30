@@ -347,7 +347,7 @@ export class QuizService {
 
     return {
       uploadUrl: result.uploadUrl,
-      fileUrl: result.publicUrl,
+      fileUrl: `/api/learning/files/download?bucket=quiz-attachments&key=${result.fileKey}`,
       fileKey: result.fileKey,
     };
   }

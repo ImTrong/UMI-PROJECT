@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { UserController } from './controllers/user.controller';
 import { NotificationController } from './controllers/notification.controller';
+import { ChatController } from './controllers/chat.controller';
 import { authenticateToken, requireRole } from './middleware/auth.middleware';
 import {
   validateCreateUser,
@@ -68,6 +69,12 @@ app.get(
   '/api/users/me',
   authenticateToken,
   UserController.getMyProfile
+);
+
+app.get(
+  '/api/users/profile/avatar/upload-url',
+  authenticateToken,
+  UserController.getAvatarUploadUrl
 );
 
 app.put(
@@ -192,6 +199,44 @@ app.post(
   '/api/users/internal/notifications',
   // In a real microservices setup, you'd protect this with a special internal network token
   NotificationController.createInternalNotification
+);
+
+// ==================== Chat Routes ====================
+
+app.get(
+  '/api/users/me/conversations',
+  authenticateToken,
+  ChatController.getConversations
+);
+
+app.post(
+  '/api/users/me/conversations',
+  authenticateToken,
+  ChatController.createConversation
+);
+
+app.get(
+  '/api/users/me/conversations/:conversationId/messages',
+  authenticateToken,
+  ChatController.getMessages
+);
+
+app.post(
+  '/api/users/me/conversations/:conversationId/messages',
+  authenticateToken,
+  ChatController.sendMessage
+);
+
+app.put(
+  '/api/users/me/conversations/:conversationId/read',
+  authenticateToken,
+  ChatController.markAsRead
+);
+
+app.get(
+  '/api/users/me/chat/unread-count',
+  authenticateToken,
+  ChatController.getUnreadCount
 );
 
 // ==================== Analytics Route ====================

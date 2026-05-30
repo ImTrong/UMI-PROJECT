@@ -54,7 +54,7 @@ export const CourseFilters = ({ onFilterChange, initialFilters = {} }: CourseFil
     <div className="space-y-4">
       {/* Search Bar */}
       <div className="relative">
-        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+        <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
         <input
           type="text"
           placeholder="Tìm kiếm khóa học..."
@@ -88,7 +88,7 @@ export const CourseFilters = ({ onFilterChange, initialFilters = {} }: CourseFil
 
           {/* Category Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Danh mục
             </label>
             <select
@@ -107,7 +107,7 @@ export const CourseFilters = ({ onFilterChange, initialFilters = {} }: CourseFil
 
           {/* Level Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Trình độ
             </label>
             <select
@@ -124,7 +124,7 @@ export const CourseFilters = ({ onFilterChange, initialFilters = {} }: CourseFil
 
           {/* Price Range */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Khoảng giá
             </label>
             <div className="flex space-x-2">
@@ -147,7 +147,7 @@ export const CourseFilters = ({ onFilterChange, initialFilters = {} }: CourseFil
 
           {/* Sort By */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Sắp xếp theo
             </label>
             <select
