@@ -3,24 +3,28 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-# Copy root package files (if workspace)
-COPY package*.json ./
-
-# Copy shared module
-COPY shared/file-storage ./shared/file-storage
-
-# Build shared module
+# 1. Cache shared module dependencies
+COPY shared/file-storage/package*.json ./shared/file-storage/
 WORKDIR /app/shared/file-storage
-RUN npm install && npm run build
+RUN --mount=type=cache,id=npm-shared-payment-service,target=/root/.npm npm install
 
-# Copy service code
+# 2. Cache service dependencies
+WORKDIR /app/services/payment-service
+COPY services/payment-service/package*.json ./
+RUN apk add --no-cache openssl libc6-compat
+RUN --mount=type=cache,id=npm-payment-service,target=/root/.npm if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+# 3. Build shared module
+WORKDIR /app
+COPY shared/file-storage ./shared/file-storage
+WORKDIR /app/shared/file-storage
+RUN npm run build
+
+# 4. Copy service code
 WORKDIR /app
 COPY services/payment-service ./services/payment-service
-
-# Install service dependencies
 WORKDIR /app/services/payment-service
-RUN apk add --no-cache openssl libc6-compat
-RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
 RUN npx prisma generate
 
 # Build service

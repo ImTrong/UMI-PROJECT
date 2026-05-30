@@ -42,6 +42,10 @@ export const validateUpdateUser = [
     .optional()
     .isBoolean()
     .withMessage('isActive must be a boolean'),
+  body('dateOfBirth')
+    .optional({ checkFalsy: true }) // Allows empty string to be treated as optional
+    .isISO8601()
+    .withMessage('Invalid date of birth format. Must be a valid date.'),
 ];
 
 export const validateEducation = [

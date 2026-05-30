@@ -1,18 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { learningService, CourseProgress, LearningStats, TaskItem } from '../services/learning.service';
+import { learningService, CourseProgress, LearningStats, TaskItem, ActivityLog } from '../services/learning.service';
+import { recommendationService } from '../services/recommendation.service';
 import { ProgressBar } from '../components/learning/ProgressBar';
 import { ActivityFeed } from '../components/learning/ActivityFeed';
+import RecommendationList from '../components/dashboard/RecommendationList';
 import { FiBookOpen, FiClock, FiAward, FiTrendingUp, FiCalendar, FiTarget, FiCheckSquare } from 'react-icons/fi';
-import { formatVND } from '../utils/currency';
 
 export default function StudentDashboard() {
   const { user } = useAuth();
   const [enrolledCourses, setEnrolledCourses] = useState<CourseProgress[]>([]);
   const [stats, setStats] = useState<LearningStats | null>(null);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  const [recommendations, setRecommendations] = useState<any>(null);
+  const [recentActivity, setRecentActivity] = useState<ActivityLog[]>([]);
+  const [nextActions, setNextActions] = useState<any[]>([]);
   const [pendingTasks, setPendingTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -23,18 +24,18 @@ export default function StudentDashboard() {
   const loadDashboardData = async () => {
     setLoading(true);
     try {
-      const [coursesData, statsData, activityData, recommendationsData, tasksData] = await Promise.all([
+      const [coursesData, statsData, activityData, actionsData, tasksData] = await Promise.all([
         learningService.getEnrolledCourses(1, 10),
         learningService.getLearningStats(),
         learningService.getRecentActivity(5),
-        learningService.getRecommendations(),
+        recommendationService.getSmartNextActions(),
         learningService.getPendingTasks().catch(() => []),
       ]);
       
       setEnrolledCourses(coursesData.courses);
       setStats(statsData);
       setRecentActivity(activityData);
-      setRecommendations(recommendationsData);
+      setNextActions(actionsData);
       setPendingTasks(tasksData.filter(t => t.status !== 'COMPLETED'));
       
     } catch (error) {
@@ -71,28 +72,28 @@ export default function StudentDashboard() {
             <FiBookOpen className="text-2xl text-primary-500" />
             <div>
               <p className="text-2xl font-bold">{stats.overall.totalCoursesEnrolled}</p>
-              <p className="text-sm text-gray-500">Đã đăng ký</p>
+              <p className="text-sm text-slate-500">Đã đăng ký</p>
             </div>
           </div>
           <div className="card flex items-center space-x-3">
             <FiAward className="text-2xl text-green-500" />
             <div>
               <p className="text-2xl font-bold">{stats.overall.totalCoursesCompleted}</p>
-              <p className="text-sm text-gray-500">Đã hoàn thành</p>
+              <p className="text-sm text-slate-500">Đã hoàn thành</p>
             </div>
           </div>
           <div className="card flex items-center space-x-3">
             <FiClock className="text-2xl text-yellow-500" />
             <div>
               <p className="text-2xl font-bold">{stats.overall.totalStudyTimeHours}</p>
-              <p className="text-sm text-gray-500">Giờ học</p>
+              <p className="text-sm text-slate-500">Giờ học</p>
             </div>
           </div>
           <div className="card flex items-center space-x-3">
-            <FiTrendingUp className="text-2xl text-purple-500" />
+            <FiTrendingUp className="text-2xl text-teal-500" />
             <div>
               <p className="text-2xl font-bold">{stats.overall.streakDays}</p>
-              <p className="text-sm text-gray-500">Chuỗi ngày học</p>
+              <p className="text-sm text-slate-500">Chuỗi ngày học</p>
             </div>
           </div>
         </div>
@@ -110,7 +111,7 @@ export default function StudentDashboard() {
           
           {enrolledCourses.length === 0 ? (
             <div className="card text-center py-8">
-              <p className="text-gray-500 mb-4">Bạn chưa đăng ký khóa học nào.</p>
+              <p className="text-slate-500 mb-4">Bạn chưa đăng ký khóa học nào.</p>
               <Link to="/courses" className="btn-primary">
                 Khám phá Khóa học
               </Link>
@@ -121,12 +122,12 @@ export default function StudentDashboard() {
                 <Link
                   key={course.id}
                   to={`/learning/${course.courseId}`}
-                  className="card block hover:shadow-md transition"
+                  className="card block hover:shadow-sm transition"
                 >
                   <div className="flex justify-between items-start mb-2">
                     <div>
                       <h3 className="font-semibold text-lg">{course.courseTitle}</h3>
-                      <p className="text-sm text-gray-500">
+                      <p className="text-sm text-slate-500">
                         Đã hoàn thành {course.completedLessons} / {course.totalLessons} bài học
                       </p>
                     </div>
@@ -141,7 +142,7 @@ export default function StudentDashboard() {
                     )}
                   </div>
                   <ProgressBar percentage={course.progressPercentage} size="sm" />
-                  <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
+                  <div className="flex items-center space-x-4 mt-3 text-sm text-slate-500">
                     <span className="flex items-center">
                       <FiClock className="mr-1" size={14} />
                       {Math.floor(course.timeSpentSeconds / 3600)}h {Math.floor((course.timeSpentSeconds % 3600) / 60)}m
@@ -157,43 +158,20 @@ export default function StudentDashboard() {
           )}
 
           {/* Recommendations */}
-          {recommendations && recommendations.recommendations.length > 0 && (
-            <div>
-              <h2 className="text-xl font-semibold mb-4">Gợi ý cho bạn</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {recommendations.recommendations.slice(0, 4).map((course: any) => (
-                  <Link
-                    key={course.id}
-                    to={`/courses/${course.slug}`}
-                    className="card hover:shadow-md transition"
-                  >
-                    <h3 className="font-semibold">{course.title}</h3>
-                    <p className="text-sm text-gray-500 mt-1 line-clamp-2">{course.description}</p>
-                    <div className="mt-2 flex items-center justify-between">
-                      <span className="text-primary-600 font-bold">{formatVND(course.price)}</span>
-                      <span className="text-sm text-gray-500">
-                        {course.level === 'BEGINNER' ? 'Người mới' : 
-                         course.level === 'INTERMEDIATE' ? 'Trung cấp' : 'Nâng cao'}
-                      </span>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
+          <RecommendationList />
         </div>
 
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Next Steps */}
-          {recommendations && recommendations.nextSteps.length > 0 && (
+          {nextActions.length > 0 && (
             <div className="card">
               <h3 className="font-semibold mb-3 flex items-center">
                 <FiTarget className="mr-2 text-primary-500" />
                 Bước tiếp theo
               </h3>
               <div className="space-y-3">
-                {recommendations.nextSteps.map((step: any, index: number) => (
+                {nextActions.map((step: any, index: number) => (
                   <div key={index} className="flex items-start space-x-2">
                     <div className="w-6 h-6 bg-primary-100 rounded-full flex items-center justify-center text-primary-600 text-sm">
                       {index + 1}
@@ -221,17 +199,17 @@ export default function StudentDashboard() {
             {pendingTasks.length > 0 ? (
               <div className="space-y-3">
                 {pendingTasks.slice(0, 3).map((task) => (
-                  <Link key={task.id} to={task.type === 'QUIZ' ? `/tasks/${task.id}/quiz` : `/tasks/${task.id}/assignment`} className="block p-3 bg-gray-50 rounded-lg hover:bg-primary-50 transition">
-                    <p className="font-medium text-sm text-gray-900 truncate">{task.title}</p>
+                  <Link key={task.id} to={task.type === 'QUIZ' ? `/tasks/${task.id}/quiz` : `/tasks/${task.id}/assignment`} className="block p-3 bg-slate-50 rounded-xl hover:bg-primary-50 transition">
+                    <p className="font-medium text-sm text-slate-900 truncate">{task.title}</p>
                     <div className="flex justify-between items-center mt-1">
-                      <span className="text-xs text-gray-500 font-semibold">{task.type === 'QUIZ' ? 'Trắc nghiệm' : 'Bài tập'}</span>
-                      {task.dueDate && <span className="text-xs text-gray-500"><FiClock className="inline mr-1"/>{new Date(task.dueDate).toLocaleDateString()}</span>}
+                      <span className="text-xs text-slate-500 font-semibold">{task.type === 'QUIZ' ? 'Trắc nghiệm' : 'Bài tập'}</span>
+                      {task.dueDate && <span className="text-xs text-slate-500"><FiClock className="inline mr-1"/>{new Date(task.dueDate).toLocaleDateString()}</span>}
                     </div>
                   </Link>
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-gray-500 text-center py-2">Bạn không có bài tập nào sắp tới.</p>
+              <p className="text-sm text-slate-500 text-center py-2">Bạn không có bài tập nào sắp tới.</p>
             )}
             <Link to="/tasks" className="block text-center text-sm text-primary-600 hover:underline mt-4">
               Xem tất cả →
@@ -253,15 +231,15 @@ export default function StudentDashboard() {
               <h3 className="font-semibold mb-3">Thống kê nhanh</h3>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tỷ lệ hoàn thành</span>
+                  <span className="text-slate-600">Tỷ lệ hoàn thành</span>
                   <span className="font-medium">{Math.round(stats.overall.completionRate)}%</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Ngày học liên tục</span>
+                  <span className="text-slate-600">Ngày học liên tục</span>
                   <span className="font-medium">{stats.overall.streakDays} ngày</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Tổng số bài học</span>
+                  <span className="text-slate-600">Tổng số bài học</span>
                   <span className="font-medium">{stats.overall.totalLessonsCompleted}</span>
                 </div>
               </div>

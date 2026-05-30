@@ -59,19 +59,19 @@ export default function ResetPassword() {
         
         {success ? (
           <div className="text-center">
-            <div className="p-3 mb-4 text-sm text-green-700 bg-green-100 rounded-md">
+            <div className="p-3 mb-4 text-sm text-green-700 bg-green-100 rounded-lg">
               Mật khẩu đã được đặt lại thành công!
             </div>
-            <p className="text-sm text-gray-600">Đang chuyển hướng đến trang đăng nhập...</p>
+            <p className="text-sm text-slate-600">Đang chuyển hướng đến trang đăng nhập...</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && <div className="p-3 text-sm text-red-700 bg-red-100 rounded-md">{error}</div>}
+            {error && <div className="p-3 text-sm text-red-700 bg-red-100 rounded-lg">{error}</div>}
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu mới</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu mới</label>
               <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
                   value={password}
@@ -84,9 +84,9 @@ export default function ResetPassword() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Xác nhận Mật khẩu mới</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Xác nhận Mật khẩu mới</label>
               <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
                   value={confirmPassword}

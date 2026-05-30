@@ -60,7 +60,7 @@ export class LessonController {
       const fileStorage = new FileStorageService();
       const bucketName = 'courses';
 
-      const { uploadUrl, publicUrl } = await fileStorage.getPresignedUploadUrl({
+      const { uploadUrl, fileKey } = await fileStorage.getPresignedUploadUrl({
         bucket: bucketName,
         fileName: fileName,
         mimeType: contentType
@@ -69,7 +69,7 @@ export class LessonController {
       res.status(HTTP_STATUS.OK).json({
         data: {
           uploadUrl,
-          fileUrl: publicUrl,
+          fileUrl: `/api/courses/files/download?bucket=${bucketName}&key=${fileKey}`,
         },
       });
     } catch (error) {

@@ -124,7 +124,7 @@ export const AssignmentPlayer = ({
   };
 
   if (loading && !assignment) return <div className="p-8 text-center"><div className="animate-spin h-8 w-8 mx-auto border-b-2 border-primary-600 rounded-full"></div></div>;
-  if (!assignment) return <div className="p-8 text-center text-gray-500">Không tìm thấy bài tập nào cho bài học này.</div>;
+  if (!assignment) return <div className="p-8 text-center text-slate-500">Không tìm thấy bài tập nào cho bài học này.</div>;
 
   const isGraded = submission?.status === 'GRADED';
   const isSubmitted = submission?.status === 'SUBMITTED' || submission?.status === 'GRADING';
@@ -134,7 +134,7 @@ export const AssignmentPlayer = ({
     <div className="max-w-4xl mx-auto p-4 md:p-8">
       <div className="card mb-6 border-t-4 border-primary-500">
         <h2 className="text-2xl font-bold mb-2">{assignment.title}</h2>
-        <div className="flex flex-wrap gap-4 text-sm text-gray-600 mb-6">
+        <div className="flex flex-wrap gap-4 text-sm text-slate-600 mb-6">
           {assignment.dueDate && (
             <div className="flex items-center gap-1">
               <FiClock className="text-amber-500" />
@@ -147,38 +147,38 @@ export const AssignmentPlayer = ({
           </div>
         </div>
         
-        <div className="prose max-w-none text-gray-700 bg-gray-50 p-4 rounded-lg">
+        <div className="prose max-w-none text-slate-700 bg-slate-50 p-4 rounded-xl">
           <p className="whitespace-pre-wrap">{assignment.description}</p>
         </div>
 
         {assignment.instructions && (
-          <div className="mt-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
-            <p className="text-sm font-semibold text-blue-800 mb-1 flex items-center gap-1"><FiFileText /> Hướng dẫn chi tiết:</p>
-            <p className="text-sm text-blue-700 whitespace-pre-wrap">{assignment.instructions}</p>
+          <div className="mt-4 bg-cyan-50 p-4 rounded-xl border border-cyan-100">
+            <p className="text-sm font-semibold text-cyan-800 mb-1 flex items-center gap-1"><FiFileText /> Hướng dẫn chi tiết:</p>
+            <p className="text-sm text-cyan-700 whitespace-pre-wrap">{assignment.instructions}</p>
           </div>
         )}
       </div>
 
       {/* Submission Status Banner */}
       {submission && (
-        <div className={`mb-6 p-4 rounded-lg flex items-start gap-4 ${
+        <div className={`mb-6 p-4 rounded-xl flex items-start gap-4 ${
           isGraded ? 'bg-green-50 border border-green-200' :
-          isSubmitted ? 'bg-blue-50 border border-blue-200' :
-          submission.status === 'RETURNED' ? 'bg-red-50 border border-red-200' : 'bg-gray-50 border border-gray-200'
+          isSubmitted ? 'bg-cyan-50 border border-cyan-200' :
+          submission.status === 'RETURNED' ? 'bg-red-50 border border-red-200' : 'bg-slate-50 border border-slate-100'
         }`}>
-          <div className={`mt-1 ${isGraded ? 'text-green-600' : isSubmitted ? 'text-blue-600' : 'text-gray-600'}`}>
+          <div className={`mt-1 ${isGraded ? 'text-green-600' : isSubmitted ? 'text-cyan-600' : 'text-slate-600'}`}>
             <FiInfo size={24} />
           </div>
           <div className="flex-1">
-            <h3 className={`font-bold ${isGraded ? 'text-green-800' : isSubmitted ? 'text-blue-800' : 'text-gray-800'}`}>
+            <h3 className={`font-bold ${isGraded ? 'text-green-800' : isSubmitted ? 'text-cyan-800' : 'text-slate-800'}`}>
               Trạng thái: {submission.status}
             </h3>
             {isGraded && (
-              <div className="mt-2 text-sm text-gray-700">
+              <div className="mt-2 text-sm text-slate-700">
                 <p><span className="font-semibold">Điểm số:</span> <span className="text-lg font-bold text-green-700">{submission.score}</span> / {assignment.maxScore}</p>
                 {submission.feedback && (
                   <div className="mt-2 bg-white p-3 rounded border border-green-100">
-                    <p className="font-semibold text-xs text-gray-500 uppercase tracking-wide">Nhận xét của giảng viên:</p>
+                    <p className="font-semibold text-xs text-slate-500 uppercase tracking-wide">Nhận xét của giảng viên:</p>
                     <p className="mt-1">{submission.feedback}</p>
                   </div>
                 )}
@@ -194,15 +194,15 @@ export const AssignmentPlayer = ({
       )}
 
       {/* Submission Form */}
-      <div className="card shadow-md">
+      <div className="card shadow-sm">
         <h3 className="text-xl font-bold mb-4 border-b pb-4">Nội dung nộp bài</h3>
         
-        {error && <div className="p-3 mb-6 bg-red-50 text-red-700 rounded-md text-sm border border-red-100">{error}</div>}
+        {error && <div className="p-3 mb-6 bg-red-50 text-red-700 rounded-lg text-sm border border-red-100">{error}</div>}
 
         <div className="space-y-6">
           {/* Text Area */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Văn bản bài nộp (Tùy chọn)</label>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Văn bản bài nộp (Tùy chọn)</label>
             <textarea
               className="input-field min-h-[150px]"
               disabled={isReadOnly}
@@ -215,10 +215,10 @@ export const AssignmentPlayer = ({
           {/* Existing Files */}
           {submission?.fileUrl && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Các tệp đã tải lên trước đó</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Các tệp đã tải lên trước đó</label>
               <div className="space-y-2">
-                <div className="flex items-center gap-3 p-3 bg-gray-50 border border-gray-200 rounded-lg">
-                  <FiFile className="text-gray-400" size={20} />
+                <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                  <FiFile className="text-slate-400" size={20} />
                   <a href={submission.fileUrl} target="_blank" rel="noreferrer" className="flex-1 text-primary-600 hover:underline truncate">
                     {submission.fileName || submission.fileUrl.split('/').pop()}
                   </a>
@@ -230,33 +230,33 @@ export const AssignmentPlayer = ({
           {/* Modern Drag and Drop Zone */}
           {!isReadOnly && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Tệp đính kèm</label>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Tệp đính kèm</label>
               
               <div
                 className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ease-in-out cursor-pointer flex flex-col items-center justify-center min-h-[200px]
                   ${isDragging 
                     ? 'border-primary-500 bg-primary-50 shadow-inner scale-[0.99] ring-4 ring-primary-500/20' 
-                    : 'border-gray-300 hover:border-primary-400 hover:bg-gray-50'
+                    : 'border-slate-200 hover:border-primary-400 hover:bg-slate-50'
                   }`}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
                 onClick={() => fileInputRef.current?.click()}
               >
-                <div className={`p-4 rounded-full mb-4 transition-colors ${isDragging ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500'}`}>
+                <div className={`p-4 rounded-full mb-4 transition-colors ${isDragging ? 'bg-primary-100 text-primary-600' : 'bg-slate-100 text-slate-500'}`}>
                   <FiUploadCloud size={40} className={isDragging ? 'animate-bounce' : ''} />
                 </div>
-                <h4 className="text-lg font-semibold text-gray-700 mb-1">
+                <h4 className="text-lg font-semibold text-slate-700 mb-1">
                   Nhấn để tải lên hoặc kéo & thả tệp
                 </h4>
-                <p className="text-sm text-gray-500 mb-4 px-8">
+                <p className="text-sm text-slate-500 mb-4 px-8">
                   Hỗ trợ tải lên 1 tệp cho mỗi lần nộp bài. Nghiêm cấm tải lên nội dung độc hại hoặc tệp không được phép.
                 </p>
                 
                 {assignment.allowedFileTypes.length > 0 && (
                   <div className="flex gap-2 flex-wrap justify-center mt-2">
                     {assignment.allowedFileTypes.map((type, i) => (
-                      <span key={i} className="text-xs font-medium px-2.5 py-1 bg-gray-200 text-gray-600 rounded-full">
+                      <span key={i} className="text-xs font-medium px-2.5 py-1 bg-slate-200 text-slate-600 rounded-full">
                         {type.toUpperCase()}
                       </span>
                     ))}
@@ -277,24 +277,24 @@ export const AssignmentPlayer = ({
               {/* Staged Files List */}
               {files.length > 0 && (
                 <div className="mt-6">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center justify-between">
+                  <h4 className="text-sm font-medium text-slate-700 mb-3 flex items-center justify-between">
                     <span>Tệp chuẩn bị tải lên ({files.length})</span>
                     <button onClick={() => setFiles([])} className="text-xs text-red-500 hover:text-red-700 hover:underline">Xóa tất cả</button>
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {files.map((file, index) => (
-                      <div key={index} className="flex items-center p-3 bg-white border border-gray-200 shadow-sm rounded-lg group hover:border-primary-300 transition-colors">
+                      <div key={index} className="flex items-center p-3 bg-white border border-slate-100 shadow-sm rounded-xl group hover:border-primary-300 transition-colors">
                         <div className="w-10 h-10 rounded bg-primary-50 flex items-center justify-center text-primary-500 mr-3 flex-shrink-0">
                           <FiFile size={20} />
                         </div>
                         <div className="flex-1 min-w-0 pr-2">
-                          <p className="text-sm font-medium text-gray-900 truncate">{file.name}</p>
-                          <p className="text-xs text-gray-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                          <p className="text-sm font-medium text-slate-900 truncate">{file.name}</p>
+                          <p className="text-xs text-slate-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                         </div>
                         <button
                           type="button"
                           onClick={(e) => { e.stopPropagation(); removeFile(index); }}
-                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl opacity-0 group-hover:opacity-100 transition-all"
                           title="Xóa tệp"
                         >
                           <FiTrash2 size={18} />
@@ -314,7 +314,7 @@ export const AssignmentPlayer = ({
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting || (!submissionText.trim() && files.length === 0 && !submission?.fileUrl)}
-                className="btn-primary px-8 shadow-lg shadow-primary-500/30 disabled:opacity-50 disabled:shadow-none"
+                className="btn-primary px-8 shadow-sm shadow-primary-500/30 disabled:opacity-50 disabled:shadow-none"
               >
                 {submitting ? (
                   <span className="flex items-center gap-2">

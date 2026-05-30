@@ -41,7 +41,7 @@ model CourseProgress {
   lastAccessedAt      DateTime @default(now())
   
   lessons             LessonProgress[]
-  userProgress        UserProgress @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userProgress        UserProgress @relation(fields: [userId], references: [userId], onDelete: Cascade)
   
   @@unique([userId, courseId])
   @@index([userId])
@@ -85,7 +85,7 @@ model Certificate {
   metadata        Json     @default("{}")
   createdAt       DateTime @default(now())
   
-  userProgress    UserProgress @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userProgress    UserProgress @relation(fields: [userId], references: [userId], onDelete: Cascade)
   
   @@unique([userId, courseId])
   @@index([userId])
@@ -103,7 +103,7 @@ model Badge {
   earnedAt    DateTime @default(now())
   metadata    Json     @default("{}")
   
-  userProgress UserProgress @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userProgress UserProgress @relation(fields: [userId], references: [userId], onDelete: Cascade)
   
   @@unique([userId, badgeName])
   @@index([userId])
@@ -121,7 +121,7 @@ model ActivityLog {
   metadata        Json     @default("{}")
   createdAt       DateTime @default(now())
   
-  userProgress    UserProgress @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userProgress    UserProgress @relation(fields: [userId], references: [userId], onDelete: Cascade)
   
   @@index([userId])
   @@index([courseId])
@@ -243,3 +243,87 @@ enum SubmissionStatus {
   RETURNED
 }
 
+// ==================== Video Processing (HLS) ====================
+
+model VideoProcessingJob {
+  id               String          @id @default(auto()) @map("_id") @db.ObjectId
+  lessonId         String          @db.ObjectId
+  courseId          String          @db.ObjectId
+  inputFilePath    String
+  originalFileName String
+  uploadedBy       String          @db.ObjectId
+  status           String          @default("PENDING") // PENDING, PROCESSING, COMPLETED, FAILED
+  hlsPath          String?         // MinIO path to master.m3u8
+  segmentCount     Int?
+  durationSeconds  Int?
+  totalSizeBytes   Int?
+  errorMessage     String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([lessonId])
+  @@index([courseId])
+  @@index([status])
+  @@index([uploadedBy])
+  @@map("video_processing_jobs")
+}
+
+// ==================== Learning Paths ====================
+
+model LearningPath {
+  id              String               @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  description     String
+  slug            String               @unique
+  category        String?              // e.g. "Công nghệ thông tin", "Kinh doanh"
+  difficulty      String               @default("ALL") // "BEGINNER", "INTERMEDIATE", "ADVANCED", "ALL"
+  imageUrl        String?
+  shortDescription String?
+  bannerUrl       String?
+  careerGoal      String?
+  skills          String[]             @default([])
+  prerequisiteRules Json?              // { courseId: string, requiredCourseIds: string[] }[]
+  completionRule  String               @default("ALL_COURSES") // "ALL_COURSES", "MIN_PERCENT:80"
+  recommended     Boolean              @default(false)
+  status          String               @default("DRAFT") // "DRAFT", "PUBLISHED", "ARCHIVED"
+  totalDurationMinutes Int             @default(0)
+  enrollmentCount Int                  @default(0)
+  createdBy       String?              @db.ObjectId
+  courseIds       String[]             // List of Course IDs in milestone order
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  
+  userEnrollments UserPathEnrollment[]
+
+  @@map("learning_paths")
+}
+
+model UserPathEnrollment {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String       @db.ObjectId
+  learningPathId String       @db.ObjectId
+  status         String       @default("IN_PROGRESS") // "IN_PROGRESS", "COMPLETED"
+  enrolledAt     DateTime     @default(now())
+  completedAt    DateTime?
+  lastUpdatedAt  DateTime     @updatedAt
+
+  learningPath   LearningPath @relation(fields: [learningPathId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, learningPathId])
+  @@index([userId])
+  @@map("user_path_enrollments")
+}
+
+// ==================== Study Schedule ====================
+
+model StudySchedule {
+  id                 String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId             String   @unique
+  slots              Json     // Array of OptimalScheduleSlot objects
+  weeklyTargetHours  Int      @default(5)
+  dailyTargetMinutes Int      @default(30)
+  updatedAt          DateTime @updatedAt
+  createdAt          DateTime @default(now())
+
+  @@map("study_schedules")
+}

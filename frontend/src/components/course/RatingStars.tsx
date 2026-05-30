@@ -34,7 +34,7 @@ export const RatingStars = ({ rating, size = 20, interactive = false, onChange }
           ) : (
             <FiStar
               size={size}
-              className="text-gray-300"
+              className="text-slate-300"
             />
           )}
         </button>

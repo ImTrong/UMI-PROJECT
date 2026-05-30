@@ -155,7 +155,7 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900">Bài học trong Khóa học</h2>
+        <h2 className="text-xl font-semibold text-slate-900">Bài học trong Khóa học</h2>
         {!isAdding && !editingLesson && (
           <button
             onClick={() => setIsAdding(true)}
@@ -168,13 +168,13 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
       </div>
 
       {(isAdding || editingLesson) && (
-        <form onSubmit={editingLesson ? handleUpdateLesson : handleAddLesson} className="card bg-gray-50 border-2 border-primary-100 p-4 space-y-4">
+        <form onSubmit={editingLesson ? handleUpdateLesson : handleAddLesson} className="card bg-slate-50 border-2 border-primary-100 p-4 space-y-4">
           <h3 className="font-medium text-lg">
             {editingLesson ? 'Sửa Bài học' : 'Thêm Bài học mới'}
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tiêu đề *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Tiêu đề *</label>
               <input
                 type="text"
                 required
@@ -185,7 +185,7 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả</label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -195,15 +195,15 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
               />
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Upload Tài nguyên (Video/PDF) *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Upload Tài nguyên (Video/PDF) *</label>
               
               <div className="flex gap-2">
                 <input
-                  type="url"
+                  type="text"
                   value={formData.videoUrl}
                   onChange={(e) => setFormData({ ...formData, videoUrl: e.target.value })}
                   className="input-field flex-1"
-                  placeholder="https://..."
+                  placeholder="URL tài nguyên hoặc /api/..."
                 />
                 
                 <div className="relative flex-shrink-0">
@@ -217,7 +217,7 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
                   <button
                     type="button"
                     disabled={isUploadingFile}
-                    className="h-full px-4 flex items-center gap-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 font-medium rounded-lg transition-colors whitespace-nowrap disabled:opacity-50"
+                    className="h-full px-4 flex items-center gap-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-medium rounded-xl transition-colors whitespace-nowrap disabled:opacity-50"
                   >
                     <FiUploadCloud /> {isUploadingFile ? 'Đang tải lên...' : 'Tải file lên'}
                   </button>
@@ -225,7 +225,7 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
               </div>
               
               {isUploadingFile && (
-                <div className="mt-2 w-full bg-gray-200 rounded-full h-2.5">
+                <div className="mt-2 w-full bg-slate-200 rounded-full h-2.5">
                   <div className="bg-primary-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
                 </div>
               )}
@@ -234,7 +234,7 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Thời lượng (giây) *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Thời lượng (giây) *</label>
               <input
                 type="number"
                 required
@@ -250,9 +250,9 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
                 id="isPreview"
                 checked={formData.isPreview}
                 onChange={(e) => setFormData({ ...formData, isPreview: e.target.checked })}
-                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                className="rounded border-slate-200 text-primary-600 focus:ring-primary-500"
               />
-              <label htmlFor="isPreview" className="text-sm font-medium text-gray-700">
+              <label htmlFor="isPreview" className="text-sm font-medium text-slate-700">
                 Cho phép học thử (Miễn phí)
               </label>
             </div>
@@ -278,15 +278,15 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
 
       <div className="space-y-3">
         {lessons.length === 0 ? (
-          <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-            <p className="text-gray-500">Chưa có bài học nào.</p>
+          <div className="text-center py-8 border-2 border-dashed border-slate-100 rounded-xl">
+            <p className="text-slate-500">Chưa có bài học nào.</p>
           </div>
         ) : (
           lessons.map((lesson, index) => (
-            <div key={lesson.id} className="flex flex-col border border-gray-200 rounded-lg shadow-sm bg-white overflow-hidden mb-3">
+            <div key={lesson.id} className="flex flex-col border border-slate-100 rounded-xl shadow-sm bg-white overflow-hidden mb-3">
               <div className="flex items-center justify-between p-4 hover:border-primary-300 transition-colors">
                 <div className="flex items-center space-x-4">
-                  <div className="flex flex-col text-gray-400">
+                  <div className="flex flex-col text-slate-400">
                     <button
                       onClick={() => handleMove(index, 'up')}
                       disabled={index === 0}
@@ -303,7 +303,7 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
                     </button>
                   </div>
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                    lesson.title.toLowerCase().includes('quiz') || lesson.videoUrl.includes('QUIZ') ? 'bg-purple-100 text-purple-600' :
+                    lesson.title.toLowerCase().includes('quiz') || lesson.videoUrl.includes('QUIZ') ? 'bg-teal-100 text-teal-600' :
                     lesson.title.toLowerCase().includes('assignment') || lesson.videoUrl.includes('ASSIGNMENT') ? 'bg-amber-100 text-amber-600' :
                     'bg-primary-100 text-primary-600'
                   }`}>
@@ -312,8 +312,8 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
                      <FiVideo />}
                   </div>
                   <div>
-                    <h4 className="font-medium text-gray-900">{lesson.title}</h4>
-                    <div className="flex items-center space-x-3 text-xs text-gray-500">
+                    <h4 className="font-medium text-slate-900">{lesson.title}</h4>
+                    <div className="flex items-center space-x-3 text-xs text-slate-500">
                       <span>{Math.floor(lesson.duration / 60)}p {lesson.duration % 60}s</span>
                       {lesson.isPreview && (
                         <span className="text-green-600 font-medium">Học thử miễn phí</span>
@@ -324,7 +324,7 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => { setActiveBuilderLessonId(lesson.id); setBuilderType('QUIZ'); }}
-                    className="flex items-center gap-1 p-2 text-purple-600 hover:bg-purple-50 rounded text-xs font-medium border border-purple-100"
+                    className="flex items-center gap-1 p-2 text-teal-600 hover:bg-teal-50 rounded text-xs font-medium border border-teal-100"
                     title="Quản lý Trắc nghiệm"
                   >
                     <FiCheckSquare size={14} /> Thêm Trắc nghiệm
@@ -336,10 +336,10 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
                   >
                     <FiFileText size={14} /> Thêm Bài tập
                   </button>
-                  <div className="w-px h-6 bg-gray-300 mx-1"></div>
+                  <div className="w-px h-6 bg-slate-300 mx-1"></div>
                   <button
                     onClick={() => startEdit(lesson)}
-                    className="p-2 text-gray-600 hover:bg-gray-100 rounded-full"
+                    className="p-2 text-slate-600 hover:bg-slate-100 rounded-full"
                     title="Edit"
                   >
                     <FiEdit2 size={18} />
@@ -355,7 +355,7 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
               </div>
 
               {activeBuilderLessonId === lesson.id && (
-                <div className="border-t bg-gray-50 p-4">
+                <div className="border-t bg-slate-50 p-4">
                   {builderType === 'QUIZ' ? (
                     <QuizBuilder courseId={courseId} lessonId={lesson.id} onClose={() => setActiveBuilderLessonId(null)} />
                   ) : (

@@ -52,7 +52,7 @@ export default function Courses() {
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Tất cả khóa học</h1>
+        <h1 className="text-3xl font-bold text-slate-900">Tất cả khóa học</h1>
         {isAuthenticated && user?.role === 'INSTRUCTOR' && (
           <Link to="/courses/create" className="btn-primary">
             Tạo khóa học
@@ -74,7 +74,7 @@ export default function Courses() {
             </div>
           ) : courses.length === 0 ? (
             <div className="card text-center py-12">
-              <p className="text-gray-500">Không tìm thấy khóa học nào phù hợp với tiêu chí của bạn.</p>
+              <p className="text-slate-500">Không tìm thấy khóa học nào phù hợp với tiêu chí của bạn.</p>
             </div>
           ) : (
             <>
@@ -90,7 +90,7 @@ export default function Courses() {
                   <button
                     onClick={() => handlePageChange(pagination.page - 1)}
                     disabled={!pagination.hasPrevPage}
-                    className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
                   >
                     Trước
                   </button>
@@ -100,7 +100,7 @@ export default function Courses() {
                   <button
                     onClick={() => handlePageChange(pagination.page + 1)}
                     disabled={!pagination.hasNextPage}
-                    className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                    className="px-3 py-1 border rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50"
                   >
                     Tiếp
                   </button>

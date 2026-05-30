@@ -4,6 +4,7 @@ import { learningService } from '../services/learning.service';
 import { courseService, Lesson } from '../services/course.service';
 import { AssignmentPlayer } from '../components/learning/AssignmentPlayer';
 import { useAuth } from '../hooks/useAuth';
+import { useFileProtection } from '../hooks/useFileProtection';
 import {
   FiArrowLeft,
   FiBookOpen,
@@ -20,12 +21,16 @@ export default function AssignmentPage() {
   const { taskId } = useParams<{ taskId: string }>();
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
+  
+  // Kích hoạt tính năng bảo mật chuột phải, kéo thả và chặn phím tắt DevTools trên trang bài tập
+  const { isDevToolsOpen } = useFileProtection();
   const [taskDetail, setTaskDetail] = useState<any>(null);
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [completed, setCompleted] = useState(false);
   const [showMaterials, setShowMaterials] = useState(true);
+  const [pdfHeight, setPdfHeight] = useState(2500);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -101,7 +106,7 @@ export default function AssignmentPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="relative w-16 h-16">
           <div className="absolute top-0 left-0 w-full h-full border-4 border-amber-200 rounded-full animate-ping"></div>
           <div className="absolute top-0 left-0 w-full h-full border-4 border-amber-600 rounded-full border-t-transparent animate-spin"></div>
@@ -110,15 +115,40 @@ export default function AssignmentPage() {
     );
   }
 
+  if (isDevToolsOpen) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6 select-none font-sans">
+        <div className="max-w-md w-full bg-slate-900 border border-red-900/30 rounded-3xl p-8 text-center shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-600 via-orange-500 to-red-600"></div>
+          <div className="w-16 h-16 bg-red-950/40 text-red-500 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-red-500/20 shadow-inner">
+            <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-bold text-white mb-3 tracking-tight">Hệ thống đã khóa nội dung</h2>
+          <p className="text-slate-400 text-sm leading-relaxed mb-8">
+            Để bảo vệ bản quyền tài liệu và bài giảng của giảng viên, bạn cần đóng công cụ kiểm tra phần tử (Developer Tools) trước khi tiếp tục làm bài tập.
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="w-full py-3.5 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-2xl transition duration-200 shadow-sm shadow-red-600/20 active:scale-[0.98]"
+          >
+            Tải lại trang sau khi đóng
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl shadow-sm p-8 max-w-md text-center">
           <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <FiFileText size={32} />
           </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Không tìm thấy</h2>
-          <p className="text-gray-500 mb-6">{error}</p>
+          <h2 className="text-xl font-bold text-slate-900 mb-2">Không tìm thấy</h2>
+          <p className="text-slate-500 mb-6">{error}</p>
           <Link to="/tasks" className="btn-primary">
             <FiArrowLeft className="mr-2 inline" /> Quay lại danh sách
           </Link>
@@ -131,7 +161,7 @@ export default function AssignmentPage() {
   const pdfUrl = getLessonPdfUrl();
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 select-none">
       {/* Premium Header */}
       <div className="relative bg-gradient-to-br from-amber-600 via-orange-700 to-red-800 overflow-hidden">
         <div className="absolute inset-0">
@@ -196,34 +226,36 @@ export default function AssignmentPage() {
 
         {/* Lesson Materials Section — Solves the "bài học không hiển thị" bug */}
         {(videoUrl || pdfUrl || lesson?.description) && (
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             <button
               onClick={() => setShowMaterials(!showMaterials)}
-              className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center justify-between p-5 hover:bg-slate-50 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-cyan-100 text-cyan-600 flex items-center justify-center">
                   {videoUrl ? <FiVideo size={20} /> : pdfUrl ? <FiFile size={20} /> : <FiFileText size={20} />}
                 </div>
                 <div className="text-left">
-                  <h3 className="font-bold text-gray-900">Tài liệu bài học</h3>
-                  <p className="text-sm text-gray-500">
+                  <h3 className="font-bold text-slate-900">Tài liệu bài học</h3>
+                  <p className="text-sm text-slate-500">
                     {videoUrl ? 'Video bài giảng' : pdfUrl ? 'Tài liệu PDF' : 'Nội dung bài học'}
                     {' — Xem trước khi làm bài tập'}
                   </p>
                 </div>
               </div>
-              {showMaterials ? <FiChevronUp className="text-gray-400" /> : <FiChevronDown className="text-gray-400" />}
+              {showMaterials ? <FiChevronUp className="text-slate-400" /> : <FiChevronDown className="text-slate-400" />}
             </button>
 
             {showMaterials && (
-              <div className="border-t border-gray-100">
+              <div className="border-t border-slate-100">
                 {videoUrl && (
                   <div className="p-4">
                     <video
                       src={videoUrl}
                       controls
-                      controlsList="nodownload"
+                      controlsList="nodownload nofullscreen"
+                      onContextMenu={(e) => e.preventDefault()}
+                      onDragStart={(e) => e.preventDefault()}
                       className="w-full rounded-xl aspect-video bg-black"
                     >
                       Trình duyệt không hỗ trợ video.
@@ -231,18 +263,42 @@ export default function AssignmentPage() {
                   </div>
                 )}
                 {pdfUrl && (
-                  <div className="p-4">
-                    <iframe
-                      src={pdfUrl}
-                      title="Tài liệu bài học"
-                      className="w-full rounded-xl border border-gray-200"
-                      style={{ height: '500px' }}
-                    />
+                  <div className="p-4 flex flex-col">
+                    <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border rounded-t-xl select-none">
+                      <span className="text-xs text-slate-500 font-medium">Bảo mật tài liệu (Cuộn chuột để xem)</span>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => setPdfHeight(Math.max(1000, pdfHeight - 1000))} 
+                          disabled={pdfHeight <= 1000}
+                          className="px-2 py-1 text-xs bg-white border border-slate-100 rounded hover:bg-slate-100 disabled:opacity-50 font-medium text-slate-700 transition"
+                        >
+                          Thu nhỏ
+                        </button>
+                        <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded">
+                          Chiều cao: {pdfHeight}px
+                        </span>
+                        <button 
+                          onClick={() => setPdfHeight(Math.min(8000, pdfHeight + 1000))}
+                          disabled={pdfHeight >= 8000}
+                          className="px-2 py-1 text-xs bg-white border border-slate-100 rounded hover:bg-slate-100 disabled:opacity-50 font-medium text-slate-700 transition"
+                        >
+                          Mở rộng
+                        </button>
+                      </div>
+                    </div>
+                    <div className="border-x border-b rounded-b-xl overflow-y-auto bg-slate-100 relative" style={{ height: '500px' }}>
+                      <iframe
+                        src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+                        title="Tài liệu bài học"
+                        className="w-full block"
+                        style={{ pointerEvents: 'none', height: `${pdfHeight}px`, border: 'none' }}
+                      />
+                    </div>
                   </div>
                 )}
                 {lesson?.description && !videoUrl && !pdfUrl && (
                   <div className="p-6">
-                    <p className="text-gray-700 whitespace-pre-wrap leading-7">{lesson.description}</p>
+                    <p className="text-slate-700 whitespace-pre-wrap leading-7">{lesson.description}</p>
                   </div>
                 )}
               </div>
@@ -251,7 +307,7 @@ export default function AssignmentPage() {
         )}
 
         {/* Assignment Submission */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
           <AssignmentPlayer
             lessonId={taskDetail?.lessonId}
             courseId={taskDetail?.courseId}
@@ -263,7 +319,7 @@ export default function AssignmentPage() {
           <div className="flex justify-center">
             <Link
               to="/tasks"
-              className="px-8 py-3 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-500/25 flex items-center gap-2"
+              className="px-8 py-3 bg-amber-600 text-white rounded-xl font-semibold hover:bg-amber-700 transition-colors shadow-sm shadow-amber-500/25 flex items-center gap-2"
             >
               <FiArrowLeft /> Về danh sách bài tập
             </Link>

@@ -93,7 +93,7 @@ export default function Checkout() {
       <div className="flex justify-center items-center min-h-[400px]">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Đang tải thông tin thanh toán...</p>
+          <p className="mt-4 text-slate-600">Đang tải thông tin thanh toán...</p>
         </div>
       </div>
     );
@@ -105,7 +105,7 @@ export default function Checkout() {
     <div className="max-w-6xl mx-auto px-4 py-8">
       <button
         onClick={() => navigate(`/orders/${orderId}`)}
-        className="mb-4 text-gray-600 hover:text-gray-800 flex items-center space-x-1"
+        className="mb-4 text-slate-600 hover:text-slate-800 flex items-center space-x-1"
       >
         <FiArrowLeft />
         <span>Quay lại Đơn hàng</span>
@@ -118,7 +118,7 @@ export default function Checkout() {
             <h2 className="text-xl font-semibold mb-4">Chi tiết Thanh toán</h2>
 
             {error ? (
-              <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-4 rounded-lg">
+              <div className="flex items-center space-x-2 text-red-600 bg-red-50 p-4 rounded-xl">
                 <FiAlertCircle size={20} />
                 <span>{error}</span>
               </div>
@@ -133,22 +133,22 @@ export default function Checkout() {
                 onError={handlePaymentError}
               />
             ) : (
-              <div className="flex items-center space-x-2 text-yellow-600 bg-yellow-50 p-4 rounded-lg">
+              <div className="flex items-center space-x-2 text-yellow-600 bg-yellow-50 p-4 rounded-xl">
                 <FiAlertCircle size={20} />
                 <span>Đang khởi tạo thanh toán...</span>
               </div>
             )}
           </div>
 
-          <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+          <div className="flex items-center justify-center space-x-2 text-sm text-slate-500">
             <FiShield />
             <span>Thanh toán bảo mật qua Stripe</span>
           </div>
 
           {/* Test card info for development */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm font-medium text-blue-800 mb-2">🧪 Thẻ test để thử nghiệm:</p>
-            <div className="text-sm text-blue-700 space-y-1">
+          <div className="bg-cyan-50 border border-cyan-200 rounded-xl p-4">
+            <p className="text-sm font-medium text-cyan-800 mb-2">🧪 Thẻ test để thử nghiệm:</p>
+            <div className="text-sm text-cyan-700 space-y-1">
               <p><strong>Số thẻ:</strong> 4242 4242 4242 4242</p>
               <p><strong>Hết hạn:</strong> 12/34 (bất kỳ ngày nào trong tương lai)</p>
               <p><strong>CVC:</strong> 123 (bất kỳ 3 số)</p>
@@ -163,14 +163,14 @@ export default function Checkout() {
           <div className="space-y-3 mb-4">
             {order.items.map((item, index) => (
               <div key={index} className="flex justify-between">
-                <span className="text-gray-600">{item.courseTitle}</span>
+                <span className="text-slate-600">{item.courseTitle}</span>
                 <span>{formatVND(item.finalPrice)}</span>
               </div>
             ))}
           </div>
           <div className="border-t pt-3 space-y-2">
             <div className="flex justify-between">
-              <span className="text-gray-600">Tạm tính</span>
+              <span className="text-slate-600">Tạm tính</span>
               <span>{formatVND(order.subtotal)}</span>
             </div>
             {order.discount > 0 && (

@@ -13,6 +13,9 @@ export interface RegisterData {
   email: string;
   password: string;
   fullName: string;
+  ipAddress?: string;
+  userAgent?: string;
+  deviceId?: string;
 }
 
 export interface LoginData {
@@ -20,6 +23,7 @@ export interface LoginData {
   password: string;
   ipAddress?: string;
   userAgent?: string;
+  deviceId?: string;
 }
 
 export class AuthService {
@@ -66,10 +70,25 @@ export class AuthService {
       logger.error('Failed to send verification email', err);
     });
 
+    const sessionId = crypto.randomUUID();
+    const deviceFingerprint = data.deviceId || 'unknown';
+
+    // Create session for new user
+    await prisma.deviceSession.create({
+      data: {
+        userId: user.id,
+        sessionId,
+        deviceId: deviceFingerprint,
+        ipAddress: data.ipAddress,
+        userAgent: data.userAgent,
+      }
+    });
+
     // Generate tokens
     const { accessToken, refreshToken } = TokenService.generateTokens(
       user.id,
-      user.email
+      user.email,
+      sessionId
     );
 
     // Save refresh token
@@ -123,10 +142,41 @@ export class AuthService {
       data: { lastLogin: new Date() },
     });
 
+    // Device Session Management (Max 2 devices)
+    const sessionId = crypto.randomUUID();
+    const deviceFingerprint = data.deviceId || 'unknown';
+
+    const activeSessions = await prisma.deviceSession.findMany({
+      where: { userId: user.id },
+      orderBy: { lastActivity: 'asc' } // oldest first
+    });
+
+    // If max 2 reached, keep the newest 1, remove the rest to make room for this new 1
+    if (activeSessions.length >= 2) {
+      const sessionsToRemove = activeSessions.slice(0, activeSessions.length - 1);
+      const sessionIdsToRemove = sessionsToRemove.map(s => s.id);
+      await prisma.deviceSession.deleteMany({
+        where: { id: { in: sessionIdsToRemove } }
+      });
+      logger.info(`Removed oldest ${sessionsToRemove.length} sessions for user ${email}`);
+    }
+
+    // Create new session
+    await prisma.deviceSession.create({
+      data: {
+        userId: user.id,
+        sessionId,
+        deviceId: deviceFingerprint,
+        ipAddress: data.ipAddress,
+        userAgent: data.userAgent,
+      }
+    });
+
     // Generate tokens
     const { accessToken, refreshToken } = TokenService.generateTokens(
       user.id,
-      user.email
+      user.email,
+      sessionId
     );
 
     // Save refresh token
@@ -160,23 +210,51 @@ export class AuthService {
       throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
-    // Generate new tokens
-    const { accessToken, refreshToken: newRefreshToken } = TokenService.generateTokens(
+    // Check if session is still valid (not kicked out)
+    const session = await prisma.deviceSession.findUnique({
+      where: { sessionId: decoded.sessionId }
+    });
+
+    if (!session) {
+      throw new Error('SESSION_EXPIRED_OR_REVOKED');
+    }
+
+    // Update session last activity
+    await prisma.deviceSession.update({
+      where: { id: session.id },
+      data: { lastActivity: new Date() }
+    });
+
+    // Generate new tokens with the same sessionId
+    const { accessToken } = TokenService.generateTokens(
       user.id,
-      user.email
+      user.email,
+      decoded.sessionId
     );
 
-    // Revoke old refresh token and save new one
-    await TokenService.revokeRefreshToken(refreshToken);
-    await TokenService.saveRefreshToken(user.id, newRefreshToken);
-
+    // Do NOT revoke the old refresh token. This prevents race conditions
+    // when multiple browser tabs attempt to refresh concurrently.
+    // The refresh token will naturally expire based on its original lifespan.
+    
     return {
       accessToken,
-      refreshToken: newRefreshToken,
+      refreshToken,
     };
   }
 
   static async logout(accessToken: string, refreshToken: string) {
+    try {
+      // Remove device session
+      const decoded = jwt.decode(accessToken) as { sessionId?: string };
+      if (decoded?.sessionId) {
+        await prisma.deviceSession.deleteMany({
+          where: { sessionId: decoded.sessionId }
+        });
+      }
+    } catch (e) {
+      logger.error('Failed to parse token for logout session cleanup', e);
+    }
+
     // Blacklist access token
     await TokenService.blacklistAccessToken(accessToken);
     
@@ -197,6 +275,7 @@ export class AuthService {
       const decoded = jwt.verify(token, process.env.JWT_SECRET!) as {
         userId: string;
         email: string;
+        sessionId: string;
       };
 
       // Check if user exists and is active
@@ -208,12 +287,32 @@ export class AuthService {
         return { valid: false, error: ERROR_MESSAGES.USER_NOT_FOUND };
       }
 
+      // Check if device session exists
+      const session = await prisma.deviceSession.findUnique({
+        where: { sessionId: decoded.sessionId }
+      });
+
+      if (!session) {
+        return { valid: false, error: 'SESSION_EXPIRED_OR_REVOKED' };
+      }
+
+      // Optimistically update lastActivity without awaiting, but debounce it to once per minute
+      // to avoid exhausting connection pools and causing DB lockups under heavy concurrent requests
+      const oneMinuteAgo = new Date(Date.now() - 60000);
+      if (session.lastActivity < oneMinuteAgo) {
+        prisma.deviceSession.update({
+          where: { id: session.id },
+          data: { lastActivity: new Date() }
+        }).catch(err => logger.error('Failed to update session activity', err));
+      }
+
       return {
         valid: true,
         user: {
           userId: user.id,
           email: user.email,
           fullName: user.fullName,
+          sessionId: decoded.sessionId,
         },
       };
     } catch (error) {

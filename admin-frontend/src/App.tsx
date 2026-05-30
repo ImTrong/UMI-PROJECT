@@ -10,6 +10,8 @@ import AdminOrders from './pages/AdminOrders';
 import AdminUsers from './pages/AdminUsers';
 import AdminCategories from './pages/AdminCategories';
 import AdminCourses from './pages/AdminCourses';
+import AdminLearningPaths from './pages/admin/AdminLearningPaths';
+import AdminLearningPathForm from './pages/admin/AdminLearningPathForm';
 
 function App() {
   const { isAuthenticated, loading, user } = useAuth();
@@ -74,6 +76,24 @@ function App() {
         <Route path="/admin/courses" element={
           <ProtectedRoute requiredRole="ADMIN">
             <AdminCourses />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/admin/learning-paths" element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLearningPaths />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/admin/learning-paths/create" element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLearningPathForm />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/admin/learning-paths/:id/edit" element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLearningPathForm />
           </ProtectedRoute>
         } />
       </Route>

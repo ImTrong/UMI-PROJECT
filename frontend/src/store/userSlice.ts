@@ -24,8 +24,15 @@ export const fetchProfile = createAsyncThunk('user/fetchProfile', async () => {
 
 export const updateProfile = createAsyncThunk(
   'user/updateProfile',
-  async (data: Parameters<typeof userService.updateProfile>[0]) => {
-    return await userService.updateProfile(data);
+  async (data: Parameters<typeof userService.updateProfile>[0], { rejectWithValue }) => {
+    try {
+      return await userService.updateProfile(data);
+    } catch (error: any) {
+      if (error.response && error.response.data && error.response.data.error) {
+        return rejectWithValue(error.response.data.error);
+      }
+      return rejectWithValue(error.message);
+    }
   }
 );
 
@@ -112,7 +119,7 @@ const userSlice = createSlice({
         toast.success('Profile updated successfully');
       })
       .addCase(updateProfile.rejected, (state, action) => {
-        state.error = action.error.message || 'Failed to update profile';
+        state.error = (action.payload as string) || action.error.message || 'Failed to update profile';
         toast.error(state.error);
       })
       // Delete Profile

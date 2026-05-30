@@ -25,11 +25,11 @@ export const LoginForm = () => {
         <h2 className="text-2xl font-bold text-center mb-6">Chào mừng trở lại</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Địa chỉ Email
             </label>
             <div className="relative">
-              <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
               <input
                 type="email"
                 value={email}
@@ -41,11 +41,11 @@ export const LoginForm = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Mật khẩu
             </label>
             <div className="relative">
-              <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
               <input
                 type="password"
                 value={password}
@@ -64,7 +64,7 @@ export const LoginForm = () => {
             {loading ? 'Đang đăng nhập...' : 'Đăng nhập'}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-4 text-center text-sm text-slate-600">
           Chưa có tài khoản?{' '}
           <Link to="/register" className="text-primary-600 hover:underline">
             Đăng ký tại đây

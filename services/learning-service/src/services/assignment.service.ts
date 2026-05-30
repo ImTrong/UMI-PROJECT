@@ -276,7 +276,7 @@ export class AssignmentService {
       });
       return {
         uploadUrl: result.uploadUrl,
-        fileUrl: result.fileUrl || result.publicUrl,
+        fileUrl: `/api/learning/files/download?bucket=assignments&key=${result.fileKey}`,
       };
     } catch (error) {
       logger.error('File storage unavailable:', error);

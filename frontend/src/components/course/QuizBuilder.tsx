@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { learningService, Quiz } from '../../services/learning.service';
-import { FiPlus, FiTrash2, FiSave, FiAlertCircle, FiChevronDown, FiChevronUp, FiMessageCircle, FiCheckCircle, FiUpload, FiDownload, FiFile, FiX, FiCheck } from 'react-icons/fi';
+import { FiPlus, FiTrash2, FiSave, FiAlertCircle, FiChevronDown, FiChevronUp, FiMessageCircle, FiCheckCircle, FiUpload, FiDownload, FiFile, FiX, FiCheck, FiZap } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
@@ -439,16 +439,16 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
     }
   };
 
-  if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Đang nạp bộ công cụ tạo trò chơi trắc nghiệm...</div>;
+  if (loading) return <div className="p-8 text-center text-slate-500 animate-pulse">Đang nạp bộ công cụ tạo trò chơi trắc nghiệm...</div>;
 
   return (
-    <div className="bg-white border rounded-xl shadow-lg mt-4 mb-8 border-primary-200 overflow-hidden transform transition-all">
-      <div className="bg-gradient-to-r from-primary-600 to-indigo-600 p-5 flex justify-between items-center text-white">
+    <div className="bg-white border rounded-xl shadow-sm mt-4 mb-8 border-primary-200 overflow-hidden transform transition-all">
+      <div className="bg-gradient-to-r from-primary-600 to-emerald-600 p-5 flex justify-between items-center text-white">
         <h3 className="text-xl font-bold flex items-center gap-2">
            <FiCheckCircle size={22} className="opacity-90" />
            {quiz ? 'Cấu trúc lại Trắc nghiệm' : 'Khởi tạo Trắc nghiệm Mới'}
         </h3>
-        <button onClick={onClose} className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium">Đóng</button>
+        <button onClick={onClose} className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl transition-colors text-sm font-medium">Đóng</button>
       </div>
 
       <form onSubmit={handleSave} className="p-6 md:p-8">
@@ -460,47 +460,47 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
         )}
 
         {/* =============== Cài Đặt Chung =============== */}
-        <div className="bg-gray-50 border border-gray-100 rounded-2xl p-6 mb-8">
-           <h4 className="font-semibold text-gray-800 mb-4 pb-2 border-b">1. Thiết lập chung</h4>
+        <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-8">
+           <h4 className="font-semibold text-slate-800 mb-4 pb-2 border-b">1. Thiết lập chung</h4>
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Tiêu đề bài trắc nghiệm <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Tiêu đề bài trắc nghiệm <span className="text-red-500">*</span></label>
                 <input required value={title} onChange={e => setTitle(e.target.value)} className="input-field shadow-sm" placeholder="VD: Kiểm tra kiến thức cuối phần 1" />
               </div>
               
               <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Mô tả (Tùy chọn)</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Mô tả (Tùy chọn)</label>
                 <textarea value={description} onChange={e => setDescription(e.target.value)} className="input-field shadow-sm" rows={2} placeholder="Nhập một số ghi chú hoặc lời khuyên..." />
               </div>
               
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Thời gian giới hạn (Phút)</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Thời gian giới hạn (Phút)</label>
                 <div className="relative">
                    <input type="number" min="0" value={timeLimitMinutes} onChange={e => setTimeLimitMinutes(e.target.value === '' ? '' : Number(e.target.value))} className="input-field shadow-sm pr-12" placeholder="VD: 30" />
-                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">Phút</span>
+                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 text-sm">Phút</span>
                 </div>
-                <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1.5 opacity-80"><FiAlertCircle size={12}/> Để trống hoặc 0 nếu không giới hạn.</p>
+                <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5 opacity-80"><FiAlertCircle size={12}/> Để trống hoặc 0 nếu không giới hạn.</p>
               </div>
               
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Điểm đậu (Passing Score %) <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Điểm đậu (Passing Score %) <span className="text-red-500">*</span></label>
                 <div className="relative">
                    <input type="number" min="1" max="100" required value={passingScore} onChange={e => setPassingScore(Number(e.target.value))} className="input-field shadow-sm pr-12 text-primary-700 font-semibold" />
-                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">%</span>
+                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span>
                 </div>
               </div>
            </div>
         </div>
 
         {/* =============== Danh Sách Câu Hỏi =============== */}
-        <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-gray-200 pb-4">
+        <div className="mb-6 flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-slate-100 pb-4">
           <div>
-            <h4 className="text-xl font-bold text-gray-800">2. Bộ câu hỏi ({questions.length})</h4>
-            <p className="text-sm text-gray-500 mt-1">Tổng điểm: <strong className="text-primary-600">{totalPoints} điểm</strong></p>
+            <h4 className="text-xl font-bold text-slate-800">2. Bộ câu hỏi ({questions.length})</h4>
+            <p className="text-sm text-slate-500 mt-1">Tổng điểm: <strong className="text-primary-600">{totalPoints} điểm</strong></p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-              <button type="button" onClick={() => setExpandedIndices(new Set(questions.map((_, i) => i)))} className="text-sm text-gray-500 hover:text-primary-600 font-medium px-2">Mở tất cả</button>
-              <button type="button" onClick={() => setExpandedIndices(new Set())} className="text-sm text-gray-500 hover:text-primary-600 font-medium px-2 border-r border-gray-300 pr-4">Gập tất cả</button>
+              <button type="button" onClick={() => setExpandedIndices(new Set(questions.map((_, i) => i)))} className="text-sm text-slate-500 hover:text-primary-600 font-medium px-2">Mở tất cả</button>
+              <button type="button" onClick={() => setExpandedIndices(new Set())} className="text-sm text-slate-500 hover:text-primary-600 font-medium px-2 border-r border-slate-200 pr-4">Gập tất cả</button>
               
               {/* Import from file */}
               <div className="relative">
@@ -531,22 +531,22 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
             const isExpanded = expandedIndices.has(qIndex);
             
             return (
-              <div key={qIndex} className={`border rounded-xl bg-white overflow-hidden transition-all duration-200 ${isExpanded ? 'border-primary-300 shadow-md ring-1 ring-primary-100' : 'border-gray-200 shadow-sm hover:border-gray-300'}`}>
+              <div key={qIndex} className={`border rounded-xl bg-white overflow-hidden transition-all duration-200 ${isExpanded ? 'border-primary-300 shadow-sm ring-1 ring-primary-100' : 'border-slate-100 shadow-sm hover:border-slate-200'}`}>
                 {/* HEAD */}
                 <div 
-                   className={`flex justify-between items-center p-4 cursor-pointer select-none transition-colors ${isExpanded ? 'bg-primary-50/50' : 'bg-gray-50 hover:bg-gray-100/80'}`}
+                   className={`flex justify-between items-center p-4 cursor-pointer select-none transition-colors ${isExpanded ? 'bg-primary-50/50' : 'bg-slate-50 hover:bg-slate-100/80'}`}
                    onClick={() => toggleAccordion(qIndex)}
                 >
                    <div className="flex items-center gap-3 flex-1 overflow-hidden">
-                      <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-sm flex items-center justify-center font-bold text-sm text-gray-600">
+                      <div className="w-8 h-8 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center font-bold text-sm text-slate-600">
                          {qIndex + 1}
                       </div>
                       <div className="flex-1 min-w-0">
-                         <h5 className="font-semibold text-gray-800 truncate text-sm">
-                            {q.questionText || <span className="text-gray-400 italic">...Đang soạn thảo...</span>}
+                         <h5 className="font-semibold text-slate-800 truncate text-sm">
+                            {q.questionText || <span className="text-slate-400 italic">...Đang soạn thảo...</span>}
                          </h5>
-                         <div className="text-xs text-gray-500 mt-0.5 flex gap-2 items-center">
-                            <span className="font-medium px-1.5 py-0.5 rounded bg-gray-100 border text-[10px] uppercase tracking-wider">{
+                         <div className="text-xs text-slate-500 mt-0.5 flex gap-2 items-center">
+                            <span className="font-medium px-1.5 py-0.5 rounded bg-slate-100 border text-[10px] uppercase tracking-wider">{
                                q.questionType === 'SINGLE_CHOICE' ? 'Một đáp án' : 
                                q.questionType === 'MULTIPLE_CHOICE' ? 'Nhiều đáp án' : 
                                'Đúng/Sai'
@@ -557,11 +557,11 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
                    </div>
                    
                    <div className="flex items-center gap-2 ml-4">
-                      <button type="button" onClick={(e) => { e.stopPropagation(); handleRemoveQuestion(qIndex); }} className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors group" title="Xóa câu hỏi">
+                      <button type="button" onClick={(e) => { e.stopPropagation(); handleRemoveQuestion(qIndex); }} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors group" title="Xóa câu hỏi">
                         <FiTrash2 size={16} className="group-hover:scale-110 transition-transform" />
                       </button>
-                      <div className="w-px h-6 bg-gray-200 mx-1"></div>
-                      <div className="p-1 text-gray-400">
+                      <div className="w-px h-6 bg-slate-200 mx-1"></div>
+                      <div className="p-1 text-slate-400">
                         {isExpanded ? <FiChevronUp size={20} /> : <FiChevronDown size={20} />}
                       </div>
                    </div>
@@ -569,34 +569,34 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
 
                 {/* BODY (COLLAPSIBLE) */}
                 {isExpanded && (
-                  <div className="p-6 border-t border-gray-100 bg-white">
+                  <div className="p-6 border-t border-slate-100 bg-white">
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
                       <div className="md:col-span-3">
-                        <label className="block text-sm font-semibold text-gray-700 mb-1.5">Nội dung câu hỏi <span className="text-red-500">*</span></label>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Nội dung câu hỏi <span className="text-red-500">*</span></label>
                         <textarea required value={q.questionText} onChange={e => handleUpdateQuestion(qIndex, { questionText: e.target.value })} className="input-field !py-3 min-h-[100px]" placeholder="Nhập nội dung đề bài (Hỗ trợ xuống dòng)..." />
                       </div>
                       <div className="flex flex-col gap-5">
                         <div>
-                           <label className="block text-sm font-semibold text-gray-700 mb-1.5">Loại câu hỏi</label>
-                           <select value={q.questionType} onChange={e => handleQuestionTypeChange(qIndex, e.target.value)} className="input-field font-medium text-gray-800">
+                           <label className="block text-sm font-semibold text-slate-700 mb-1.5">Loại câu hỏi</label>
+                           <select value={q.questionType} onChange={e => handleQuestionTypeChange(qIndex, e.target.value)} className="input-field font-medium text-slate-800">
                              <option value="SINGLE_CHOICE">Một đáp án</option>
                              <option value="MULTIPLE_CHOICE">Nhiều đáp án (Multi-select)</option>
                              <option value="TRUE_FALSE">Đúng / Sai</option>
                            </select>
                         </div>
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-1.5">Điểm số <span className="text-red-500">*</span></label>
+                          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Điểm số <span className="text-red-500">*</span></label>
                           <input type="number" min="0" required value={q.points} onChange={e => handleUpdateQuestion(qIndex, { points: Number(e.target.value) })} className="input-field text-primary-700 font-bold" />
                         </div>
                       </div>
                     </div>
 
                     {/* OPTIONS SECTION */}
-                    <div className="space-y-4 mb-8 bg-slate-50 p-5 rounded-xl border border-slate-200/60">
+                    <div className="space-y-4 mb-8 bg-slate-50 p-5 rounded-xl border border-slate-100/60">
                       <div className="flex justify-between items-center mb-2">
-                         <label className="block text-sm font-semibold text-gray-800 flex items-center gap-2">
+                         <label className="block text-sm font-semibold text-slate-800 flex items-center gap-2">
                            Lựa chọn Đáp án 
-                           <span className="text-xs font-normal text-gray-500 bg-gray-200 px-2 flex items-center rounded-full">Đánh dấu tích để chọn đáp án đúng</span>
+                           <span className="text-xs font-normal text-slate-500 bg-slate-200 px-2 flex items-center rounded-full">Đánh dấu tích để chọn đáp án đúng</span>
                          </label>
                       </div>
                       
@@ -604,7 +604,7 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
                         {q.options.map((opt, optIndex) => {
                           const isOptCorrect = opt.isCorrect;
                           return (
-                            <div key={opt.id} className={`flex gap-3 items-center group p-2 rounded-lg border transition-colors ${isOptCorrect ? 'bg-green-50/50 border-green-200' : 'bg-white border-transparent hover:border-gray-200 shadow-sm'}`}>
+                            <div key={opt.id} className={`flex gap-3 items-center group p-2 rounded-xl border transition-colors ${isOptCorrect ? 'bg-green-50/50 border-green-200' : 'bg-white border-transparent hover:border-slate-100 shadow-sm'}`}>
                               <div className="flex items-center justify-center pl-2">
                                 <label className="relative flex items-center justify-center cursor-pointer">
                                   <input
@@ -632,7 +632,7 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
                                   newOpts[optIndex] = { ...newOpts[optIndex], text: e.target.value };
                                   handleUpdateQuestion(qIndex, { options: newOpts });
                                 }}
-                                className={`input-field flex-1 ${q.questionType === 'TRUE_FALSE' ? 'bg-gray-100 text-gray-600 cursor-not-allowed font-medium' : 'bg-white'}`}
+                                className={`input-field flex-1 ${q.questionType === 'TRUE_FALSE' ? 'bg-slate-100 text-slate-600 cursor-not-allowed font-medium' : 'bg-white'}`}
                                 placeholder={`Nội dung lựa chọn ${optIndex + 1}`}
                               />
                               
@@ -645,7 +645,7 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
                                     newOpts.splice(optIndex, 1);
                                     handleUpdateQuestion(qIndex, { options: newOpts });
                                   }}
-                                  className={`p-2 rounded-md transition-colors ${q.options.length <= 2 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100'}`}
+                                  className={`p-2 rounded-lg transition-colors ${q.options.length <= 2 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100'}`}
                                   disabled={q.options.length <= 2}
                                   title="Xóa lựa chọn"
                                 >
@@ -664,7 +664,7 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
                             const newOpts = [...q.options, { id: `opt-${Date.now()}`, text: '', isCorrect: false }];
                             handleUpdateQuestion(qIndex, { options: newOpts });
                           }}
-                          className="text-sm font-semibold text-primary-600 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 rounded-lg px-4 py-2 mt-4 transition-colors flex items-center gap-1.5 w-max shadow-sm border border-primary-100"
+                          className="text-sm font-semibold text-primary-600 hover:text-primary-800 bg-primary-50 hover:bg-primary-100 rounded-xl px-4 py-2 mt-4 transition-colors flex items-center gap-1.5 w-max shadow-sm border border-primary-100"
                         >
                           <FiPlus strokeWidth={3} /> Lựa chọn mới
                         </button>
@@ -673,9 +673,9 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
 
                     {/* EXPLANATION */}
                     <div>
-                       <label className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1.5">
+                       <label className="text-sm font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                           <FiMessageCircle className="text-amber-500" />
-                          Giải thích đáp án <span className="font-normal text-gray-500 text-xs ml-1">(Tùy chọn)</span>
+                          Giải thích đáp án <span className="font-normal text-slate-500 text-xs ml-1">(Tùy chọn)</span>
                        </label>
                        <textarea 
                           value={q.explanation || ''} 
@@ -693,35 +693,35 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
           })}
           
           {questions.length === 0 && (
-            <div className="text-center py-16 px-6 bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center group cursor-pointer transition-colors hover:bg-gray-100 hover:border-primary-300" onClick={handleAddQuestion}>
+            <div className="text-center py-16 px-6 bg-slate-50 border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center group cursor-pointer transition-colors hover:bg-slate-100 hover:border-primary-300" onClick={handleAddQuestion}>
               <div className="w-16 h-16 rounded-full bg-primary-50 text-primary-500 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
                  <FiCheckCircle size={32} />
               </div>
-              <h4 className="text-lg font-bold text-gray-700 mb-1">Chưa có câu hỏi nào</h4>
-              <p className="text-gray-500 text-sm max-w-sm">Tạo bộ câu hỏi để kiểm tra kiến thức học viên ở cuối mỗi chương.</p>
+              <h4 className="text-lg font-bold text-slate-700 mb-1">Chưa có câu hỏi nào</h4>
+              <p className="text-slate-500 text-sm max-w-sm">Tạo bộ câu hỏi để kiểm tra kiến thức học viên ở cuối mỗi chương.</p>
               <button type="button" className="mt-5 btn-primary text-sm px-6">Bắt đầu tạo câu hỏi</button>
             </div>
           )}
         </div>
 
         {/* Download templates */}
-        <div className="mt-8 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-          <p className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <FiDownload className="text-gray-500" /> Tải file mẫu để import câu hỏi
+        <div className="mt-8 p-4 bg-slate-50 border border-slate-100 rounded-xl">
+          <p className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <FiDownload className="text-slate-500" /> Tải file mẫu để import câu hỏi
           </p>
           <div className="flex gap-3">
             <button
               type="button"
               onClick={downloadSampleJSON}
-              className="text-sm flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors text-gray-700 font-medium shadow-sm"
+              className="text-sm flex items-center gap-2 px-4 py-2 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 transition-colors text-slate-700 font-medium shadow-sm"
             >
-              <FiFile size={14} className="text-blue-500" />
+              <FiFile size={14} className="text-cyan-500" />
               Mẫu JSON
             </button>
             <button
               type="button"
               onClick={downloadSampleExcel}
-              className="text-sm flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors text-gray-700 font-medium shadow-sm"
+              className="text-sm flex items-center gap-2 px-4 py-2 bg-white border border-slate-100 rounded-xl hover:bg-slate-50 hover:border-slate-200 transition-colors text-slate-700 font-medium shadow-sm"
             >
               <FiFile size={14} className="text-green-600" />
               Mẫu Excel (.xlsx)
@@ -730,9 +730,9 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
         </div>
 
         {/* BOTTOM ACTIONS */}
-        <div className="mt-10 flex justify-end gap-3 pt-6 border-t border-gray-200 bg-white sticky bottom-0 z-10 pb-2">
-          <button type="button" onClick={onClose} className="px-6 py-2.5 font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors">Thoát</button>
-          <button type="submit" disabled={saving || questions.length === 0} className="btn-primary py-2.5 px-8 rounded-xl shadow-lg shadow-primary-500/30 disabled:opacity-50 disabled:shadow-none flex items-center gap-2">
+        <div className="mt-10 flex justify-end gap-3 pt-6 border-t border-slate-100 bg-white sticky bottom-0 z-10 pb-2">
+          <button type="button" onClick={onClose} className="px-6 py-2.5 font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors">Thoát</button>
+          <button type="submit" disabled={saving || questions.length === 0} className="btn-primary py-2.5 px-8 rounded-xl shadow-sm shadow-primary-500/30 disabled:opacity-50 disabled:shadow-none flex items-center gap-2">
             <FiSave size={18} className={saving ? 'animate-pulse' : ''} />
             {saving ? 'Đang mã hóa & lưu...' : 'Xuất bản Trắc nghiệm'}
           </button>
@@ -741,7 +741,7 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
         {/* =============== Import Preview Modal =============== */}
         {showImportModal && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={() => setShowImportModal(false)}>
-            <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[85vh] overflow-hidden shadow-sm" onClick={e => e.stopPropagation()}>
               {/* Modal Header */}
               <div className="bg-gradient-to-r from-green-600 to-emerald-600 p-5 flex justify-between items-center text-white">
                 <div>
@@ -752,7 +752,7 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
                     {importFileName} — {importedQuestions.length} câu hỏi
                   </p>
                 </div>
-                <button onClick={() => setShowImportModal(false)} className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-lg transition-colors">
+                <button onClick={() => setShowImportModal(false)} className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 p-2 rounded-xl transition-colors">
                   <FiX size={20} />
                 </button>
               </div>
@@ -760,32 +760,32 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
               {/* Modal Body */}
               <div className="overflow-y-auto max-h-[55vh] p-6">
                 {importError && (
-                  <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-lg text-sm">
+                  <div className="mb-4 p-3 bg-red-50 text-red-700 border border-red-200 rounded-xl text-sm">
                     <FiAlertCircle className="inline mr-2" />{importError}
                   </div>
                 )}
                 
                 <div className="space-y-3">
                   {importedQuestions.map((q, idx) => (
-                    <div key={idx} className="border border-gray-200 rounded-xl p-4 bg-gray-50/50 hover:border-green-200 transition-colors">
+                    <div key={idx} className="border border-slate-100 rounded-xl p-4 bg-slate-50/50 hover:border-green-200 transition-colors">
                       <div className="flex items-start gap-3">
-                        <div className="w-7 h-7 rounded-lg bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0 mt-0.5">
+                        <div className="w-7 h-7 rounded-xl bg-green-100 text-green-700 flex items-center justify-center font-bold text-sm flex-shrink-0 mt-0.5">
                           {idx + 1}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-800 text-sm">{q.questionText || <span className="text-gray-400 italic">Không có nội dung</span>}</p>
+                          <p className="font-medium text-slate-800 text-sm">{q.questionText || <span className="text-slate-400 italic">Không có nội dung</span>}</p>
                           <div className="flex items-center gap-2 mt-1.5">
-                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-gray-100 border text-gray-500">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 border text-slate-500">
                               {q.questionType === 'SINGLE_CHOICE' ? 'Một đáp án' : q.questionType === 'MULTIPLE_CHOICE' ? 'Nhiều đáp án' : 'Đúng/Sai'}
                             </span>
-                            <span className="text-xs text-gray-500">{q.points} điểm</span>
+                            <span className="text-xs text-slate-500">{q.points} điểm</span>
                           </div>
                           <div className="mt-2 grid grid-cols-2 gap-1.5">
                             {q.options.map((opt, oi) => (
-                              <div key={oi} className={`text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 ${
+                              <div key={oi} className={`text-xs px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 ${
                                 opt.isCorrect 
                                   ? 'bg-green-50 text-green-700 border border-green-200 font-medium' 
-                                  : 'bg-white text-gray-600 border border-gray-100'
+                                  : 'bg-white text-slate-600 border border-slate-100'
                               }`}>
                                 {opt.isCorrect && <FiCheck size={12} className="flex-shrink-0" />}
                                 {opt.text}
@@ -793,8 +793,8 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
                             ))}
                           </div>
                           {q.explanation && (
-                            <p className="mt-2 text-xs text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-lg border border-amber-100">
-                              💡 {q.explanation}
+                            <p className="mt-2 text-xs text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-xl border border-amber-100">
+                              <FiZap className="inline mr-1" /> {q.explanation}
                             </p>
                           )}
                         </div>
@@ -805,22 +805,22 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
               </div>
 
               {/* Modal Footer */}
-              <div className="border-t p-5 flex items-center justify-between bg-gray-50">
-                <p className="text-sm text-gray-500">
+              <div className="border-t p-5 flex items-center justify-between bg-slate-50">
+                <p className="text-sm text-slate-500">
                   Sẽ thêm <strong className="text-green-700">{importedQuestions.length}</strong> câu hỏi vào danh sách hiện tại ({questions.length} câu)
                 </p>
                 <div className="flex gap-3">
                   <button
                     type="button"
                     onClick={() => setShowImportModal(false)}
-                    className="px-5 py-2.5 font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-xl transition-colors"
+                    className="px-5 py-2.5 font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
                   >
                     Hủy
                   </button>
                   <button
                     type="button"
                     onClick={confirmImport}
-                    className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl shadow-lg shadow-green-500/30 transition-colors flex items-center gap-2"
+                    className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl shadow-sm shadow-green-500/30 transition-colors flex items-center gap-2"
                   >
                     <FiCheck size={18} />
                     Xác nhận Import ({importedQuestions.length} câu)

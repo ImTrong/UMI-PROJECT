@@ -288,6 +288,20 @@ export class ProgressService {
           course.title
         );
         await BadgeService.checkTimeBasedBadge(userId, new Date());
+
+        // Send real-time course completion notification
+        try {
+          const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+          await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+            userId,
+            title: '🎉 Khóa học hoàn thành!',
+            message: `Chúc mừng bạn đã hoàn thành xuất sắc khóa học "${course.title}". Bạn có thể xem chứng chỉ trong mục cá nhân!`,
+            type: 'SUCCESS',
+            link: '/certificates',
+          });
+        } catch (err) {
+          logger.error('Failed to send course completion notification:', err);
+        }
       }
     }
 

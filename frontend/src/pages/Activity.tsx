@@ -53,20 +53,20 @@ export default function Activity() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/30 pt-8 pb-20">
+    <div className="min-h-screen bg-slate-50/30 pt-8 pb-20">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header Hero Section */}
-        <div className="relative mb-10 p-8 rounded-3xl overflow-hidden bg-gradient-to-br from-indigo-900 via-indigo-800 to-purple-900 shadow-xl overflow-hidden group">
+        <div className="relative mb-10 p-8 rounded-3xl overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-900 shadow-sm overflow-hidden group">
           <div className="absolute top-0 right-0 -mr-10 -mt-20 w-80 h-80 rounded-full bg-white/5 blur-3xl group-hover:scale-150 transition-transform duration-1000"></div>
-          <div className="absolute bottom-0 left-20 -mb-24 w-60 h-60 rounded-full bg-purple-500/20 blur-2xl group-hover:scale-150 transition-transform duration-1000"></div>
+          <div className="absolute bottom-0 left-20 -mb-24 w-60 h-60 rounded-full bg-teal-500/20 blur-2xl group-hover:scale-150 transition-transform duration-1000"></div>
           
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
             <div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-white mb-3 flex items-center">
                 <FiZap className="mr-3 text-yellow-400" /> Hoạt động Học tập
               </h1>
-              <p className="text-indigo-100 text-lg max-w-xl font-medium">
+              <p className="text-emerald-100 text-lg max-w-xl font-medium">
                 Theo dõi tiến trình vươn đến tri thức của bạn. Mỗi hành động nhỏ hôm nay là thành công lớn ngày mai!
               </p>
             </div>
@@ -79,7 +79,7 @@ export default function Activity() {
                 </div>
                 <div>
                   <div className="text-white font-bold text-lg leading-tight">Ngày liên tiếp</div>
-                  <div className="text-indigo-200 text-sm">Giữ vững phong độ!</div>
+                  <div className="text-emerald-200 text-sm">Giữ vững phong độ!</div>
                 </div>
               </div>
             )}
@@ -91,12 +91,12 @@ export default function Activity() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
             
             {/* Stat Card 1 */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 relative overflow-hidden group">
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-sm transition-all duration-300 hover:-translate-y-1 relative overflow-hidden group">
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-primary-50 rounded-full transition-transform duration-500 group-hover:scale-150 opacity-50"></div>
               <div className="relative z-10 flex items-start justify-between">
                 <div>
-                  <p className="text-gray-500 font-medium mb-1">Hành động tuần này</p>
-                  <h3 className="text-3xl font-extrabold text-gray-900">
+                  <p className="text-slate-500 font-medium mb-1">Hành động tuần này</p>
+                  <h3 className="text-3xl font-extrabold text-slate-900">
                     {stats.weeklyActivity.reduce((sum: number, a: any) => sum + a._count, 0)}
                   </h3>
                 </div>
@@ -107,12 +107,12 @@ export default function Activity() {
             </div>
 
             {/* Stat Card 2 */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 relative overflow-hidden group">
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-sm transition-all duration-300 hover:-translate-y-1 relative overflow-hidden group">
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-green-50 rounded-full transition-transform duration-500 group-hover:scale-150 opacity-50"></div>
               <div className="relative z-10 flex items-start justify-between">
                 <div>
-                  <p className="text-gray-500 font-medium mb-1">Tiến độ hoàn thành</p>
-                  <h3 className="text-3xl font-extrabold text-gray-900">
+                  <p className="text-slate-500 font-medium mb-1">Tiến độ hoàn thành</p>
+                  <h3 className="text-3xl font-extrabold text-slate-900">
                     {Math.round(stats.overall.completionRate || 0)}<span className="text-xl text-green-500 ml-1">%</span>
                   </h3>
                 </div>
@@ -123,13 +123,13 @@ export default function Activity() {
             </div>
 
             {/* Stat Card 3 */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 relative overflow-hidden group sm:col-span-2 lg:col-span-1">
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-sm transition-all duration-300 hover:-translate-y-1 relative overflow-hidden group sm:col-span-2 lg:col-span-1">
               <div className="absolute -right-6 -top-6 w-24 h-24 bg-yellow-50 rounded-full transition-transform duration-500 group-hover:scale-150 opacity-50"></div>
               <div className="relative z-10 flex items-start justify-between">
                 <div>
-                  <p className="text-gray-500 font-medium mb-1">Tổng thời gian học</p>
-                  <h3 className="text-3xl font-extrabold text-gray-900">
-                    {Math.round(stats.overall.totalStudyTimeHours)} <span className="text-lg font-semibold text-gray-500 ml-1">giờ</span>
+                  <p className="text-slate-500 font-medium mb-1">Tổng thời gian học</p>
+                  <h3 className="text-3xl font-extrabold text-slate-900">
+                    {Math.round(stats.overall.totalStudyTimeHours)} <span className="text-lg font-semibold text-slate-500 ml-1">giờ</span>
                   </h3>
                 </div>
                 <div className="w-12 h-12 bg-yellow-100 text-yellow-600 rounded-2xl flex items-center justify-center shadow-sm">
@@ -142,30 +142,30 @@ export default function Activity() {
         )}
 
         {/* Activity Feed Section */}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 sm:p-8">
-          <div className="flex items-center mb-8 pb-4 border-b border-gray-100">
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 sm:p-8">
+          <div className="flex items-center mb-8 pb-4 border-b border-slate-100">
             <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center mr-4">
               <FiActivity className="text-primary-600 w-5 h-5" />
             </div>
-            <h2 className="text-2xl font-bold text-gray-900">Dòng thời gian (Timeline)</h2>
+            <h2 className="text-2xl font-bold text-slate-900">Dòng thời gian (Timeline)</h2>
           </div>
           
           <ActivityFeed activities={activities} />
 
           {/* Premium Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex justify-center items-center mt-12 bg-gray-50/50 p-4 rounded-2xl border border-gray-100 gap-4">
+            <div className="flex justify-center items-center mt-12 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 gap-4">
               <button
                 onClick={() => setPagination({ ...pagination, page: pagination.page - 1 })}
                 disabled={!pagination.hasPrevPage}
-                className="px-6 py-2.5 bg-white border border-gray-200 text-gray-700 font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 hover:shadow-sm transition-all"
+                className="px-6 py-2.5 bg-white border border-slate-100 text-slate-700 font-medium rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 hover:shadow-sm transition-all"
               >
                 Trang Trước
               </button>
-              <div className="flex bg-white px-5 py-2.5 rounded-xl border border-gray-200 shadow-sm font-semibold">
+              <div className="flex bg-white px-5 py-2.5 rounded-xl border border-slate-100 shadow-sm font-semibold">
                 <span className="text-primary-600">{pagination.page}</span>
-                <span className="text-gray-400 mx-2">/</span>
-                <span className="text-gray-600">{pagination.totalPages}</span>
+                <span className="text-slate-400 mx-2">/</span>
+                <span className="text-slate-600">{pagination.totalPages}</span>
               </div>
               <button
                 onClick={() => setPagination({ ...pagination, page: pagination.page + 1 })}

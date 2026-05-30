@@ -59,9 +59,7 @@ export const validateCreateLesson = [
   body('videoUrl')
     .trim()
     .notEmpty()
-    .withMessage('Video URL is required')
-    .isURL()
-    .withMessage('Invalid video URL'),
+    .withMessage('Video URL is required'),
   body('duration')
     .isInt({ min: 1 })
     .withMessage('Duration must be a positive integer'),

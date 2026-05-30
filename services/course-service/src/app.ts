@@ -133,6 +133,12 @@ app.post(
   CourseController.getBatchCourses
 );
 
+// Internal route for recommendation engine (service-to-service)
+app.post(
+  '/api/courses/recommendations/batch',
+  CourseController.getRecommendationBatch
+);
+
 // Internal route for other services
 app.post(
   '/api/courses/:courseId/increment-enrollment',
@@ -181,6 +187,15 @@ app.post(
   validateCourseId,
   handleValidationErrors,
   CourseController.publishCourse
+);
+
+// ==================== File Routes ====================
+import { FileController } from './controllers/file.controller';
+
+app.get(
+  '/api/courses/files/download',
+  authenticateOptional,
+  FileController.downloadFile
 );
 
 // ==================== Lesson Routes ====================

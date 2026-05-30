@@ -196,7 +196,15 @@ export class UserService {
     // Convert date strings to Date objects if necessary
     const updateData: any = { ...data };
     if (typeof updateData.dateOfBirth === 'string') {
-      updateData.dateOfBirth = new Date(updateData.dateOfBirth);
+      if (updateData.dateOfBirth.trim() === '') {
+        updateData.dateOfBirth = null; // Set to null if empty string
+      } else {
+        const date = new Date(updateData.dateOfBirth);
+        if (isNaN(date.getTime())) {
+          throw new Error('Invalid date format for dateOfBirth');
+        }
+        updateData.dateOfBirth = date;
+      }
     }
 
     const updatedUser = await prisma.userProfile.update({

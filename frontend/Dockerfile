@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN --mount=type=cache,id=npm-frontend,target=/root/.npm npm install
 
 # Copy source code
 COPY . .

@@ -3,6 +3,7 @@ import { AuthRequest } from '../middleware/auth.middleware';
 import { UserService } from '../services/user.service';
 import { HTTP_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+import { fileStorage } from '@umi/file-storage';
 
 export class UserController {
   // User Profile Controllers
@@ -148,6 +149,39 @@ export class UserController {
     }
   }
 
+  static async getAvatarUploadUrl(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+          error: ERROR_MESSAGES.UNAUTHORIZED,
+        });
+      }
+
+      const { fileName, mimeType } = req.query;
+      
+      if (!fileName || !mimeType) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'fileName and mimeType are required',
+        });
+      }
+
+      const result = await fileStorage.getPresignedUploadUrl({
+        bucket: 'avatars',
+        fileName: fileName as string,
+        mimeType: mimeType as string,
+      });
+
+      res.status(HTTP_STATUS.OK).json({
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Get avatar upload URL error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to generate upload URL',
+      });
+    }
+  }
+
   static async updateMyProfile(req: AuthRequest, res: Response) {
     try {
       if (!req.user) {
@@ -171,6 +205,12 @@ export class UserController {
       if (error.message === ERROR_MESSAGES.USER_NOT_FOUND) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({
           error: error.message,
+        });
+      }
+
+      if (error.message.includes('Invalid date')) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Định dạng ngày tháng không hợp lệ.',
         });
       }
 

@@ -63,7 +63,7 @@ export default function OrderDetail() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <button
         onClick={() => navigate('/orders')}
-        className="mb-4 text-gray-600 hover:text-gray-800"
+        className="mb-4 text-slate-600 hover:text-slate-800"
       >
         ← Quay lại Đơn hàng
       </button>

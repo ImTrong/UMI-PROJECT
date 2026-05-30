@@ -7,7 +7,8 @@ import {
   FiDollarSign,
   FiList,
   FiShoppingCart,
-  FiLogOut
+  FiLogOut,
+  FiActivity
 } from 'react-icons/fi';
 
 interface SidebarProps {
@@ -23,6 +24,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     { name: 'Bảng điều khiển', href: '/admin/dashboard', icon: FiGrid },
     { name: 'Khóa học', href: '/admin/courses', icon: FiBookOpen },
     { name: 'Danh mục', href: '/admin/categories', icon: FiList },
+    { name: 'Lộ trình học tập', href: '/admin/learning-paths', icon: FiActivity },
     { name: 'Người dùng', href: '/admin/users', icon: FiUsers },
     { name: 'Đơn hàng', href: '/admin/orders', icon: FiShoppingCart },
     { name: 'Thanh toán', href: '/admin/payments', icon: FiDollarSign },

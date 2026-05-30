@@ -407,6 +407,51 @@ export class CourseController {
     }
   }
 
+  static async getRecommendationBatch(req: Request, res: Response) {
+    try {
+      const { categoryIds, excludeIds, levels, sortBy, limit } = req.body;
+
+      const where: any = {
+        published: true,
+        approvalStatus: 'APPROVED',
+      };
+
+      if (categoryIds && categoryIds.length > 0) {
+        where.categoryId = { in: categoryIds };
+      }
+      if (excludeIds && excludeIds.length > 0) {
+        where.id = { notIn: excludeIds };
+      }
+      if (levels && levels.length > 0) {
+        where.level = { in: levels };
+      }
+
+      const orderBy: any = {};
+      if (sortBy === 'rating') orderBy.rating = 'desc';
+      else if (sortBy === 'enrolledCount') orderBy.enrolledCount = 'desc';
+      else orderBy.createdAt = 'desc';
+
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+
+      const courses = await prisma.course.findMany({
+        where,
+        orderBy,
+        take: limit || 10,
+        include: {
+          category: true,
+        },
+      });
+
+      await prisma.$disconnect();
+
+      res.status(HTTP_STATUS.OK).json({ data: courses });
+    } catch (error: any) {
+      logger.error('Get recommendation batch error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to fetch recommendation batch' });
+    }
+  }
+
   static async incrementEnrollment(req: Request, res: Response) {
     try {
       const { courseId } = req.params;

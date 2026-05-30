@@ -45,11 +45,11 @@ export const RegisterForm = () => {
         <h2 className="text-2xl font-bold text-center mb-6">Tạo tài khoản mới</h2>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Họ và tên
             </label>
             <div className="relative">
-              <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 name="fullName"
@@ -62,11 +62,11 @@ export const RegisterForm = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Địa chỉ Email
             </label>
             <div className="relative">
-              <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
               <input
                 type="email"
                 name="email"
@@ -79,11 +79,11 @@ export const RegisterForm = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Mật khẩu
             </label>
             <div className="relative">
-              <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
               <input
                 type="password"
                 name="password"
@@ -97,11 +97,11 @@ export const RegisterForm = () => {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               Xác nhận mật khẩu
             </label>
             <div className="relative">
-              <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
               <input
                 type="password"
                 name="confirmPassword"
@@ -124,7 +124,7 @@ export const RegisterForm = () => {
             {loading ? 'Đang tạo tài khoản...' : 'Đăng ký'}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-600">
+        <p className="mt-4 text-center text-sm text-slate-600">
           Đã có tài khoản?{' '}
           <Link to="/login" className="text-primary-600 hover:underline">
             Đăng nhập tại đây

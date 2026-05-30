@@ -52,7 +52,11 @@ export const CoursePlayer = ({ lesson, progress, onComplete, onTimeUpdate }: Cou
   };
 
   return (
-    <div className="bg-black rounded-lg overflow-hidden flex flex-col h-full">
+    <div 
+      className="bg-black rounded-xl overflow-hidden flex flex-col h-full select-none"
+      onContextMenu={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
+    >
       <video
         ref={videoRef}
         src={lesson.videoUrl}
@@ -60,16 +64,18 @@ export const CoursePlayer = ({ lesson, progress, onComplete, onTimeUpdate }: Cou
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         controls
-        controlsList="nodownload"
+        controlsList="nodownload nofullscreen"
         autoPlay={false}
+        onContextMenu={(e) => e.preventDefault()}
+        onDragStart={(e) => e.preventDefault()}
       >
         Trình duyệt của bạn không hỗ trợ thẻ video.
       </video>
         
-      <div className="p-4 bg-gray-900 border-t border-gray-800 flex-none relative z-10">
+      <div className="p-4 bg-slate-900 border-t border-slate-800 flex-none relative z-10">
         <h3 className="text-white font-semibold">{lesson.title}</h3>
         {lesson.description && (
-          <p className="text-gray-400 text-sm mt-1">{lesson.description}</p>
+          <p className="text-slate-400 text-sm mt-1">{lesson.description}</p>
         )}
         {isCompleted && (
           <span className="inline-block mt-2 text-xs bg-green-500 text-white px-2 py-1 rounded">

@@ -14,11 +14,11 @@ import {
 } from '../store/userSlice';
 import { useAuth } from '../hooks/useAuth';
 import { Education, WorkExperience, CreateEducationData, CreateWorkData } from '../services/user.service';
-import {
-  FiUser, FiMail, FiPhone, FiMapPin, FiCalendar, FiEdit2, FiPlus,
-  FiTrash2, FiSave, FiX, FiBriefcase, FiBook, FiAward, FiBarChart2, FiLock,
-} from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiMapPin, FiCalendar, FiEdit2, FiPlus, FiTrash2, FiSave, FiX, FiBriefcase, FiBook, FiAward, FiBarChart2, FiLock, FiCamera } from 'react-icons/fi';
 import { authService } from '../services/auth.service';
+import { updateUser } from '../store/authSlice';
+import { userService } from '../services/user.service';
+import toast from 'react-hot-toast';
 
 // ============================
 // Education Modal Component
@@ -56,31 +56,31 @@ function EducationModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-sm w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b">
-          <h3 className="text-lg font-bold text-gray-900">
+          <h3 className="text-lg font-bold text-slate-900">
             {initialData ? 'Chỉnh sửa Học vấn' : 'Thêm Học vấn mới'}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <FiX size={20} />
           </button>
         </div>
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tên trường *</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Tên trường *</label>
             <input type="text" required value={form.institution}
               onChange={(e) => setForm({ ...form, institution: e.target.value })}
               className="input-field" placeholder="VD: Đại học Bách Khoa Hà Nội" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Bằng cấp *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Bằng cấp *</label>
               <input type="text" required value={form.degree}
                 onChange={(e) => setForm({ ...form, degree: e.target.value })}
                 className="input-field" placeholder="VD: Cử nhân" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ngành học *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Ngành học *</label>
               <input type="text" required value={form.fieldOfStudy}
                 onChange={(e) => setForm({ ...form, fieldOfStudy: e.target.value })}
                 className="input-field" placeholder="VD: Khoa học máy tính" />
@@ -88,26 +88,26 @@ function EducationModal({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ngày bắt đầu *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Ngày bắt đầu *</label>
               <input type="date" required value={form.startDate}
                 onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                 className="input-field" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ngày kết thúc</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Ngày kết thúc</label>
               <input type="date" value={form.endDate || ''}
                 onChange={(e) => setForm({ ...form, endDate: e.target.value })}
                 className="input-field" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Xếp loại / GPA</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Xếp loại / GPA</label>
             <input type="text" value={form.grade || ''}
               onChange={(e) => setForm({ ...form, grade: e.target.value })}
               className="input-field" placeholder="VD: 3.2/4.0 GPA hoặc Giỏi" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả thêm</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả thêm</label>
             <textarea value={form.description || ''}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               className="input-field" rows={3} placeholder="Hoạt động, thành tích..." />
@@ -161,58 +161,58 @@ function WorkModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-sm w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-6 border-b">
-          <h3 className="text-lg font-bold text-gray-900">
+          <h3 className="text-lg font-bold text-slate-900">
             {initialData ? 'Chỉnh sửa Kinh nghiệm' : 'Thêm Kinh nghiệm mới'}
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <FiX size={20} />
           </button>
         </div>
         <form onSubmit={(e) => { e.preventDefault(); onSubmit(form); }} className="p-6 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Công ty *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Công ty *</label>
               <input type="text" required value={form.company}
                 onChange={(e) => setForm({ ...form, company: e.target.value })}
                 className="input-field" placeholder="VD: VNPT" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Vị trí *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Vị trí *</label>
               <input type="text" required value={form.position}
                 onChange={(e) => setForm({ ...form, position: e.target.value })}
                 className="input-field" placeholder="VD: Lập trình viên" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Địa điểm</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Địa điểm</label>
             <input type="text" value={form.location || ''}
               onChange={(e) => setForm({ ...form, location: e.target.value })}
               className="input-field" placeholder="VD: Hà Nội, VN" />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ngày bắt đầu *</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Ngày bắt đầu *</label>
               <input type="date" required value={form.startDate}
                 onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                 className="input-field" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ngày kết thúc</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Ngày kết thúc</label>
               <input type="date" value={form.endDate || ''} disabled={form.current}
                 onChange={(e) => setForm({ ...form, endDate: e.target.value })}
-                className="input-field disabled:bg-gray-100" />
+                className="input-field disabled:bg-slate-100" />
             </div>
           </div>
           <div className="flex items-center gap-2">
             <input type="checkbox" id="current" checked={form.current}
               onChange={(e) => setForm({ ...form, current: e.target.checked, endDate: e.target.checked ? '' : form.endDate })}
               className="w-4 h-4 text-primary-600 rounded" />
-            <label htmlFor="current" className="text-sm text-gray-700">Tôi đang làm công việc này</label>
+            <label htmlFor="current" className="text-sm text-slate-700">Tôi đang làm công việc này</label>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mô tả công việc</label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Mô tả công việc</label>
             <textarea value={form.description || ''}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               className="input-field" rows={3} placeholder="Nhiệm vụ, dự án, thành tựu..." />
@@ -246,13 +246,13 @@ function ConfirmDialog({
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6">
-        <h3 className="text-lg font-bold text-gray-900 mb-2">{title}</h3>
-        <p className="text-gray-600 mb-6">{message}</p>
+      <div className="bg-white rounded-xl shadow-sm w-full max-w-sm p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-2">{title}</h3>
+        <p className="text-slate-600 mb-6">{message}</p>
         <div className="flex justify-end space-x-3">
           <button onClick={onClose} className="btn-secondary">Hủy bỏ</button>
           <button onClick={onConfirm} disabled={loading}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium">
+            className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium">
             {loading ? 'Đang xóa...' : 'Xóa dữ liệu'}
           </button>
         </div>
@@ -271,6 +271,7 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'education' | 'work' | 'stats' | 'security'>('overview');
   const [actionLoading, setActionLoading] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   // Security Form State
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
@@ -337,9 +338,44 @@ export default function Profile() {
     e.preventDefault();
     try {
       await dispatch(updateProfile(formData)).unwrap();
+      dispatch(updateUser({ fullName: formData.fullName }));
       setIsEditing(false);
     } catch {
       // handled by slice
+    }
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Kích thước ảnh không được vượt quá 5MB');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const { uploadUrl, publicUrl } = await userService.getAvatarUploadUrl(file.name, file.type);
+      
+      const uploadResponse = await fetch(uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+
+      if (!uploadResponse.ok) {
+         throw new Error('Upload to S3 failed');
+      }
+
+      await dispatch(updateProfile({ avatar: publicUrl })).unwrap();
+      dispatch(updateUser({ avatar: publicUrl }));
+    } catch (error: any) {
+      console.error('Avatar upload error:', error);
+      toast.error('Tải lên ảnh thất bại. Vui lòng thử lại.');
+    } finally {
+      setIsUploadingAvatar(false);
+      e.target.value = '';
     }
   };
 
@@ -427,24 +463,38 @@ export default function Profile() {
       <div className="card">
         <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
           <div className="flex items-center space-x-4">
-            <div className="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center shadow-lg">
-              <span className="text-3xl font-bold text-white">
-                {profile?.fullName?.charAt(0)?.toUpperCase() || 'U'}
-              </span>
+            <div className="relative group w-20 h-20">
+              {profile?.avatar ? (
+                <img src={profile.avatar} alt="Avatar" className="w-20 h-20 rounded-full object-cover shadow-sm" />
+              ) : (
+                <div className="w-20 h-20 bg-gradient-to-br from-primary-400 to-primary-600 rounded-full flex items-center justify-center shadow-sm">
+                  <span className="text-3xl font-bold text-white">
+                    {profile?.fullName?.charAt(0)?.toUpperCase() || 'U'}
+                  </span>
+                </div>
+              )}
+              <label className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+                <FiCamera className="text-white" size={24} />
+                <input type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} disabled={isUploadingAvatar} />
+              </label>
+              {isUploadingAvatar && (
+                 <div className="absolute inset-0 bg-white/60 rounded-full flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary-600"></div>
+                 </div>
+              )}
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{profile?.fullName}</h1>
-              <span className={`inline-block mt-1 text-xs px-3 py-1 rounded-full font-medium ${
-                profile?.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' :
-                profile?.role === 'INSTRUCTOR' ? 'bg-blue-100 text-blue-700' :
-                'bg-green-100 text-green-700'
-              }`}>
+              <h1 className="text-2xl font-bold text-slate-900">{profile?.fullName}</h1>
+              <span className={`inline-block mt-1 text-xs px-3 py-1 rounded-full font-medium ${profile?.role === 'ADMIN' ? 'bg-teal-100 text-teal-700' :
+                  profile?.role === 'INSTRUCTOR' ? 'bg-cyan-100 text-cyan-700' :
+                    'bg-green-100 text-green-700'
+                }`}>
                 {profile?.role}
               </span>
-              {profile?.bio && <p className="text-gray-500 text-sm mt-1 max-w-md">{profile.bio}</p>}
+              {profile?.bio && <p className="text-slate-500 text-sm mt-1 max-w-md">{profile.bio}</p>}
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 text-sm text-gray-500">
+          <div className="flex flex-wrap gap-3 text-sm text-slate-500">
             {profile?.email && (
               <div className="flex items-center gap-1"><FiMail size={14} /> {profile.email}</div>
             )}
@@ -456,7 +506,7 @@ export default function Profile() {
             )}
             {profile?.createdAt && (
               <div className="flex items-center gap-1">
-                <FiCalendar size={14} /> Tham gia từ {new Date(profile.createdAt).toLocaleDateString()}
+                <FiCalendar size={14} /> Tham gia từ {new Date(profile.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })}
               </div>
             )}
           </div>
@@ -480,17 +530,16 @@ export default function Profile() {
       )}
 
       {/* ========== Tabs ========== */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-slate-100">
         <nav className="flex space-x-1 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
-                activeTab === tab.key
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === tab.key
                   ? 'border-primary-500 text-primary-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-200'
+                }`}
             >
               <tab.icon size={16} />
               {tab.label}
@@ -522,32 +571,32 @@ export default function Profile() {
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Họ và tên</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Họ và tên</label>
                   <input type="text" value={formData.fullName}
                     onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                     className="input-field" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Số điện thoại</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại</label>
                   <input type="tel" value={formData.phoneNumber}
                     onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                     className="input-field" placeholder="+84 xxx xxx xxx" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Địa chỉ</label>
                   <input type="text" value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     className="input-field" placeholder="Thành phố, Quốc gia" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ngày sinh</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Ngày sinh</label>
                   <input type="date" value={formData.dateOfBirth}
                     onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
                     className="input-field" />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Giới thiệu bản thân (Bio)</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Giới thiệu bản thân (Bio)</label>
                 <textarea value={formData.bio}
                   onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
                   className="input-field" rows={3} placeholder="Giới thiệu đôi nét về bạn..." />
@@ -568,14 +617,14 @@ export default function Profile() {
                 { label: 'Email', value: profile?.email, icon: FiMail },
                 { label: 'Số điện thoại', value: profile?.phoneNumber || 'Chưa thiết lập', icon: FiPhone },
                 { label: 'Địa chỉ', value: profile?.address || 'Chưa thiết lập', icon: FiMapPin },
-                { label: 'Ngày sinh', value: profile?.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString() : 'Chưa thiết lập', icon: FiCalendar },
-                { label: 'Tham gia từ', value: profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString() : '', icon: FiCalendar },
+                { label: 'Ngày sinh', value: profile?.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'Chưa thiết lập', icon: FiCalendar },
+                { label: 'Tham gia từ', value: profile?.createdAt ? new Date(profile.createdAt).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '', icon: FiCalendar },
               ].map((item, i) => (
-                <div key={i} className="flex items-start gap-3 p-3 rounded-lg bg-gray-50">
+                <div key={i} className="flex items-start gap-3 p-3 rounded-xl bg-slate-50">
                   <item.icon className="text-primary-500 mt-0.5" size={18} />
                   <div>
-                    <p className="text-xs text-gray-500">{item.label}</p>
-                    <p className="text-sm font-medium text-gray-900">{item.value}</p>
+                    <p className="text-xs text-slate-500">{item.label}</p>
+                    <p className="text-sm font-medium text-slate-900">{item.value}</p>
                   </div>
                 </div>
               ))}
@@ -601,23 +650,23 @@ export default function Profile() {
                 <div key={edu.id} className="card border-l-4 border-primary-500">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <h3 className="font-bold text-gray-900">{edu.degree}</h3>
+                      <h3 className="font-bold text-slate-900">{edu.degree}</h3>
                       <p className="text-primary-600 font-medium">{edu.institution}</p>
-                      <p className="text-sm text-gray-500">{edu.fieldOfStudy}</p>
-                      <p className="text-sm text-gray-400 mt-1">
-                        {new Date(edu.startDate).toLocaleDateString('vi-VN', { year: 'numeric', month: 'short' })} — {' '}
-                        {edu.endDate ? new Date(edu.endDate).toLocaleDateString('vi-VN', { year: 'numeric', month: 'short' }) : 'Hiện tại'}
+                      <p className="text-sm text-slate-500">{edu.fieldOfStudy}</p>
+                      <p className="text-sm text-slate-400 mt-1">
+                        {new Date(edu.startDate).toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' })} — {' '}
+                        {edu.endDate ? new Date(edu.endDate).toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' }) : 'Hiện tại'}
                       </p>
-                      {edu.grade && <p className="text-sm text-gray-600 mt-1">Xếp loại: {edu.grade}</p>}
-                      {edu.description && <p className="text-sm text-gray-600 mt-2">{edu.description}</p>}
+                      {edu.grade && <p className="text-sm text-slate-600 mt-1">Xếp loại: {edu.grade}</p>}
+                      {edu.description && <p className="text-sm text-slate-600 mt-2">{edu.description}</p>}
                     </div>
                     <div className="flex gap-2 ml-4">
                       <button onClick={() => { setEditingEdu(edu); setEduModalOpen(true); }}
-                        className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
+                        className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-colors">
                         <FiEdit2 size={16} />
                       </button>
                       <button onClick={() => setDeleteEduConfirm(edu.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors">
                         <FiTrash2 size={16} />
                       </button>
                     </div>
@@ -627,8 +676,8 @@ export default function Profile() {
             </div>
           ) : (
             <div className="card text-center py-12">
-              <FiBook className="mx-auto text-gray-300 mb-3" size={48} />
-              <p className="text-gray-500 mb-4">Chưa có thông tin học vấn nào được thêm.</p>
+              <FiBook className="mx-auto text-slate-300 mb-3" size={48} />
+              <p className="text-slate-500 mb-4">Chưa có thông tin học vấn nào được thêm.</p>
               <button onClick={() => { setEditingEdu(null); setEduModalOpen(true); }}
                 className="btn-primary text-sm">
                 <FiPlus className="inline mr-1" size={14} /> Thêm Học vấn đầu tiên của bạn
@@ -652,30 +701,30 @@ export default function Profile() {
           {profile?.work && profile.work.length > 0 ? (
             <div className="space-y-4">
               {profile.work.map((work) => (
-                <div key={work.id} className={`card border-l-4 ${work.current ? 'border-green-500' : 'border-gray-300'}`}>
+                <div key={work.id} className={`card border-l-4 ${work.current ? 'border-green-500' : 'border-slate-200'}`}>
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-gray-900">{work.position}</h3>
+                        <h3 className="font-bold text-slate-900">{work.position}</h3>
                         {work.current && (
                           <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Hiện tại</span>
                         )}
                       </div>
                       <p className="text-primary-600 font-medium">{work.company}</p>
-                      {work.location && <p className="text-sm text-gray-500">{work.location}</p>}
-                      <p className="text-sm text-gray-400 mt-1">
-                        {new Date(work.startDate).toLocaleDateString('vi-VN', { year: 'numeric', month: 'short' })} — {' '}
-                        {work.current ? 'Hiện tại' : work.endDate ? new Date(work.endDate).toLocaleDateString('vi-VN', { year: 'numeric', month: 'short' }) : 'Hiện tại'}
+                      {work.location && <p className="text-sm text-slate-500">{work.location}</p>}
+                      <p className="text-sm text-slate-400 mt-1">
+                        {new Date(work.startDate).toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' })} — {' '}
+                        {work.current ? 'Hiện tại' : work.endDate ? new Date(work.endDate).toLocaleDateString('vi-VN', { month: '2-digit', year: 'numeric' }) : 'Hiện tại'}
                       </p>
-                      {work.description && <p className="text-sm text-gray-600 mt-2">{work.description}</p>}
+                      {work.description && <p className="text-sm text-slate-600 mt-2">{work.description}</p>}
                     </div>
                     <div className="flex gap-2 ml-4">
                       <button onClick={() => { setEditingWork(work); setWorkModalOpen(true); }}
-                        className="p-2 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors">
+                        className="p-2 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-colors">
                         <FiEdit2 size={16} />
                       </button>
                       <button onClick={() => setDeleteWorkConfirm(work.id)}
-                        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                        className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors">
                         <FiTrash2 size={16} />
                       </button>
                     </div>
@@ -685,8 +734,8 @@ export default function Profile() {
             </div>
           ) : (
             <div className="card text-center py-12">
-              <FiBriefcase className="mx-auto text-gray-300 mb-3" size={48} />
-              <p className="text-gray-500 mb-4">Chưa có kinh nghiệm làm việc nào được thêm.</p>
+              <FiBriefcase className="mx-auto text-slate-300 mb-3" size={48} />
+              <p className="text-slate-500 mb-4">Chưa có kinh nghiệm làm việc nào được thêm.</p>
               <button onClick={() => { setEditingWork(null); setWorkModalOpen(true); }}
                 className="btn-primary text-sm">
                 <FiPlus className="inline mr-1" size={14} /> Thêm Kinh nghiệm đầu tiên của bạn
@@ -703,40 +752,40 @@ export default function Profile() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="card text-center">
               <FiBook className="mx-auto text-primary-500 mb-2" size={28} />
-              <p className="text-2xl font-bold text-gray-900">{stats?.totalEducation ?? profile?.education?.length ?? 0}</p>
-              <p className="text-sm text-gray-500">Học vấn</p>
+              <p className="text-2xl font-bold text-slate-900">{stats?.totalEducation ?? profile?.education?.length ?? 0}</p>
+              <p className="text-sm text-slate-500">Học vấn</p>
             </div>
             <div className="card text-center">
-              <FiBriefcase className="mx-auto text-blue-500 mb-2" size={28} />
-              <p className="text-2xl font-bold text-gray-900">{stats?.totalWorkExperience ?? profile?.work?.length ?? 0}</p>
-              <p className="text-sm text-gray-500">Kinh nghiệm</p>
+              <FiBriefcase className="mx-auto text-cyan-500 mb-2" size={28} />
+              <p className="text-2xl font-bold text-slate-900">{stats?.totalWorkExperience ?? profile?.work?.length ?? 0}</p>
+              <p className="text-sm text-slate-500">Kinh nghiệm</p>
             </div>
             <div className="card text-center">
               <FiAward className="mx-auto text-amber-500 mb-2" size={28} />
-              <p className="text-2xl font-bold text-gray-900">{stats?.badges?.length ?? profile?.badges?.length ?? 0}</p>
-              <p className="text-sm text-gray-500">Huy hiệu</p>
+              <p className="text-2xl font-bold text-slate-900">{stats?.badges?.length ?? profile?.badges?.length ?? 0}</p>
+              <p className="text-sm text-slate-500">Huy hiệu</p>
             </div>
             <div className="card text-center">
               <FiCalendar className="mx-auto text-green-500 mb-2" size={28} />
-              <p className="text-2xl font-bold text-gray-900">
+              <p className="text-2xl font-bold text-slate-900">
                 {stats?.createdAt || profile?.createdAt
                   ? Math.floor((Date.now() - new Date(stats?.createdAt || profile!.createdAt).getTime()) / (1000 * 60 * 60 * 24))
                   : 0}
               </p>
-              <p className="text-sm text-gray-500">Ngày tham gia</p>
+              <p className="text-sm text-slate-500">Ngày tham gia</p>
             </div>
           </div>
 
           {stats?.currentWork && (
             <div className="card">
-              <h3 className="font-semibold text-gray-700 mb-2">Công việc hiện tại</h3>
+              <h3 className="font-semibold text-slate-700 mb-2">Công việc hiện tại</h3>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
                   <FiBriefcase className="text-green-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{stats.currentWork.position}</p>
-                  <p className="text-sm text-gray-500">{stats.currentWork.company}</p>
+                  <p className="font-medium text-slate-900">{stats.currentWork.position}</p>
+                  <p className="text-sm text-slate-500">{stats.currentWork.company}</p>
                 </div>
               </div>
             </div>
@@ -749,15 +798,15 @@ export default function Profile() {
         <div className="card max-w-lg">
           <h2 className="text-lg font-semibold mb-4">Đổi Mật khẩu</h2>
           {passwordMessage.text && (
-            <div className={`p-3 mb-4 text-sm rounded-md ${passwordMessage.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            <div className={`p-3 mb-4 text-sm rounded-lg ${passwordMessage.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
               {passwordMessage.text}
             </div>
           )}
           <form onSubmit={handleChangePassword} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu hiện tại</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu hiện tại</label>
               <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
                   value={passwordForm.currentPassword}
@@ -768,9 +817,9 @@ export default function Profile() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu mới</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Mật khẩu mới</label>
               <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
                   value={passwordForm.newPassword}
@@ -782,9 +831,9 @@ export default function Profile() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Xác nhận mật khẩu mới</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Xác nhận mật khẩu mới</label>
               <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
                 <input
                   type="password"
                   value={passwordForm.confirmPassword}

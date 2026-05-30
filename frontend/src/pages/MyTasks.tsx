@@ -60,13 +60,13 @@ export default function MyTasks() {
         );
       case 'IN_PROGRESS':
         return (
-          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-700 flex items-center gap-1.5">
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-cyan-100 text-cyan-700 flex items-center gap-1.5">
             <FiClock size={12} /> Đang làm
           </span>
         );
       default:
         return (
-          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600 flex items-center gap-1.5">
+          <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-slate-100 text-slate-600 flex items-center gap-1.5">
             <FiClock size={12} /> Chưa làm
           </span>
         );
@@ -105,13 +105,13 @@ export default function MyTasks() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50/50 pt-8 pb-20">
+    <div className="min-h-screen bg-slate-50/50 pt-8 pb-20">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Header Hero */}
-        <div className="relative mb-10 p-8 rounded-3xl overflow-hidden bg-gradient-to-br from-primary-700 to-indigo-900 shadow-xl group">
+        <div className="relative mb-10 p-8 rounded-3xl overflow-hidden bg-gradient-to-br from-primary-700 to-emerald-900 shadow-sm group">
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white/10 blur-3xl group-hover:scale-110 transition-transform duration-1000"></div>
-          <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-48 h-48 rounded-full bg-purple-400/10 blur-2xl"></div>
+          <div className="absolute bottom-0 left-0 -ml-10 -mb-10 w-48 h-48 rounded-full bg-teal-400/10 blur-2xl"></div>
 
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
@@ -138,11 +138,11 @@ export default function MyTasks() {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-2 mb-8 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm max-w-fit">
+        <div className="flex flex-wrap items-center gap-2 mb-8 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm max-w-fit">
           <button
             onClick={() => setFilter('ALL')}
             className={`px-5 py-2 rounded-xl font-medium text-sm transition-all ${
-              filter === 'ALL' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'
+              filter === 'ALL' ? 'bg-primary-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
             Tất cả ({tasks.length})
@@ -150,7 +150,7 @@ export default function MyTasks() {
           <button
             onClick={() => setFilter('PENDING')}
             className={`px-5 py-2 rounded-xl font-medium text-sm transition-all ${
-              filter === 'PENDING' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'
+              filter === 'PENDING' ? 'bg-primary-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
             Cần làm ({pendingCount})
@@ -158,7 +158,7 @@ export default function MyTasks() {
           <button
             onClick={() => setFilter('COMPLETED')}
             className={`px-5 py-2 rounded-xl font-medium text-sm transition-all ${
-              filter === 'COMPLETED' ? 'bg-primary-600 text-white shadow-md' : 'text-gray-600 hover:bg-gray-50'
+              filter === 'COMPLETED' ? 'bg-primary-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
             Đã hoàn thành ({completedCount})
@@ -168,18 +168,18 @@ export default function MyTasks() {
         {/* Task List */}
         <div className="space-y-4">
           {filteredTasks.length === 0 ? (
-            <div className="bg-white rounded-3xl p-16 text-center border border-gray-100">
-              <div className="w-20 h-20 bg-gray-50 text-gray-300 rounded-full flex items-center justify-center mx-auto mb-5">
+            <div className="bg-white rounded-3xl p-16 text-center border border-slate-100">
+              <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-full flex items-center justify-center mx-auto mb-5">
                 <FiCheckCircle className="w-10 h-10" />
               </div>
-              <h2 className="text-xl font-bold text-gray-800 mb-2">Tuyệt vời!</h2>
-              <p className="text-gray-500">Danh sách hiện tại trống. Bạn không có bài tập hoặc trắc nghiệm nào thỏa điều kiện lọc.</p>
+              <h2 className="text-xl font-bold text-slate-800 mb-2">Tuyệt vời!</h2>
+              <p className="text-slate-500">Danh sách hiện tại trống. Bạn không có bài tập hoặc trắc nghiệm nào thỏa điều kiện lọc.</p>
             </div>
           ) : (
             filteredTasks.map((task) => (
               <div
                 key={task.id}
-                className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all duration-200 group overflow-hidden"
+                className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-sm transition-all duration-200 group overflow-hidden"
               >
                 <div className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
                   <div className="flex items-start gap-4 flex-1 min-w-0">
@@ -187,7 +187,7 @@ export default function MyTasks() {
                     <div
                       className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-110 ${
                         task.type === 'QUIZ'
-                          ? 'bg-purple-100 text-purple-600'
+                          ? 'bg-teal-100 text-teal-600'
                           : 'bg-amber-100 text-amber-600'
                       }`}
                     >
@@ -197,23 +197,23 @@ export default function MyTasks() {
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-gray-400">
+                        <span className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider text-slate-400">
                           <FiBookOpen size={11} />
                           {task.courseTitle || 'Khóa học'}
                         </span>
                         {getStatusBadge(task.status)}
                       </div>
-                      <h3 className="text-lg font-bold text-gray-900 group-hover:text-primary-600 transition-colors truncate">
+                      <h3 className="text-lg font-bold text-slate-900 group-hover:text-primary-600 transition-colors truncate">
                         {task.title}
                       </h3>
-                      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-gray-500">
+                      <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5 text-sm text-slate-500">
                         <span className="flex items-center gap-1.5">
                           {task.type === 'QUIZ' ? (
-                            <FiTarget size={13} className="text-purple-500" />
+                            <FiTarget size={13} className="text-teal-500" />
                           ) : (
                             <FiAward size={13} className="text-amber-500" />
                           )}
-                          <span className="font-medium text-gray-600">
+                          <span className="font-medium text-slate-600">
                             {task.type === 'QUIZ' ? 'Trắc nghiệm' : 'Bài tập nộp'}
                           </span>
                         </span>
@@ -248,10 +248,10 @@ export default function MyTasks() {
                     to={getTaskLink(task)}
                     className={`flex-shrink-0 px-6 py-2.5 rounded-xl font-semibold flex items-center gap-2 transition-all text-sm ${
                       task.status === 'COMPLETED'
-                        ? 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         : task.type === 'QUIZ'
-                        ? 'bg-purple-50 text-purple-600 hover:bg-purple-600 hover:text-white shadow-sm hover:shadow-md hover:shadow-purple-500/20'
-                        : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white shadow-sm hover:shadow-md hover:shadow-amber-500/20'
+                        ? 'bg-teal-50 text-teal-600 hover:bg-teal-600 hover:text-white shadow-sm hover:shadow-sm hover:shadow-teal-500/20'
+                        : 'bg-amber-50 text-amber-600 hover:bg-amber-600 hover:text-white shadow-sm hover:shadow-sm hover:shadow-amber-500/20'
                     }`}
                   >
                     {getActionLabel(task)}

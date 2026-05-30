@@ -154,7 +154,7 @@ export const QuizPlayer = ({
   };
 
   if (loading && !quiz) return <div className="p-8 text-center"><div className="animate-spin h-8 w-8 mx-auto border-b-2 border-primary-600 rounded-full"></div></div>;
-  if (!quiz) return <div className="p-8 text-center text-gray-500">Không tìm thấy bài trắc nghiệm nào cho bài học này.</div>;
+  if (!quiz) return <div className="p-8 text-center text-slate-500">Không tìm thấy bài trắc nghiệm nào cho bài học này.</div>;
 
   // ─── Results View ───
   if (result) {
@@ -170,7 +170,7 @@ export const QuizPlayer = ({
           <p className="text-xl">
             Điểm của bạn: <span className="font-bold">{Math.round(result.score * 100) / 100}%</span>
           </p>
-          <p className="text-gray-500 mt-2">Điểm đạt yêu cầu: {quiz.passingScore}%</p>
+          <p className="text-slate-500 mt-2">Điểm đạt yêu cầu: {quiz.passingScore}%</p>
           
           <button onClick={() => { setAttempt(null); setResult(null); setAnswers({}); }} className="btn-primary mt-6">
             {result.passed ? 'Làm lại bài' : 'Thử lại'}
@@ -186,7 +186,7 @@ export const QuizPlayer = ({
                   {exp.correct ? <FiCheckCircle className="text-green-600" /> : <FiXCircle className="text-red-600" />}
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900 mb-2">
+                  <p className="font-medium text-slate-900 mb-2">
                     Câu {index + 1}: {
                       quiz.questions.find(q => q.id === exp.questionId)?.text ||
                       quiz.questions.find(q => q.id === exp.questionId)?.questionText
@@ -194,7 +194,7 @@ export const QuizPlayer = ({
                   </p>
                   <div className="text-sm">
                     <p>
-                      <span className="font-semibold text-gray-700">Câu trả lời của bạn:</span>{' '}
+                      <span className="font-semibold text-slate-700">Câu trả lời của bạn:</span>{' '}
                       {(exp.selectedOptionIds || []).length > 0
                         ? (exp.selectedOptionIds || []).map((id: string) => getOptionText(exp.questionId, id)).join(', ')
                         : 'Chưa trả lời'}
@@ -207,7 +207,7 @@ export const QuizPlayer = ({
                     )}
                   </div>
                   {exp.explanation && (
-                    <div className="mt-3 p-3 bg-white bg-opacity-60 rounded text-sm text-gray-700">
+                    <div className="mt-3 p-3 bg-white bg-opacity-60 rounded text-sm text-slate-700">
                       <span className="font-semibold">Giải thích:</span> {exp.explanation}
                     </div>
                   )}
@@ -242,8 +242,8 @@ export const QuizPlayer = ({
           <p className="text-xl">
             Điểm cao nhất: <span className="font-bold text-2xl">{Math.round((bestAttempt?.score || 0) * 100) / 100}%</span>
           </p>
-          <p className="text-gray-500 mt-1">Điểm đạt yêu cầu: {quiz.passingScore}%</p>
-          <p className="text-gray-400 text-sm mt-2">
+          <p className="text-slate-500 mt-1">Điểm đạt yêu cầu: {quiz.passingScore}%</p>
+          <p className="text-slate-400 text-sm mt-2">
             Đã làm {pastAttempts.length} / {quiz.maxAttempts} lượt
           </p>
 
@@ -272,10 +272,10 @@ export const QuizPlayer = ({
                   <FiXCircle className="text-red-400 flex-shrink-0" size={20} />
                 )}
                 <div>
-                  <p className="font-semibold text-gray-900">
+                  <p className="font-semibold text-slate-900">
                     Lần {pastAttempts.length - idx}: <span className={att.passed ? 'text-green-600' : 'text-red-600'}>{Math.round(att.score * 100) / 100}%</span>
                   </p>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-slate-500">
                     {att.correctAnswers}/{att.totalQuestions} câu đúng
                     {att.timeTakenSeconds && ` • ${Math.floor(att.timeTakenSeconds / 60)}m ${att.timeTakenSeconds % 60}s`}
                     {att.submittedAt && ` • ${new Date(att.submittedAt).toLocaleDateString('vi-VN')}`}
@@ -298,21 +298,21 @@ export const QuizPlayer = ({
       <div className="max-w-2xl mx-auto p-4 md:p-8 text-center">
         <div className="card">
           <h2 className="text-2xl font-bold mb-4">{quiz.title}</h2>
-          <p className="text-gray-600 mb-8">{quiz.description}</p>
+          <p className="text-slate-600 mb-8">{quiz.description}</p>
           
           <div className="grid grid-cols-2 gap-4 mb-8 text-sm">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-gray-500 flex items-center justify-center gap-2 mb-1"><FiClock /> Thời gian làm bài</p>
+            <div className="bg-slate-50 p-4 rounded-xl">
+              <p className="text-slate-500 flex items-center justify-center gap-2 mb-1"><FiClock /> Thời gian làm bài</p>
               <p className="font-bold">{quiz.timeLimitMinutes ? `${quiz.timeLimitMinutes} Phút` : 'Không giới hạn'}</p>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <p className="text-gray-500 mb-1">Điểm đạt yêu cầu</p>
+            <div className="bg-slate-50 p-4 rounded-xl">
+              <p className="text-slate-500 mb-1">Điểm đạt yêu cầu</p>
               <p className="font-bold">{quiz.passingScore}%</p>
             </div>
           </div>
 
           {showRetake && (
-            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700">
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
               Lượt làm thứ {pastAttempts.length + 1} / {quiz.maxAttempts}
             </div>
           )}
@@ -326,7 +326,7 @@ export const QuizPlayer = ({
           {showRetake && (
             <button
               onClick={() => setShowRetake(false)}
-              className="block mx-auto mt-3 text-sm text-gray-500 hover:text-gray-700"
+              className="block mx-auto mt-3 text-sm text-slate-500 hover:text-slate-700"
             >
               ← Quay lại xem kết quả
             </button>
@@ -339,10 +339,10 @@ export const QuizPlayer = ({
   // ─── Active Quiz Form ───
   return (
     <div className="max-w-3xl mx-auto p-4 md:p-8">
-      <div className="flex justify-between items-center bg-white p-4 sticky top-0 z-10 border-b shadow-sm mb-6 rounded-lg">
+      <div className="flex justify-between items-center bg-white p-4 sticky top-0 z-10 border-b shadow-sm mb-6 rounded-xl">
         <h2 className="font-bold text-lg">{quiz.title}</h2>
         {timeLeft !== null && (
-          <div className={`font-mono text-xl flex items-center gap-2 ${timeLeft < 60 ? 'text-red-600 animate-pulse' : 'text-gray-700'}`}>
+          <div className={`font-mono text-xl flex items-center gap-2 ${timeLeft < 60 ? 'text-red-600 animate-pulse' : 'text-slate-700'}`}>
             <FiClock /> {formatTime(timeLeft)}
           </div>
         )}
@@ -358,7 +358,7 @@ export const QuizPlayer = ({
           return (
             <div key={q.id} className="card">
               <h3 className="font-medium text-lg mb-4">
-                <span className="text-gray-500 mr-2">{index + 1}.</span>
+                <span className="text-slate-500 mr-2">{index + 1}.</span>
                 {q.text || q.questionText}
                 <span className="text-sm text-primary-600 float-right">{q.points} điểm</span>
               </h3>
@@ -369,17 +369,17 @@ export const QuizPlayer = ({
                   return (
                     <label
                       key={opt.id}
-                      className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${
+                      className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all ${
                         isSelected
                           ? 'border-primary-500 bg-primary-50 shadow-sm'
-                          : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                          : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
                       }`}
                     >
                       {/* Custom visual indicator */}
                       <div className={`flex-shrink-0 w-5 h-5 rounded-${isMulti ? 'md' : 'full'} border-2 flex items-center justify-center transition-all ${
                         isSelected
                           ? 'border-primary-600 bg-primary-600'
-                          : 'border-gray-300 bg-white'
+                          : 'border-slate-200 bg-white'
                       }`}>
                         {isSelected && (
                           isMulti ? (
@@ -399,7 +399,7 @@ export const QuizPlayer = ({
                         checked={isSelected}
                         onChange={() => handleAnswerChange(q.id, opt.id, q.type || q.questionType || 'MULTIPLE_CHOICE')}
                       />
-                      <span className={`text-gray-700 ${isSelected ? 'font-medium text-gray-900' : ''}`}>{opt.text}</span>
+                      <span className={`text-slate-700 ${isSelected ? 'font-medium text-slate-900' : ''}`}>{opt.text}</span>
                     </label>
                   );
                 })}
@@ -410,7 +410,7 @@ export const QuizPlayer = ({
       </div>
 
       <div className="flex justify-end">
-        <button onClick={handleSubmit} disabled={loading} className="btn-primary px-8 py-3 text-lg shadow-lg">
+        <button onClick={handleSubmit} disabled={loading} className="btn-primary px-8 py-3 text-lg shadow-sm">
           {loading ? 'Đang nộp...' : 'Nộp bài'}
         </button>
       </div>

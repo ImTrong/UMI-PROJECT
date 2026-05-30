@@ -8,12 +8,17 @@ import logger from '../utils/logger';
 export class AuthController {
   static async register(req: Request, res: Response) {
     try {
-      const { email, password, fullName } = req.body;
+      const { email, password, fullName, deviceId } = req.body;
+      const ipAddress = req.ip;
+      const userAgent = req.get('user-agent');
 
       const result = await AuthService.register({
         email,
         password,
         fullName,
+        ipAddress,
+        userAgent,
+        deviceId,
       });
 
       res.status(HTTP_STATUS.CREATED).json({
@@ -37,7 +42,7 @@ export class AuthController {
 
   static async login(req: Request, res: Response) {
     try {
-      const { email, password } = req.body;
+      const { email, password, deviceId } = req.body;
       const ipAddress = req.ip;
       const userAgent = req.get('user-agent');
 
@@ -46,6 +51,7 @@ export class AuthController {
         password,
         ipAddress,
         userAgent,
+        deviceId,
       });
 
       res.status(HTTP_STATUS.OK).json({

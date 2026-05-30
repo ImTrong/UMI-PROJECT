@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Certificate } from '../../services/learning.service';
 import { format } from 'date-fns';
-import { FiAward, FiDownload, FiShare2, FiCheckCircle, FiXCircle, FiEye } from 'react-icons/fi';
+import { FiAward, FiDownload, FiShare2, FiCheckCircle, FiXCircle, FiEye, FiCalendar } from 'react-icons/fi';
 
 interface CertificateCardProps {
   certificate: Certificate;
@@ -14,7 +14,7 @@ export const CertificateCard = ({ certificate, onDownload, onShare }: Certificat
   const isValid = certificate.isVerified && !isExpired;
 
   return (
-    <div className="group bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-xl hover:border-primary-200 transition-all duration-300 overflow-hidden">
+    <div className="group bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-sm hover:border-primary-200 transition-all duration-300 overflow-hidden">
       {/* Top gradient bar */}
       <div className={`h-1.5 ${isValid ? 'bg-gradient-to-r from-green-400 to-emerald-500' : 'bg-gradient-to-r from-red-400 to-rose-500'}`}></div>
       
@@ -23,7 +23,7 @@ export const CertificateCard = ({ certificate, onDownload, onShare }: Certificat
           {/* Icon */}
           <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${
             isValid 
-              ? 'bg-gradient-to-br from-primary-50 to-blue-50 text-primary-600 border border-primary-100' 
+              ? 'bg-gradient-to-br from-primary-50 to-cyan-50 text-primary-600 border border-primary-100' 
               : 'bg-red-50 text-red-400 border border-red-100'
           }`}>
             <FiAward size={24} />
@@ -31,16 +31,16 @@ export const CertificateCard = ({ certificate, onDownload, onShare }: Certificat
 
           {/* Info */}
           <div className="flex-1 min-w-0">
-            <h3 className="font-bold text-gray-900 text-lg leading-tight group-hover:text-primary-700 transition-colors">
+            <h3 className="font-bold text-slate-900 text-lg leading-tight group-hover:text-primary-700 transition-colors">
               {certificate.courseTitle}
             </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Cấp cho: <span className="font-medium text-gray-700">{certificate.userName}</span>
+            <p className="text-sm text-slate-500 mt-1">
+              Cấp cho: <span className="font-medium text-slate-700">{certificate.userName}</span>
             </p>
             
             <div className="flex flex-wrap items-center gap-3 mt-3">
-              <span className="text-xs text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full">
-                📅 {format(new Date(certificate.issueDate), 'dd/MM/yyyy')}
+              <span className="text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full">
+                <FiCalendar className="inline mr-1" /> {format(new Date(certificate.issueDate), 'dd/MM/yyyy')}
               </span>
               
               {isValid ? (
@@ -54,13 +54,13 @@ export const CertificateCard = ({ certificate, onDownload, onShare }: Certificat
               )}
 
               {certificate.expiresAt && !isExpired && (
-                <span className="text-xs text-gray-500 bg-gray-50 px-2.5 py-1 rounded-full">
+                <span className="text-xs text-slate-500 bg-slate-50 px-2.5 py-1 rounded-full">
                   Đến: {format(new Date(certificate.expiresAt), 'dd/MM/yyyy')}
                 </span>
               )}
             </div>
 
-            <p className="text-[11px] text-gray-400 font-mono mt-2">
+            <p className="text-[11px] text-slate-400 font-mono mt-2">
               {certificate.certificateNumber}
             </p>
           </div>
@@ -69,7 +69,7 @@ export const CertificateCard = ({ certificate, onDownload, onShare }: Certificat
           <div className="flex flex-col gap-1.5 flex-shrink-0">
             <Link
               to={`/certificates/${certificate.id}`}
-              className="p-2.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"
+              className="p-2.5 text-slate-400 hover:text-primary-600 hover:bg-primary-50 rounded-xl transition-all"
               title="Xem chi tiết"
             >
               <FiEye size={18} />
@@ -77,7 +77,7 @@ export const CertificateCard = ({ certificate, onDownload, onShare }: Certificat
             {onDownload && (
               <button
                 onClick={onDownload}
-                className="p-2.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all"
+                className="p-2.5 text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-xl transition-all"
                 title="Tải về PDF"
               >
                 <FiDownload size={18} />
@@ -86,7 +86,7 @@ export const CertificateCard = ({ certificate, onDownload, onShare }: Certificat
             {onShare && (
               <button
                 onClick={onShare}
-                className="p-2.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-xl transition-all"
+                className="p-2.5 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-xl transition-all"
                 title="Chia sẻ"
               >
                 <FiShare2 size={18} />
