@@ -58,7 +58,7 @@ export default function Header() {
     { name: 'Lộ trình học tập', href: '/learning-paths', icon: FiActivity },
     { name: 'Lịch sử đơn hàng', href: '/orders', icon: FiList },
     { name: 'Bài tập & Trắc nghiệm', href: '/tasks', icon: FiCheckSquare },
-    { name: 'Góc học tập', href: '/my-learning', icon: FiActivity },
+    { name: 'Tiến độ học tập', href: '/my-learning', icon: FiActivity },
     { name: 'Phân tích học tập', href: '/learning-analytics', icon: FiBarChart2 },
     { name: 'Chứng chỉ', href: '/certificates', icon: FiAward },
     { name: 'Huy chương', href: '/badges', icon: FiAward },

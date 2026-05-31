@@ -98,11 +98,11 @@ export default function AdminDashboard() {
         recentOrdersData,
         recentUsersData
       ] = await Promise.all([
-        userService.getAnalytics(),
-        courseService.getAnalytics(),
-        orderService.getAnalytics(),
-        orderService.getAllOrders({ limit: 5 }),
-        userService.getAllUsers(1, 5)
+        userService.getAnalytics().catch(() => ({ total: 0, students: 0, instructors: 0, admins: 0, active: 0, newThisMonth: 0 })),
+        courseService.getAnalytics().catch(() => ({ total: 0, published: 0, draft: 0, newThisMonth: 0 })),
+        orderService.getAnalytics().catch(() => ({ totalOrders: 0, completedOrders: 0, totalRevenue: 0, thisMonthRevenue: 0 })),
+        orderService.getAllOrders({ limit: 5 }).catch(() => ({ orders: [] })),
+        userService.getAllUsers(1, 5).catch(() => ({ users: [] }))
       ]);
 
       // Note: Payment service doesn't have custom analytics yet, using generic order data as substitute if needed

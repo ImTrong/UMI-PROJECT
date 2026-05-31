@@ -5,11 +5,23 @@ import { formatVND } from '../../utils/currency';
 interface CartItemProps {
   item: CartItemType;
   onRemove: (courseId: string) => void;
+  isSelected: boolean;
+  onToggle: (courseId: string) => void;
 }
 
-export const CartItem = ({ item, onRemove }: CartItemProps) => {
+export const CartItem = ({ item, onRemove, isSelected, onToggle }: CartItemProps) => {
   return (
-    <div className="flex items-center space-x-4 py-4 border-b border-slate-100 last:border-0">
+    <div className={`flex items-center space-x-4 py-4 border-b border-slate-100 last:border-0 ${isSelected ? 'bg-primary-50/30' : ''} px-2 rounded-lg transition-colors`}>
+      {/* Checkbox */}
+      <div className="flex-shrink-0 mr-2">
+        <input 
+          type="checkbox" 
+          checked={isSelected}
+          onChange={() => onToggle(item.courseId)}
+          className="w-5 h-5 text-primary-600 rounded border-slate-300 focus:ring-primary-500 cursor-pointer"
+        />
+      </div>
+
       {/* Thumbnail */}
       <div className="w-20 h-20 bg-slate-100 rounded-xl overflow-hidden flex-shrink-0">
         {item.thumbnail ? (

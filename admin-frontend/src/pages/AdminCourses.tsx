@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+
 import { courseService, Course } from '../services/course.service';
 import {
   FiCheckCircle, FiXCircle, FiEye, FiClock,
@@ -249,14 +249,15 @@ export default function AdminCourses() {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                       <div className="flex justify-end gap-2">
                         {/* Always show View Course */}
-                        <Link 
-                          to={`/courses/${course.slug}`} 
+                        <a 
+                          href={`http://localhost:3000/courses/${course.slug}`} 
                           target="_blank" 
+                          rel="noopener noreferrer"
                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
                           title="Xem chi tiết nội dung (Mở tab mới)"
                         >
                           <FiEye size={18} />
-                        </Link>
+                        </a>
 
                         {activeTab === 'PENDING' && (
                           <>
