@@ -15,10 +15,36 @@ export default function Cart() {
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { isAuthenticated } = useAuth();
-  const { items, totalPrice, loading: cartLoading } = useSelector((state: RootState) => state.cart);
+  const { items, loading: cartLoading } = useSelector((state: RootState) => state.cart);
   
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+
+  // Tính tổng tiền của các khóa học được chọn
+  const selectedTotalPrice = items
+    .filter(item => selectedItems.has(item.courseId))
+    .reduce((sum, item) => sum + item.price, 0);
+
+  const isAllSelected = items.length > 0 && selectedItems.size === items.length;
+
+  const handleToggleSelect = (courseId: string) => {
+    const newSelected = new Set(selectedItems);
+    if (newSelected.has(courseId)) {
+      newSelected.delete(courseId);
+    } else {
+      newSelected.add(courseId);
+    }
+    setSelectedItems(newSelected);
+  };
+
+  const handleToggleAll = () => {
+    if (isAllSelected) {
+      setSelectedItems(new Set());
+    } else {
+      setSelectedItems(new Set(items.map(item => item.courseId)));
+    }
+  };
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -31,21 +57,28 @@ export default function Cart() {
   const handleRemoveFromCart = async (courseId: string) => {
     try {
       await dispatch(removeFromCart(courseId)).unwrap();
+      if (selectedItems.has(courseId)) {
+        const newSelected = new Set(selectedItems);
+        newSelected.delete(courseId);
+        setSelectedItems(newSelected);
+      }
     } catch (error) {
       toast.error('Xóa mục thất bại');
     }
   };
 
   const handleCheckout = async (notes: string) => {
-    if (items.length === 0) {
-      toast.error('Giỏ hàng của bạn đang trống');
+    const itemsToCheckout = items.filter(item => selectedItems.has(item.courseId));
+    
+    if (itemsToCheckout.length === 0) {
+      toast.error('Vui lòng chọn ít nhất một khóa học để thanh toán');
       return;
     }
 
     setCheckoutLoading(true);
     try {
       const result = await orderService.createOrder({
-        items: items.map(item => ({
+        items: itemsToCheckout.map(item => ({
           courseId: item.courseId,
           courseTitle: item.title,
           price: item.price,
@@ -97,8 +130,8 @@ export default function Cart() {
           <span>Quay lại Giỏ hàng</span>
         </button>
         <CheckoutForm
-          items={items}
-          totalPrice={totalPrice}
+          items={items.filter(item => selectedItems.has(item.courseId))}
+          totalPrice={selectedTotalPrice}
           onSubmit={handleCheckout}
           isLoading={checkoutLoading}
         />
@@ -114,12 +147,26 @@ export default function Cart() {
         {/* Cart Items */}
         <div className="md:col-span-2">
           <div className="card">
+            <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
+              <label className="flex items-center cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={isAllSelected}
+                  onChange={handleToggleAll}
+                  className="w-5 h-5 text-primary-600 rounded border-slate-300 focus:ring-primary-500 cursor-pointer mr-3"
+                />
+                <span className="font-semibold text-slate-700 group-hover:text-primary-600 transition-colors">Chọn tất cả ({items.length} khóa học)</span>
+              </label>
+              <span className="text-sm text-slate-500">Đã chọn: {selectedItems.size}</span>
+            </div>
             <div className="space-y-2">
               {items.map((item) => (
                 <CartItem
                   key={item.courseId}
                   item={item}
                   onRemove={handleRemoveFromCart}
+                  isSelected={selectedItems.has(item.courseId)}
+                  onToggle={handleToggleSelect}
                 />
               ))}
             </div>
@@ -132,8 +179,8 @@ export default function Cart() {
             <h2 className="text-xl font-semibold mb-4">Tóm tắt đơn hàng</h2>
             <div className="space-y-3 mb-4">
               <div className="flex justify-between">
-                <span className="text-slate-600">Tạm tính</span>
-                <span>{formatVND(totalPrice)}</span>
+                <span className="text-slate-600">Tạm tính ({selectedItems.size} khóa học)</span>
+                <span>{formatVND(selectedTotalPrice)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-600">Giảm giá</span>
@@ -141,12 +188,19 @@ export default function Cart() {
               </div>
               <div className="flex justify-between font-bold text-lg pt-3 border-t">
                 <span>Tổng cộng</span>
-                <span className="text-primary-600">{formatVND(totalPrice)}</span>
+                <span className="text-primary-600">{formatVND(selectedTotalPrice)}</span>
               </div>
             </div>
             <button
-              onClick={() => setShowCheckout(true)}
-              className="w-full btn-primary"
+              onClick={() => {
+                if (selectedItems.size === 0) {
+                  toast.error('Vui lòng chọn ít nhất một khóa học để thanh toán');
+                  return;
+                }
+                setShowCheckout(true);
+              }}
+              disabled={selectedItems.size === 0}
+              className="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Tiến hành thanh toán
             </button>

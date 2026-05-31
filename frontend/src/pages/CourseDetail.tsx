@@ -9,8 +9,10 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../store';
 import { addToCart } from '../store/cartSlice';
 import toast from 'react-hot-toast';
-import { FiPlay, FiUsers, FiStar, FiBookOpen, FiShoppingCart, FiMessageCircle } from 'react-icons/fi';
+import { FiPlay, FiUsers, FiStar, FiBookOpen, FiShoppingCart, FiMessageCircle, FiCreditCard } from 'react-icons/fi';
 import { formatVND } from '../utils/currency';
+import { orderService } from '../services/order.service';
+import { learningService } from '../services/learning.service';
 
 export default function CourseDetail() {
   const { slug } = useParams<{ slug: string }>();
@@ -26,8 +28,9 @@ export default function CourseDetail() {
   const [editingReview, setEditingReview] = useState<Review | null>(null);
   const [ratingDistribution, setRatingDistribution] = useState<Record<number, number>>({});
   const [userReview, setUserReview] = useState<Review | null>(null);
-  const [isEnrolled] = useState(false);
+  const [isEnrolled, setIsEnrolled] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
+  const [buyNowLoading, setBuyNowLoading] = useState(false);
   const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null);
   const [pdfHeight, setPdfHeight] = useState(2500);
 
@@ -49,6 +52,31 @@ export default function CourseDetail() {
     }
   };
 
+  const handleBuyNow = async () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    if (!course) return;
+
+    setBuyNowLoading(true);
+    try {
+      const result = await orderService.createOrder({
+        items: [{
+          courseId: course.id,
+          courseTitle: course.title,
+          price: course.price,
+        }],
+      });
+      toast.success('Đang chuyển đến trang thanh toán...');
+      navigate(`/checkout/${result.order.id}`);
+    } catch (error: any) {
+      toast.error(error.response?.data?.error || 'Không thể tiến hành mua ngay');
+    } finally {
+      setBuyNowLoading(false);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       if (!slug) return;
@@ -67,8 +95,20 @@ export default function CourseDetail() {
         setRatingDistribution(distribution);
         
         if (isAuthenticated) {
-          const userReviewData = await courseService.getUserReview(courseData.id);
-          setUserReview(userReviewData);
+          try {
+            const userReviewData = await courseService.getUserReview(courseData.id);
+            setUserReview(userReviewData);
+          } catch {
+            // Chưa có đánh giá - bỏ qua
+          }
+          
+          try {
+            const progress = await learningService.getCourseProgress(courseData.id);
+            // Backend trả về 200 với data: null nếu chưa đăng ký
+            setIsEnrolled(progress !== null && progress !== undefined);
+          } catch {
+            setIsEnrolled(false);
+          }
         }
       } catch (error) {
         console.error('Lỗi khi tải khóa học:', error);
@@ -162,18 +202,31 @@ export default function CourseDetail() {
               <span className="text-3xl font-bold">{formatVND(course.price)}</span>
             </div>
             {isEnrolled ? (
-              <button className="mt-4 btn-primary bg-white text-primary-600 hover:bg-slate-100">
+              <button 
+                onClick={() => navigate(`/learning/${course.id}`)}
+                className="mt-4 btn-primary bg-white text-primary-600 hover:bg-slate-100"
+              >
                 Tiếp tục học
               </button>
             ) : (
-              <button
-                onClick={handleAddToCart}
-                disabled={cartLoading}
-                className="mt-4 btn-primary bg-white text-primary-600 hover:bg-slate-100 flex items-center space-x-2"
-              >
-                <FiShoppingCart size={18} />
-                <span>{cartLoading ? 'Đang thêm...' : 'Thêm vào giỏ'}</span>
-              </button>
+              <div className="mt-4 flex flex-wrap gap-3">
+                <button
+                  onClick={handleBuyNow}
+                  disabled={buyNowLoading || cartLoading}
+                  className="btn-primary bg-white text-primary-600 hover:bg-slate-100 flex items-center space-x-2 border-transparent shadow-md"
+                >
+                  <FiCreditCard size={18} />
+                  <span>{buyNowLoading ? 'Đang xử lý...' : 'Mua ngay'}</span>
+                </button>
+                <button
+                  onClick={handleAddToCart}
+                  disabled={cartLoading || buyNowLoading}
+                  className="btn-secondary bg-primary-700 text-white hover:bg-primary-800 border-primary-500 flex items-center space-x-2"
+                >
+                  <FiShoppingCart size={18} />
+                  <span>{cartLoading ? 'Đang thêm...' : 'Thêm vào giỏ'}</span>
+                </button>
+              </div>
             )}
           </div>
           <div className="hidden md:block">

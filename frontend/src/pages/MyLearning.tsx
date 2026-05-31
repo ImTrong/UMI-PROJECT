@@ -55,7 +55,7 @@ export default function MyLearning() {
       setStats(statsData);
     } catch (error) {
       console.error('Failed to load learning data:', error);
-      toast.error('Không thể tải dữ liệu góc học tập');
+      toast.error('Không thể tải dữ liệu tiến độ học tập');
     } finally {
       setLoading(false);
     }
@@ -96,7 +96,7 @@ export default function MyLearning() {
           
           <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center">
             <div>
-              <h1 className="text-4xl font-extrabold text-white mb-3">Góc học tập</h1>
+              <h1 className="text-4xl font-extrabold text-white mb-3">Tiến độ học tập</h1>
               <p className="text-primary-100 text-lg max-w-2xl font-medium">
                 Tiếp tục hành trình chinh phục tri thức. Hôm nay bạn sẽ học gì?
               </p>
