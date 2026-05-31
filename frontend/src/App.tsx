@@ -44,6 +44,8 @@ import AssignmentPage from './pages/AssignmentPage'
 import AssignmentSubmissions from './pages/instructor/AssignmentSubmissions'
 import CourseStudents from './pages/instructor/CourseStudents'
 import CourseStudentDetail from './pages/instructor/CourseStudentDetail'
+import CourseAnalytics from './pages/instructor/CourseAnalytics'
+import InstructorCourseAssignments from './pages/instructor/InstructorCourseAssignments'
 import LearningPaths from './pages/LearningPaths'
 import LearningAnalytics from './pages/LearningAnalytics'
 import AIAssistant from './pages/AIAssistant'
@@ -239,6 +241,16 @@ function App() {
           <Route path="/instructor/course/:courseId/students/:studentId" element={
             <ProtectedRoute requiredRole="INSTRUCTOR">
               <CourseStudentDetail />
+            </ProtectedRoute>
+          } />
+          <Route path="/analytics/course/:courseId" element={
+            <ProtectedRoute requiredRole="INSTRUCTOR">
+              <CourseAnalytics />
+            </ProtectedRoute>
+          } />
+          <Route path="/instructor/course/:courseId/assignments" element={
+            <ProtectedRoute requiredRole="INSTRUCTOR">
+              <InstructorCourseAssignments />
             </ProtectedRoute>
           } />
 

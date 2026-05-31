@@ -27,9 +27,17 @@ export class TaskService {
       select: { lessonId: true }
     });
 
-    const taskMap: Record<string, 'QUIZ' | 'ASSIGNMENT'> = {};
-    quizzes.forEach(q => taskMap[q.lessonId] = 'QUIZ');
-    assignments.forEach(a => taskMap[a.lessonId] = 'ASSIGNMENT');
+    const taskMap: Record<string, Array<'QUIZ' | 'ASSIGNMENT'>> = {};
+    quizzes.forEach(q => {
+      if (!taskMap[q.lessonId]) taskMap[q.lessonId] = [];
+      taskMap[q.lessonId].push('QUIZ');
+    });
+    assignments.forEach(a => {
+      if (!taskMap[a.lessonId]) taskMap[a.lessonId] = [];
+      if (!taskMap[a.lessonId].includes('ASSIGNMENT')) {
+         taskMap[a.lessonId].push('ASSIGNMENT');
+      }
+    });
 
     return taskMap;
   }
