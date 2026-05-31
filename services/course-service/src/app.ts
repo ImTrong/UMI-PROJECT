@@ -158,7 +158,16 @@ app.get(
   LessonController.getLessonByIdInternal
 );
 
-// Dynamic param route - MUST be after /slug/:slug and /me
+// ==================== File Routes ====================
+import { FileController } from './controllers/file.controller';
+
+app.get(
+  '/api/courses/files/download',
+  authenticateOptional,
+  FileController.downloadFile
+);
+
+// Dynamic param route - MUST be after /slug/:slug, /me, /files/*
 app.get('/api/courses/:courseId', authenticateOptional, validateCourseId, handleValidationErrors, CourseController.getCourseById);
 
 app.put(
@@ -189,14 +198,6 @@ app.post(
   CourseController.publishCourse
 );
 
-// ==================== File Routes ====================
-import { FileController } from './controllers/file.controller';
-
-app.get(
-  '/api/courses/files/download',
-  authenticateOptional,
-  FileController.downloadFile
-);
 
 // ==================== Lesson Routes ====================
 

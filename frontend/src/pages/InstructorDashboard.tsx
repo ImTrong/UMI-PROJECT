@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { courseService, Course } from '../services/course.service';
-import { FiBookOpen, FiUsers, FiDollarSign, FiTrendingUp, FiEdit2, FiEye, FiEyeOff, FiTrash2, FiPlus, FiBarChart2, FiBook } from 'react-icons/fi';
+import { FiBookOpen, FiUsers, FiDollarSign, FiTrendingUp, FiEdit2, FiEye, FiEyeOff, FiTrash2, FiPlus, FiBarChart2, FiBook, FiFileText } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { formatVND } from '../utils/currency';
 
@@ -235,6 +235,13 @@ export default function InstructorDashboard() {
                           title="Quản lý học viên"
                         >
                           <FiUsers size={16} />
+                        </Link>
+                        <Link
+                          to={`/instructor/course/${course.id}/assignments`}
+                          className="p-1 text-slate-500 hover:text-indigo-600"
+                          title="Bài tập tự luận"
+                        >
+                          <FiFileText size={16} />
                         </Link>
                       </div>
                     </td>

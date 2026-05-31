@@ -43,8 +43,8 @@ export default function Learning() {
   const [loading, setLoading] = useState(true);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [lessonType, setLessonType] = useState<'VIDEO' | 'QUIZ' | 'ASSIGNMENT' | 'PDF' | 'TEXT'>('VIDEO');
-  const [tasks, setTasks] = useState<Record<string, 'QUIZ' | 'ASSIGNMENT'>>({});
-  const [hasTaskAttached, setHasTaskAttached] = useState<'QUIZ' | 'ASSIGNMENT' | null>(null);
+  const [tasks, setTasks] = useState<Record<string, Array<'QUIZ' | 'ASSIGNMENT'>>>({});
+  const [hasTaskAttached, setHasTaskAttached] = useState<Array<'QUIZ' | 'ASSIGNMENT'>>([]);
   const [pdfHeight, setPdfHeight] = useState(2500);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
@@ -150,8 +150,8 @@ export default function Learning() {
       if (!currentLesson) return;
 
       // Track task attachment separately
-      const taskType = tasks[currentLesson.id] || null;
-      setHasTaskAttached(taskType);
+      const taskTypes = tasks[currentLesson.id] || [];
+      setHasTaskAttached(taskTypes);
 
       // Determine CONTENT type (video/pdf/text) — independent of task
       if (getLessonPdfUrl(currentLesson)) {
@@ -172,8 +172,8 @@ export default function Learning() {
       }
 
       // No content — if there is a task, show that directly
-      if (taskType) {
-        setLessonType(taskType);
+      if (taskTypes.length > 0) {
+        setLessonType(taskTypes[0]);
         return;
       }
 
@@ -444,41 +444,56 @@ export default function Learning() {
             )}
             
             {/* Task section — shows quiz/assignment link when lesson has both content + task */}
-            {hasTaskAttached && lessonType !== 'QUIZ' && lessonType !== 'ASSIGNMENT' && currentLesson && (
+            {hasTaskAttached.length > 0 && lessonType !== 'QUIZ' && lessonType !== 'ASSIGNMENT' && currentLesson && (
               <div className="p-5 bg-gradient-to-r from-teal-50 to-emerald-50 border-t border-teal-100">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${hasTaskAttached === 'QUIZ' ? 'bg-teal-100 text-teal-600' : 'bg-amber-100 text-amber-600'}`}>
-                      {hasTaskAttached === 'QUIZ' ? <FiCheckSquare size={20} /> : <FiFileText size={20} />}
+                    <div className="flex -space-x-2">
+                       {hasTaskAttached.includes('QUIZ') && (
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-teal-100 text-teal-600 ring-2 ring-white z-10`}>
+                             <FiCheckSquare size={20} />
+                          </div>
+                       )}
+                       {hasTaskAttached.includes('ASSIGNMENT') && (
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center bg-amber-100 text-amber-600 ring-2 ring-white z-0`}>
+                             <FiFileText size={20} />
+                          </div>
+                       )}
                     </div>
                     <div>
                       <p className="font-bold text-slate-900">
-                        {hasTaskAttached === 'QUIZ' ? 'Bài trắc nghiệm' : 'Bài tập cần nộp'}
+                        {hasTaskAttached.length > 1 ? 'Bài tập và Trắc nghiệm' : hasTaskAttached[0] === 'QUIZ' ? 'Bài trắc nghiệm' : 'Bài tập cần nộp'}
                       </p>
-                      <p className="text-sm text-slate-500">Bài học này có kèm {hasTaskAttached === 'QUIZ' ? 'bài kiểm tra' : 'bài tập nộp'}. Nhấn để làm bài.</p>
+                      <p className="text-sm text-slate-500">Bài học này có kèm {hasTaskAttached.length > 1 ? 'bài tập và trắc nghiệm' : hasTaskAttached[0] === 'QUIZ' ? 'bài kiểm tra' : 'bài tập nộp'}. Nhấn để làm bài.</p>
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => setLessonType(hasTaskAttached)}
-                      className={`px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all ${
-                        hasTaskAttached === 'QUIZ'
-                          ? 'bg-teal-600 text-white hover:bg-teal-700 shadow-sm'
-                          : 'bg-amber-600 text-white hover:bg-amber-700 shadow-sm'
-                      }`}
-                    >
-                      {hasTaskAttached === 'QUIZ' ? 'Làm trắc nghiệm' : 'Nộp bài tập'}
-                    </button>
+                    {hasTaskAttached.includes('QUIZ') && (
+                        <button
+                          onClick={() => setLessonType('QUIZ')}
+                          className="px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all bg-teal-600 text-white hover:bg-teal-700 shadow-sm"
+                        >
+                          Làm trắc nghiệm
+                        </button>
+                    )}
+                    {hasTaskAttached.includes('ASSIGNMENT') && (
+                        <button
+                          onClick={() => setLessonType('ASSIGNMENT')}
+                          className="px-5 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all bg-amber-600 text-white hover:bg-amber-700 shadow-sm"
+                        >
+                          Nộp bài tập
+                        </button>
+                    )}
                   </div>
                 </div>
               </div>
             )}
 
             {/* Back to content button when viewing task inline */}
-            {hasTaskAttached && (lessonType === 'QUIZ' || lessonType === 'ASSIGNMENT') && currentLesson && (
+            {hasTaskAttached.length > 0 && (lessonType === 'QUIZ' || lessonType === 'ASSIGNMENT') && currentLesson && (
               Boolean(currentLesson.videoUrl) || getLessonPdfUrl(currentLesson) || getLessonTextContent(currentLesson)
             ) && (
-              <div className="p-3 bg-cyan-50 border-t border-cyan-100">
+              <div className="p-3 bg-cyan-50 border-t border-cyan-100 flex justify-between items-center">
                 <button
                   onClick={() => {
                     const hasVideo = Boolean(currentLesson.videoUrl) && !currentLesson.videoUrl.toLowerCase().endsWith('.pdf');
@@ -490,6 +505,14 @@ export default function Learning() {
                 >
                   ← Quay lại nội dung bài học
                 </button>
+                {hasTaskAttached.length > 1 && (
+                  <button
+                    onClick={() => setLessonType(lessonType === 'QUIZ' ? 'ASSIGNMENT' : 'QUIZ')}
+                    className="text-sm font-medium text-primary-600 hover:text-primary-800 flex items-center gap-1.5"
+                  >
+                    Chuyển sang {lessonType === 'QUIZ' ? 'Bài tập nộp' : 'Bài trắc nghiệm'} →
+                  </button>
+                )}
               </div>
             )}
 
@@ -580,13 +603,17 @@ export default function Learning() {
                       )}
                       <div className="flex-1">
                         <div className="flex items-start space-x-2 mt-0.5">
-                           {tasks[lesson.id] === 'QUIZ' ? (
-                             <div className="p-1 bg-teal-100 rounded text-teal-600 flex-shrink-0 mt-0.5" title="Bài kiểm tra"><FiCheckSquare size={12}/></div>
-                           ) : tasks[lesson.id] === 'ASSIGNMENT' ? (
-                             <div className="p-1 bg-amber-100 rounded text-amber-600 flex-shrink-0 mt-0.5" title="Bài tập"><FiFileText size={12}/></div>
-                           ) : (
-                             <div className="p-1 bg-cyan-100 rounded text-cyan-500 flex-shrink-0 mt-0.5" title="Video bài giảng"><FiVideo size={12}/></div>
-                           )}
+                           <div className="flex gap-1 flex-shrink-0 mt-0.5">
+                              {(!tasks[lesson.id] || tasks[lesson.id].length === 0) && (
+                                <div className="p-1 bg-cyan-100 rounded text-cyan-500" title="Video bài giảng"><FiVideo size={12}/></div>
+                              )}
+                              {tasks[lesson.id]?.includes('QUIZ') && (
+                                <div className="p-1 bg-teal-100 rounded text-teal-600" title="Bài kiểm tra"><FiCheckSquare size={12}/></div>
+                              )}
+                              {tasks[lesson.id]?.includes('ASSIGNMENT') && (
+                                <div className="p-1 bg-amber-100 rounded text-amber-600" title="Bài tập"><FiFileText size={12}/></div>
+                              )}
+                           </div>
                            <p className={`text-sm ${isCurrent ? 'font-bold text-primary-700' : 'text-slate-700 font-medium'}`}>
                              {lesson.title}
                            </p>

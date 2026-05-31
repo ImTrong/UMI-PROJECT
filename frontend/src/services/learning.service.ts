@@ -373,7 +373,7 @@ export const learningService = {
   },
 
   // Tasks
-  async getCourseTasks(courseId: string): Promise<Record<string, 'QUIZ' | 'ASSIGNMENT'>> {
+  async getCourseTasks(courseId: string): Promise<Record<string, Array<'QUIZ' | 'ASSIGNMENT'>>> {
     const response = await learningApi.get(`/api/learning/course/${courseId}/tasks`);
     return response.data.data;
   },
