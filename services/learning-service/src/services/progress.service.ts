@@ -258,7 +258,6 @@ export class ProgressService {
           progressPercentage,
           timeSpentSeconds: courseProgress.timeSpentSeconds + timeSpentSeconds,
           lastAccessedAt: new Date(),
-          ...(progressPercentage === 100 && { completedAt: new Date() }),
         },
       });
 
@@ -273,36 +272,24 @@ export class ProgressService {
         metadata: { lessonTitle: lesson.title, courseTitle: course.title, progressPercentage },
       });
 
+      let completionResult = { isComplete: false, reason: '' };
       if (progressPercentage === 100) {
-        await ActivityService.logActivity({
-          userId,
-          courseId,
-          action: ActivityAction.COURSE_COMPLETE,
-          metadata: { courseTitle: course.title },
-        });
-        await BadgeService.checkCourseCompleteBadge(userId, courseId);
-        await BadgeService.checkSpeedLearnerBadge(
-          userId,
-          courseProgress.timeSpentSeconds + timeSpentSeconds,
-          courseId,
-          course.title
-        );
-        await BadgeService.checkTimeBasedBadge(userId, new Date());
-
-        // Send real-time course completion notification
-        try {
-          const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
-          await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
-            userId,
-            title: '🎉 Khóa học hoàn thành!',
-            message: `Chúc mừng bạn đã hoàn thành xuất sắc khóa học "${course.title}". Bạn có thể xem chứng chỉ trong mục cá nhân!`,
-            type: 'SUCCESS',
-            link: '/certificates',
-          });
-        } catch (err) {
-          logger.error('Failed to send course completion notification:', err);
-        }
+        completionResult = await this.checkAndCompleteCourse(userId, courseId, course.title) as any;
       }
+
+      await this.updateStreak(userId);
+
+      const updatedCourseProgress = await prisma.courseProgress.findUnique({
+        where: { userId_courseId: { userId, courseId } },
+      });
+
+      return {
+        lessonProgress,
+        courseProgress: updatedCourseProgress,
+        isNewCompletion: !wasCompleted,
+        courseCompleted: completionResult.isComplete,
+        missingQuizzes: completionResult.reason === 'QUIZZES_INCOMPLETE',
+      };
     }
 
     await this.updateStreak(userId);
@@ -315,8 +302,138 @@ export class ProgressService {
       lessonProgress,
       courseProgress: updatedCourseProgress,
       isNewCompletion: !wasCompleted,
-      courseCompleted: updatedCourseProgress?.progressPercentage === 100,
+      courseCompleted: updatedCourseProgress?.progressPercentage === 100 && !!updatedCourseProgress?.completedAt,
+      missingQuizzes: false,
     };
+  }
+
+  static async checkAndCompleteCourse(userId: string, courseId: string, courseTitle: string) {
+    const courseProgress = await prisma.courseProgress.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+    });
+
+    if (!courseProgress) return { isComplete: false, reason: 'NO_PROGRESS' };
+    if (courseProgress.completedAt) return { isComplete: true, alreadyCompleted: true };
+    if (courseProgress.progressPercentage < 100) return { isComplete: false, reason: 'LESSONS_INCOMPLETE' };
+
+    // Check for uncompleted quizzes
+    const quizzes = await prisma.quiz.findMany({
+      where: { courseId },
+      select: { id: true }
+    });
+
+    for (const quiz of quizzes) {
+      const attempt = await prisma.quizAttempt.findFirst({
+        where: { quizId: quiz.id, userId, status: 'SUBMITTED' }
+      });
+      if (!attempt) {
+        return { isComplete: false, reason: 'QUIZZES_INCOMPLETE' };
+      }
+    }
+
+    // All lessons 100% and all quizzes submitted -> Complete course!
+    await ActivityService.logActivity({
+      userId,
+      courseId,
+      action: ActivityAction.COURSE_COMPLETE,
+      metadata: { courseTitle },
+    });
+    
+    await BadgeService.checkCourseCompleteBadge(userId, courseId);
+    await BadgeService.checkSpeedLearnerBadge(
+      userId,
+      courseProgress.timeSpentSeconds,
+      courseId,
+      courseTitle
+    );
+    await BadgeService.checkTimeBasedBadge(userId, new Date());
+
+    // Auto-calculate quiz scores and determine pass/fail
+    try {
+      const quizzesWithScore = await prisma.quiz.findMany({
+        where: { courseId },
+        select: { id: true, passingScore: true },
+      });
+
+      if (quizzesWithScore.length > 0) {
+        const quizScores = await Promise.all(
+          quizzesWithScore.map(async (quiz) => {
+            const bestAttempt = await prisma.quizAttempt.findFirst({
+              where: { quizId: quiz.id, userId, status: 'SUBMITTED' },
+              orderBy: { score: 'desc' },
+            });
+            return bestAttempt?.score ?? 0;
+          })
+        );
+
+        const avgScore = quizScores.reduce((a, b) => a + b, 0) / quizzesWithScore.length;
+        const currentPassingScore = courseProgress.passingScore ?? 60;
+        const passed = avgScore >= currentPassingScore;
+
+        await prisma.courseProgress.update({
+          where: { userId_courseId: { userId, courseId } },
+          data: {
+            averageQuizScore: Math.round(avgScore * 100) / 100,
+            passed,
+            allowRetake: !passed,
+            completedAt: new Date(),
+          },
+        });
+      } else {
+        // No quizzes → auto-pass
+        await prisma.courseProgress.update({
+          where: { userId_courseId: { userId, courseId } },
+          data: {
+            averageQuizScore: 100,
+            passed: true,
+            allowRetake: false,
+            completedAt: new Date(),
+          },
+        });
+      }
+    } catch (examErr) {
+      logger.error('Failed to calculate course exam result:', examErr);
+    }
+
+    // Reload to get latest pass/fail status
+    const latestProgress = await prisma.courseProgress.findUnique({
+      where: { userId_courseId: { userId, courseId } },
+    });
+    const isPassed = latestProgress?.passed;
+
+    // Send real-time course completion notification
+    try {
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+      if (isPassed) {
+        await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+          userId,
+          title: '🎉 Khóa học hoàn thành!',
+          message: `Chúc mừng bạn đã hoàn thành xuất sắc khóa học "${courseTitle}" với điểm ${latestProgress?.averageQuizScore?.toFixed(1)}%. Bạn có thể nhận chứng nhận ngay!`,
+          type: 'SUCCESS',
+          link: `/course-exam/${courseId}`,
+        });
+      } else {
+        await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+          userId,
+          title: '📝 Khóa học hoàn thành - Chưa đạt điểm',
+          message: `Bạn đã hoàn thành khóa học "${courseTitle}" nhưng điểm trung bình quiz (${latestProgress?.averageQuizScore?.toFixed(1)}%) chưa đạt ngưỡng. Bạn có thể học lại miễn phí!`,
+          type: 'WARNING',
+          link: `/course-exam/${courseId}`,
+        });
+      }
+    } catch (err) {
+      logger.error('Failed to send course completion notification:', err);
+    }
+
+    // Update path progress
+    try {
+      const { PathService } = require('./path.service');
+      await PathService.updatePathProgress(userId, courseId);
+    } catch (err) {
+      logger.error('Failed to update path progress:', err);
+    }
+
+    return { isComplete: true, newlyCompleted: true };
   }
 
   private static async updateUserProgress(userId: string): Promise<void> {

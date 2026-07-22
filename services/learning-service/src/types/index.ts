@@ -37,6 +37,8 @@ export interface CertificateMetadata {
   revokedAt?: string;
   revokedBy?: string;
   revokedReason?: string;
+  pathTitle?: string;
+  finalProjectScore?: number;
   [key: string]: any;
 }
 
@@ -81,12 +83,16 @@ export interface HealthCheckResult {
 export enum ActivityAction {
   COURSE_ENROLL = 'COURSE_ENROLL',
   COURSE_COMPLETE = 'COURSE_COMPLETE',
+  COURSE_RETAKE = 'COURSE_RETAKE',
   LESSON_START = 'LESSON_START',
   LESSON_COMPLETE = 'LESSON_COMPLETE',
   QUIZ_ATTEMPT = 'QUIZ_ATTEMPT',
   QUIZ_PASS = 'QUIZ_PASS',
   CERTIFICATE_GENERATED = 'CERTIFICATE_GENERATED',
   CERTIFICATE_REVOKED = 'CERTIFICATE_REVOKED',
+  PATH_CERTIFICATE_GENERATED = 'PATH_CERTIFICATE_GENERATED',
+  FINAL_PROJECT_SUBMITTED = 'FINAL_PROJECT_SUBMITTED',
+  FINAL_PROJECT_GRADED = 'FINAL_PROJECT_GRADED',
   BADGE_EARNED = 'BADGE_EARNED',
   REVIEW_SUBMITTED = 'REVIEW_SUBMITTED',
 }
@@ -150,3 +156,73 @@ export const BADGE_CONFIG: Record<BadgeType, BadgeConfig> = {
     icon: '💯',
   },
 };
+
+// ==================== Course Exam Result ====================
+
+export interface CourseExamResult {
+  courseId: string;
+  courseTitle: string;
+  averageQuizScore: number;
+  passingScore: number;
+  passed: boolean;
+  totalQuizzes: number;
+  completedQuizzes: number;
+  quizResults: {
+    quizId: string;
+    lessonId: string;
+    lessonTitle: string;
+    bestScore: number;
+    passed: boolean;
+    attempts: number;
+  }[];
+  allowRetake: boolean;
+  retakeCount: number;
+}
+
+// ==================== Final Project Types ====================
+
+export interface EvaluationStage {
+  stageNumber: number;
+  title: string;
+  objective: string;
+  criteria: string;
+  maxScore: number;
+  weight: number;
+  passCriteria: string;
+}
+
+export interface StageResult {
+  stageNumber: number;
+  title: string;
+  score: number;
+  maxScore: number;
+  weightedScore: number;
+  passed: boolean;
+  feedback: string;
+  details: string[];
+}
+
+export interface EvaluationResult {
+  stageResults: StageResult[];
+  totalScore: number;
+  passed: boolean;
+  feedbackReport: string;
+}
+
+export interface FinalProjectData {
+  learningPathId: string;
+  title: string;
+  description: string;
+  instructions?: string;
+  objectives?: string;
+  references?: { title: string; url: string }[];
+  maxScore?: number;
+  passingScore?: number;
+  allowedFileTypes?: string[];
+  maxFileSizeMB?: number;
+  maxAttempts?: number;
+  deadline?: string;
+  evaluationPipeline?: EvaluationStage[];
+}
+
+

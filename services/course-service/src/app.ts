@@ -45,6 +45,10 @@ const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
   message: { error: 'Too many requests, please try again later.' },
+  skip: (req) => {
+    const path = req.originalUrl || req.path;
+    return path.includes('/internal') || path.includes('/health');
+  }
 });
 app.use('/api/courses', limiter);
 

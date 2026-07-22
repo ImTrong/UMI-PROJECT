@@ -2,8 +2,12 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { FiAward, FiX, FiArrowRight } from 'react-icons/fi';
 
+import { learningService } from '../../services/learning.service';
+import { toast } from 'react-hot-toast';
+
 interface Props {
   isOpen: boolean;
+  pathId: string;
   pathTitle: string;
   onClose: () => void;
 }
@@ -26,9 +30,11 @@ const CONFETTI_COLORS = [
   '#14b8a6', '#06b6d4', '#3b82f6',
 ];
 
-export default function PathCompletionCelebration({ isOpen, pathTitle, onClose }: Props) {
+export default function PathCompletionCelebration({ isOpen, pathId, pathTitle, onClose }: Props) {
   const [particles, setParticles] = useState<Particle[]>([]);
   const [showContent, setShowContent] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [hasGenerated, setHasGenerated] = useState(false);
 
   const createParticles = useCallback(() => {
     const newParticles: Particle[] = [];
@@ -52,12 +58,31 @@ export default function PathCompletionCelebration({ isOpen, pathTitle, onClose }
     if (isOpen) {
       createParticles();
       const timer = setTimeout(() => setShowContent(true), 300);
+      
+      // Auto-generate certificate
+      if (pathId && !hasGenerated && !isGenerating) {
+        setIsGenerating(true);
+        learningService.generatePathCertificate(pathId)
+          .then(() => {
+            setHasGenerated(true);
+            toast.success('Chứng chỉ lộ trình đã được tạo thành công!');
+          })
+          .catch((err) => {
+            console.error('Error auto-generating certificate:', err);
+            // Don't show error toast here since it might have already been created
+          })
+          .finally(() => {
+            setIsGenerating(false);
+          });
+      }
+
       return () => clearTimeout(timer);
     } else {
       setShowContent(false);
       setParticles([]);
+      setHasGenerated(false);
     }
-  }, [isOpen, createParticles]);
+  }, [isOpen, createParticles, pathId]);
 
   // Animate particles falling
   useEffect(() => {
@@ -164,10 +189,24 @@ export default function PathCompletionCelebration({ isOpen, pathTitle, onClose }
           <div className="flex flex-col gap-3">
             <Link
               to="/certificates"
-              className="w-full py-3 bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold rounded-xl text-sm shadow-sm hover:shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center justify-center gap-2"
-              onClick={onClose}
+              className={`w-full py-3 font-bold rounded-xl text-sm shadow-sm transition-all flex items-center justify-center gap-2 ${
+                isGenerating 
+                  ? 'bg-emerald-100 text-emerald-400 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]'
+              }`}
+              onClick={(e) => {
+                if (isGenerating) e.preventDefault();
+                else onClose();
+              }}
             >
-              Xem chứng chỉ <FiArrowRight className="w-4 h-4" />
+              {isGenerating ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />
+                  Đang tạo chứng chỉ...
+                </>
+              ) : (
+                <>Xem chứng chỉ lộ trình <FiArrowRight className="w-4 h-4" /></>
+              )}
             </Link>
             <button
               onClick={onClose}

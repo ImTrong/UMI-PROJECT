@@ -4,15 +4,18 @@ import { learningService, Certificate } from '../services/learning.service';
 import { CertificateCard } from '../components/learning/CertificateCard';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
-import { FiAward } from 'react-icons/fi';
+import { FiAward, FiBookOpen, FiMap } from 'react-icons/fi';
+
+type TabType = 'all' | 'course' | 'path';
 
 export default function Certificates() {
   const { isAuthenticated } = useAuth();
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<TabType>('all');
   const [pagination, setPagination] = useState({
     page: 1,
-    limit: 10,
+    limit: 20,
     total: 0,
     totalPages: 0,
     hasPrevPage: false,
@@ -32,20 +35,21 @@ export default function Certificates() {
       setPagination(result.pagination);
     } catch (error) {
       console.error('Failed to load certificates:', error);
-      toast.error('Tải chứng chỉ thất bại');
+      toast.error('Tải chứng nhận thất bại');
     } finally {
       setLoading(false);
     }
   };
 
   const handleDownload = async (certificate: Certificate) => {
-    const toastId = toast.loading('Đang chuẩn bị tải chứng chỉ...');
+    const label = certificate.type === 'PATH_CERTIFICATE' ? 'chứng chỉ' : 'chứng nhận';
+    const toastId = toast.loading(`Đang chuẩn bị tải ${label}...`);
     try {
       await learningService.downloadCertificate(certificate.id);
-      toast.success('Đã tải chứng chỉ thành công!', { id: toastId });
+      toast.success(`Đã tải ${label} thành công!`, { id: toastId });
     } catch (error) {
       console.error('Download failed:', error);
-      toast.error('Tải chứng chỉ thất bại', { id: toastId });
+      toast.error(`Tải ${label} thất bại`, { id: toastId });
     }
   };
 
@@ -53,6 +57,15 @@ export default function Certificates() {
     navigator.clipboard.writeText(certificate.verificationUrl);
     toast.success('Đã sao chép liên kết xác minh vào bộ nhớ tạm');
   };
+
+  const filteredCertificates = certificates.filter((cert) => {
+    if (activeTab === 'course') return cert.type === 'COURSE_COMPLETION';
+    if (activeTab === 'path') return cert.type === 'PATH_CERTIFICATE';
+    return true;
+  });
+
+  const courseCertCount = certificates.filter((c) => c.type === 'COURSE_COMPLETION').length;
+  const pathCertCount = certificates.filter((c) => c.type === 'PATH_CERTIFICATE').length;
 
   if (loading && certificates.length === 0) {
     return (
@@ -62,23 +75,64 @@ export default function Certificates() {
     );
   }
 
+  const tabs = [
+    { key: 'all' as TabType, label: 'Tất cả', count: certificates.length, icon: FiAward },
+    { key: 'course' as TabType, label: 'Chứng nhận khóa học', count: courseCertCount, icon: FiBookOpen },
+    { key: 'path' as TabType, label: 'Chứng chỉ lộ trình', count: pathCertCount, icon: FiMap },
+  ];
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-slate-900 mb-6">Chứng chỉ của tôi</h1>
+      <h1 className="text-3xl font-bold text-slate-900 mb-2">Chứng nhận & Chứng chỉ</h1>
+      <p className="text-slate-500 mb-6">Quản lý chứng nhận hoàn thành khóa học và chứng chỉ lộ trình của bạn</p>
 
-      {certificates.length === 0 ? (
+      {/* Tabs */}
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium whitespace-nowrap transition-all ${
+                activeTab === tab.key
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200 shadow-sm'
+                  : 'bg-white text-slate-600 border border-slate-200 hover:border-primary-200 hover:text-primary-600'
+              }`}
+            >
+              <Icon size={16} />
+              {tab.label}
+              <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                activeTab === tab.key ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-500'
+              }`}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {filteredCertificates.length === 0 ? (
         <div className="card text-center py-12">
           <FiAward className="mx-auto text-4xl text-slate-400 mb-4" />
-          <h2 className="text-xl font-semibold text-slate-900 mb-2">Chưa có chứng chỉ nào</h2>
-          <p className="text-slate-600 mb-6">Hoàn thành khóa học để nhận chứng chỉ</p>
-          <Link to="/courses" className="btn-primary">
-            Khám phá khóa học
+          <h2 className="text-xl font-semibold text-slate-900 mb-2">
+            {activeTab === 'path' ? 'Chưa có chứng chỉ lộ trình nào' :
+             activeTab === 'course' ? 'Chưa có chứng nhận nào' :
+             'Chưa có chứng nhận hoặc chứng chỉ nào'}
+          </h2>
+          <p className="text-slate-600 mb-6">
+            {activeTab === 'path'
+              ? 'Hoàn thành lộ trình học và project cuối kỳ (≥80%) để nhận chứng chỉ'
+              : 'Hoàn thành khóa học và đạt điểm quiz để nhận chứng nhận'}
+          </p>
+          <Link to={activeTab === 'path' ? '/learning-paths' : '/courses'} className="btn-primary">
+            {activeTab === 'path' ? 'Khám phá lộ trình' : 'Khám phá khóa học'}
           </Link>
         </div>
       ) : (
         <>
           <div className="space-y-4">
-            {certificates.map((cert) => (
+            {filteredCertificates.map((cert) => (
               <CertificateCard
                 key={cert.id}
                 certificate={cert}

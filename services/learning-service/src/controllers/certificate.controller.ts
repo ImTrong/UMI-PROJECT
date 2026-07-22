@@ -1,5 +1,5 @@
 import { Response } from 'express';
-import fs from 'fs';
+import { minioInternalClient, BUCKETS } from '../config/minio.config';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { CertificateService } from '../services/certificate.service';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/constants';
@@ -81,18 +81,19 @@ export class CertificateController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { certificateId } = req.params;
-      const filePath = await CertificateService.getCertificateFilePath(certificateId, req.user.userId);
+      const fileKey = await CertificateService.getCertificateFileKey(certificateId, req.user.userId);
 
-      if (!fs.existsSync(filePath)) {
-        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'Certificate file not found' });
+      try {
+        const fileStream = await minioInternalClient.getObject(BUCKETS.CERTIFICATES, fileKey);
+        
+        const fileName = `certificate-${certificateId}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        
+        fileStream.pipe(res);
+      } catch (err) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'Certificate file not found in storage' });
       }
-
-      const fileName = `certificate-${certificateId}.pdf`;
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-
-      const fileStream = fs.createReadStream(filePath);
-      fileStream.pipe(res);
     } catch (error: any) {
       logger.error('Download certificate error:', error);
       if (error.message === 'Certificate not found') {
@@ -102,6 +103,30 @@ export class CertificateController {
         return res.status(HTTP_STATUS.FORBIDDEN).json({ error: error.message });
       }
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to download certificate' });
+    }
+  }
+
+  /**
+   * POST /api/learning/certificates/path/:pathId/generate
+   * Generate a path certificate (chứng chỉ lộ trình)
+   */
+  static async generatePathCertificate(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { pathId } = req.params;
+      const certificate = await CertificateService.generatePathCertificate(req.user.userId, pathId);
+      res.status(HTTP_STATUS.CREATED).json({
+        message: 'Chứng chỉ lộ trình đã được tạo thành công',
+        data: certificate,
+      });
+    } catch (error: any) {
+      logger.error('Generate path certificate error:', error);
+      if (error.message.includes('not found') || error.message.includes('not completed')) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to generate path certificate' });
     }
   }
 

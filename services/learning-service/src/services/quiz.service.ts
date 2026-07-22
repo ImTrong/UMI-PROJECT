@@ -254,8 +254,16 @@ export class QuizService {
 
     logger.info(`Quiz submitted: attempt ${attemptId}, score ${score.toFixed(1)}%, passed: ${passed}`);
 
+    // Check if this submission completes the course
+    const { ProgressService } = require('./progress.service');
+    const axios = require('axios');
+    const courseResponse = await axios.get(`${process.env.COURSE_SERVICE_URL || 'http://localhost:3003'}/api/courses/${quiz.courseId}`).catch(() => ({ data: { data: { title: 'Khóa học' } }}));
+    const courseTitle = courseResponse?.data?.data?.title || 'Khóa học';
+    const completionResult = await ProgressService.checkAndCompleteCourse(userId, quiz.courseId, courseTitle);
+
     return {
       attempt: updatedAttempt,
+      courseCompleted: completionResult.isComplete && completionResult.newlyCompleted,
       results: {
         score: Math.round(score * 100) / 100,
         correctAnswers: correctCount,

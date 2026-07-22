@@ -37,6 +37,7 @@ export const BUCKETS = {
   COURSES: 'courses',
   ASSIGNMENTS: 'assignments',
   QUIZ_ATTACHMENTS: 'quiz-attachments',
+  CERTIFICATES: 'certificates',
 } as const;
 
 // ============================================
@@ -109,6 +110,40 @@ export async function initializeVideosBucket(): Promise<void> {
     logger.info(`✅ Private video bucket "${bucketName}" is ready (no public access)`);
   } catch (error) {
     logger.error('❌ Failed to initialize video bucket:', error);
+    throw error;
+  }
+}
+
+/**
+ * Ensure the certificates bucket exists and is public.
+ * Certificates need to be publicly verifiable via link or QR code.
+ */
+export async function initializeCertificatesBucket(): Promise<void> {
+  try {
+    const bucketName = BUCKETS.CERTIFICATES;
+    const exists = await internalClient.bucketExists(bucketName);
+
+    if (!exists) {
+      await internalClient.makeBucket(bucketName);
+      logger.info(`✅ Created bucket: ${bucketName}`);
+    }
+
+    // Set public read policy for certificates
+    const policy = {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { AWS: ["*"] },
+          Action: ["s3:GetObject"],
+          Resource: [`arn:aws:s3:::${bucketName}/*`]
+        }
+      ]
+    };
+    await internalClient.setBucketPolicy(bucketName, JSON.stringify(policy));
+    logger.info(`✅ Public certificates bucket "${bucketName}" is ready`);
+  } catch (error) {
+    logger.error('❌ Failed to initialize certificates bucket:', error);
     throw error;
   }
 }

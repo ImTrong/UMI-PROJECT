@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xmi:XMI xmi:version="2.1" xmlns:uml="http://schema.omg.org/spec/UML/2.1" xmlns:xmi="http://schema.omg.org/spec/XMI/2.1">
+  <uml:Model xmi:id="UMI_Model" name="UMI_Domain_Model">
+
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="String" name="String"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="Boolean" name="Boolean"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="Int" name="Int"/>
+    <packagedElement xmi:type="uml:PrimitiveType" xmi:id="Float" name="Float"/>
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_user" name="User_Authentication_Domain">
+      <packagedElement xmi:type="uml:Class" xmi:id="User" name="User">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="User_a_0" name="id" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="User_a_1" name="email" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="User_a_2" name="password" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="User_a_3" name="fullName" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="User_a_4" name="emailVerified" visibility="public" type="Boolean"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="User_a_5" name="isActive" visibility="public" type="Boolean"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="UserProfile" name="UserProfile">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="UserProfile_a_0" name="id" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="UserProfile_a_1" name="userId" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="UserProfile_a_2" name="email" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="UserProfile_a_3" name="fullName" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="UserProfile_a_4" name="avatar" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="UserProfile_a_5" name="role" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="DeviceSession" name="DeviceSession">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="DeviceSession_a_0" name="id" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="DeviceSession_a_1" name="sessionId" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="DeviceSession_a_2" name="ipAddress" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="RefreshToken" name="RefreshToken">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="RefreshToken_a_0" name="token" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="RefreshToken_a_1" name="revoked" visibility="public" type="Boolean"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="EducationBackground" name="EducationBackground">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EducationBackground_a_0" name="institution" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="EducationBackground_a_1" name="degree" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="WorkExperience" name="WorkExperience">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="WorkExperience_a_0" name="company" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="WorkExperience_a_1" name="position" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Notification" name="Notification">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Notification_a_0" name="title" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Notification_a_1" name="message" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Notification_a_2" name="isRead" visibility="public" type="Boolean"/>
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_catalog" name="Catalog_Course_Domain">
+      <packagedElement xmi:type="uml:Class" xmi:id="Category" name="Category">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Category_a_0" name="id" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Category_a_1" name="name" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Category_a_2" name="slug" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Course" name="Course">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Course_a_0" name="id" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Course_a_1" name="title" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Course_a_2" name="price" visibility="public" type="Float"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Course_a_3" name="instructorId" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Course_a_4" name="published" visibility="public" type="Boolean"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Lesson" name="Lesson">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Lesson_a_0" name="id" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Lesson_a_1" name="title" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Lesson_a_2" name="videoUrl" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Lesson_a_3" name="duration" visibility="public" type="Int"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Lesson_a_4" name="order" visibility="public" type="Int"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Review" name="Review">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Review_a_0" name="rating" visibility="public" type="Int"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Review_a_1" name="comment" visibility="public" type="String"/>
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_learning" name="Learning_Progress_Domain">
+      <packagedElement xmi:type="uml:Class" xmi:id="UserProgress" name="UserProgress">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="UserProgress_a_0" name="userId" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="UserProgress_a_1" name="totalStudyTime" visibility="public" type="Int"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="UserProgress_a_2" name="streakDays" visibility="public" type="Int"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="CourseProgress" name="CourseProgress">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="CourseProgress_a_0" name="progressPercentage" visibility="public" type="Float"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="CourseProgress_a_1" name="completedLessons" visibility="public" type="Int"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="LessonProgress" name="LessonProgress">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="LessonProgress_a_0" name="completed" visibility="public" type="Boolean"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="LessonProgress_a_1" name="timeSpentSeconds" visibility="public" type="Int"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Quiz" name="Quiz">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Quiz_a_0" name="title" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Quiz_a_1" name="passingScore" visibility="public" type="Float"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="QuizAttempt" name="QuizAttempt">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="QuizAttempt_a_0" name="score" visibility="public" type="Float"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="QuizAttempt_a_1" name="passed" visibility="public" type="Boolean"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Assignment" name="Assignment">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Assignment_a_0" name="title" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Assignment_a_1" name="maxScore" visibility="public" type="Float"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="AssignmentSubmission" name="AssignmentSubmission">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="AssignmentSubmission_a_0" name="content" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="AssignmentSubmission_a_1" name="score" visibility="public" type="Float"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Certificate" name="Certificate">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Certificate_a_0" name="certificateNumber" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Certificate_a_1" name="isVerified" visibility="public" type="Boolean"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Badge" name="Badge">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Badge_a_0" name="badgeName" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="LearningPath" name="LearningPath">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="LearningPath_a_0" name="title" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="LearningPath_a_1" name="difficulty" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="UserPathEnrollment" name="UserPathEnrollment">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="UserPathEnrollment_a_0" name="status" visibility="public" type="String"/>
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_comm" name="Communication_Domain">
+      <packagedElement xmi:type="uml:Class" xmi:id="Conversation" name="Conversation">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Conversation_a_0" name="lastMessage" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="ChatMessage" name="ChatMessage">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="ChatMessage_a_0" name="senderId" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="ChatMessage_a_1" name="content" visibility="public" type="String"/>
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_ai" name="AI_Assistant_Domain">
+      <packagedElement xmi:type="uml:Class" xmi:id="AIConversation" name="AIConversation">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="AIConversation_a_0" name="userId" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="AIConversation_a_1" name="title" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="AIMessage" name="AIMessage">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="AIMessage_a_0" name="role" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="AIMessage_a_1" name="content" visibility="public" type="String"/>
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Package" xmi:id="pkg_commerce" name="Commerce_Payment_Domain">
+      <packagedElement xmi:type="uml:Class" xmi:id="Cart" name="Cart">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Cart_a_0" name="userId" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Cart_a_1" name="totalPrice" visibility="public" type="Float"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Order" name="Order">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Order_a_0" name="orderNumber" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Order_a_1" name="totalPrice" visibility="public" type="Float"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Order_a_2" name="status" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="OrderItem" name="OrderItem">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="OrderItem_a_0" name="courseId" visibility="public" type="String"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="OrderItem_a_1" name="price" visibility="public" type="Float"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Payment" name="Payment">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Payment_a_0" name="amount" visibility="public" type="Float"/>
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Payment_a_1" name="status" visibility="public" type="String"/>
+      </packagedElement>
+      <packagedElement xmi:type="uml:Class" xmi:id="Refund" name="Refund">
+        <ownedAttribute xmi:type="uml:Property" xmi:id="Refund_a_0" name="amount" visibility="public" type="Float"/>
+      </packagedElement>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_1" name="has_profile">
+      <memberEnd xmi:idref="assoc_1_end1"/>
+      <memberEnd xmi:idref="assoc_1_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_1_end1" type="UserProfile" association="assoc_1">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_1_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_1_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_1_end2" type="User" association="assoc_1">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_1_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_1_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_2" name="has_session">
+      <memberEnd xmi:idref="assoc_2_end1"/>
+      <memberEnd xmi:idref="assoc_2_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_2_end1" type="DeviceSession" association="assoc_2">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_2_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_2_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_2_end2" type="User" association="assoc_2">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_2_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_2_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_3" name="has_token">
+      <memberEnd xmi:idref="assoc_3_end1"/>
+      <memberEnd xmi:idref="assoc_3_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_3_end1" type="RefreshToken" association="assoc_3">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_3_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_3_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_3_end2" type="User" association="assoc_3">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_3_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_3_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_4" name="places_order">
+      <memberEnd xmi:idref="assoc_4_end1"/>
+      <memberEnd xmi:idref="assoc_4_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_4_end1" type="Order" association="assoc_4">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_4_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_4_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_4_end2" type="User" association="assoc_4">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_4_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_4_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_5" name="instructs">
+      <memberEnd xmi:idref="assoc_5_end1"/>
+      <memberEnd xmi:idref="assoc_5_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_5_end1" type="Course" association="assoc_5">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_5_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_5_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_5_end2" type="User" association="assoc_5">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_5_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_5_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_6" name="tracks_progress">
+      <memberEnd xmi:idref="assoc_6_end1"/>
+      <memberEnd xmi:idref="assoc_6_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_6_end1" type="UserProgress" association="assoc_6">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_6_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_6_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_6_end2" type="User" association="assoc_6">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_6_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_6_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_7" name="has_ai_chat">
+      <memberEnd xmi:idref="assoc_7_end1"/>
+      <memberEnd xmi:idref="assoc_7_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_7_end1" type="AIConversation" association="assoc_7">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_7_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_7_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_7_end2" type="User" association="assoc_7">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_7_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_7_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_8" name="categorizes">
+      <memberEnd xmi:idref="assoc_8_end1"/>
+      <memberEnd xmi:idref="assoc_8_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_8_end1" type="Course" association="assoc_8">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_8_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_8_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_8_end2" type="Category" association="assoc_8">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_8_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_8_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_9" name="contains_lesson">
+      <memberEnd xmi:idref="assoc_9_end1"/>
+      <memberEnd xmi:idref="assoc_9_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_9_end1" type="Lesson" association="assoc_9">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_9_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_9_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_9_end2" type="Course" association="assoc_9">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_9_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_9_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_10" name="has_review">
+      <memberEnd xmi:idref="assoc_10_end1"/>
+      <memberEnd xmi:idref="assoc_10_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_10_end1" type="Review" association="assoc_10">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_10_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_10_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_10_end2" type="Course" association="assoc_10">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_10_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_10_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_11" name="has_course_prog">
+      <memberEnd xmi:idref="assoc_11_end1"/>
+      <memberEnd xmi:idref="assoc_11_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_11_end1" type="CourseProgress" association="assoc_11">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_11_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_11_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_11_end2" type="UserProgress" association="assoc_11">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_11_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_11_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_12" name="earns_cert">
+      <memberEnd xmi:idref="assoc_12_end1"/>
+      <memberEnd xmi:idref="assoc_12_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_12_end1" type="Certificate" association="assoc_12">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_12_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_12_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_12_end2" type="UserProgress" association="assoc_12">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_12_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_12_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_13" name="grants_cert">
+      <memberEnd xmi:idref="assoc_13_end1"/>
+      <memberEnd xmi:idref="assoc_13_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_13_end1" type="Certificate" association="assoc_13">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_13_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_13_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_13_end2" type="Course" association="assoc_13">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_13_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_13_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_14" name="contains_item">
+      <memberEnd xmi:idref="assoc_14_end1"/>
+      <memberEnd xmi:idref="assoc_14_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_14_end1" type="OrderItem" association="assoc_14">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_14_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_14_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_14_end2" type="Order" association="assoc_14">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_14_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_14_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_15" name="requires_payment">
+      <memberEnd xmi:idref="assoc_15_end1"/>
+      <memberEnd xmi:idref="assoc_15_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_15_end1" type="Payment" association="assoc_15">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_15_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_15_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_15_end2" type="Order" association="assoc_15">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_15_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_15_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_16" name="has_quiz">
+      <memberEnd xmi:idref="assoc_16_end1"/>
+      <memberEnd xmi:idref="assoc_16_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_16_end1" type="Quiz" association="assoc_16">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_16_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_16_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_16_end2" type="Lesson" association="assoc_16">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_16_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_16_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_17" name="has_assignment">
+      <memberEnd xmi:idref="assoc_17_end1"/>
+      <memberEnd xmi:idref="assoc_17_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_17_end1" type="Assignment" association="assoc_17">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_17_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_17_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_17_end2" type="Lesson" association="assoc_17">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_17_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_17_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_18" name="contains_msg">
+      <memberEnd xmi:idref="assoc_18_end1"/>
+      <memberEnd xmi:idref="assoc_18_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_18_end1" type="ChatMessage" association="assoc_18">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_18_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_18_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_18_end2" type="Conversation" association="assoc_18">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_18_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_18_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+    <packagedElement xmi:type="uml:Association" xmi:id="assoc_19" name="has_enrollment">
+      <memberEnd xmi:idref="assoc_19_end1"/>
+      <memberEnd xmi:idref="assoc_19_end2"/>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_19_end1" type="UserPathEnrollment" association="assoc_19">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_19_l1" value="0"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_19_u1" value="*"/>
+      </ownedEnd>
+      <ownedEnd xmi:type="uml:Property" xmi:id="assoc_19_end2" type="LearningPath" association="assoc_19">
+        <lowerValue xmi:type="uml:LiteralInteger" xmi:id="assoc_19_l2" value="1"/>
+        <upperValue xmi:type="uml:LiteralUnlimitedNatural" xmi:id="assoc_19_u2" value="1"/>
+      </ownedEnd>
+    </packagedElement>
+  </uml:Model>
+</xmi:XMI>

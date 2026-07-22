@@ -56,6 +56,41 @@ export interface LearningInsights {
   reminders: Array<{ type: string; message: string; priority: string }>;
 }
 
+// ==================== Career Path Types ====================
+
+export interface CareerPathCourse {
+  order: number;
+  courseId: string;
+  courseTitle: string;
+  status: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED';
+  currentProgress?: number;
+  skills: string[];
+  estimatedHours: number;
+  certificate: string;
+}
+
+export interface CareerPathRecommendation {
+  careerGoal: string;
+  matchedPath: {
+    pathId: string;
+    title: string;
+    description: string;
+    matchScore: number;
+    matchReason: string;
+  } | null;
+  roadmap: CareerPathCourse[];
+  totalEstimatedHours: number;
+  pathCertificate: string | null;
+  summary: string;
+  alternativePaths: Array<{
+    pathId: string;
+    title: string;
+    matchScore: number;
+    reason: string;
+  }>;
+  error?: boolean;
+}
+
 // ==================== AI Service ====================
 
 export const aiService = {
@@ -130,4 +165,16 @@ export const aiService = {
     const response = await aiApi.get('/api/ai/recommended-paths');
     return response.data.data;
   },
+
+  // ========== Phase 3: AI Career Path Recommendation ==========
+
+  /**
+   * Get AI-powered personalized career path recommendation
+   * Sends learner's career goal and gets a structured roadmap
+   */
+  getCareerPathRecommendation: async (goal: string): Promise<CareerPathRecommendation> => {
+    const response = await aiApi.post('/api/ai/career-path', { goal });
+    return response.data.data;
+  },
 };
+

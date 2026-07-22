@@ -60,7 +60,7 @@ export default function Header() {
     { name: 'Bài tập & Trắc nghiệm', href: '/tasks', icon: FiCheckSquare },
     { name: 'Tiến độ học tập', href: '/my-learning', icon: FiActivity },
     { name: 'Phân tích học tập', href: '/learning-analytics', icon: FiBarChart2 },
-    { name: 'Chứng chỉ', href: '/certificates', icon: FiAward },
+    { name: 'Chứng nhận', href: '/certificates', icon: FiAward },
     { name: 'Huy chương', href: '/badges', icon: FiAward },
     { name: 'Hoạt động', href: '/activity', icon: FiActivity },
     { name: 'AI Assistant', href: '/ai-assistant', icon: FiMessageSquare },

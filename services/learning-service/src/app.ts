@@ -23,7 +23,7 @@ import {
   handleValidationErrors,
 } from './middleware/validation.middleware';
 import logger from './utils/logger';
-import { initializeVideosBucket } from './config/minio.config';
+import { initializeVideosBucket, initializeCertificatesBucket } from './config/minio.config';
 import { videoUpload } from './config/multer.config';
 import { HLSQueueService } from './services/hls-queue.service';
 
@@ -39,6 +39,10 @@ const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'),
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
   message: { error: 'Too many requests, please try again later.' },
+  skip: (req) => {
+    const path = req.originalUrl || req.path;
+    return path.includes('/internal') || path.includes('/health');
+  }
 });
 app.use('/api/learning', limiter);
 
@@ -175,6 +179,28 @@ app.get('/api/learning/lessons/:lessonId/hls/key', hlsRateLimiter, HLSController
 import { FileController } from './controllers/file.controller';
 app.get('/api/learning/files/download', authenticateToken, fileRateLimiter, FileController.downloadFile);
 
+// ==================== Course Exam Routes ====================
+import { CourseExamController } from './controllers/course-exam.controller';
+app.get('/api/learning/exam/course/:courseId/result', authenticateToken, CourseExamController.getCourseExamResult);
+app.post('/api/learning/exam/course/:courseId/retake', authenticateToken, CourseExamController.retakeCourse);
+
+// ==================== Final Project Routes ====================
+import { FinalProjectController } from './controllers/final-project.controller';
+app.post('/api/learning/final-project/:pathId', authenticateToken, FinalProjectController.createFinalProject);
+app.get('/api/learning/final-project/:pathId', authenticateToken, FinalProjectController.getFinalProject);
+app.put('/api/learning/final-project/:projectId', authenticateToken, FinalProjectController.updateFinalProject);
+app.post('/api/learning/final-project/:projectId/submit', authenticateToken, FinalProjectController.submitFinalProject);
+app.post('/api/learning/final-project/:projectId/upload-url', authenticateToken, FinalProjectController.getUploadUrl);
+app.get('/api/learning/final-project/:projectId/submissions', authenticateToken, FinalProjectController.getSubmissions);
+app.get('/api/learning/final-project/:projectId/submission/me', authenticateToken, FinalProjectController.getUserSubmission);
+app.get('/api/learning/final-project/:projectId/submissions/me', authenticateToken, FinalProjectController.getUserSubmissions);
+app.put('/api/learning/final-project/submission/:submissionId/grade', authenticateToken, FinalProjectController.gradeSubmission);
+app.post('/api/learning/final-project/:submissionId/evaluate', authenticateToken, FinalProjectController.evaluateSubmission);
+app.get('/api/learning/final-project/:pathId/unlock-status', authenticateToken, FinalProjectController.getUnlockStatus);
+
+// ==================== Path Certificate Route ====================
+app.post('/api/learning/certificates/path/:pathId/generate', authenticateToken, CertificateController.generatePathCertificate);
+
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
@@ -182,6 +208,11 @@ app.use((req, res) => {
 // Initialize MinIO private video bucket on startup
 initializeVideosBucket().catch((err) => {
   logger.error('Failed to initialize MinIO video bucket:', err);
+});
+
+// Initialize MinIO public certificates bucket on startup
+initializeCertificatesBucket().catch((err) => {
+  logger.error('Failed to initialize MinIO certificates bucket:', err);
 });
 
 // Resume any pending HLS processing jobs from last run

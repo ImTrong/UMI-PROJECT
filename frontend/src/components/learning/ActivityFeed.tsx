@@ -38,7 +38,7 @@ export const ActivityFeed = ({ activities }: ActivityFeedProps) => {
       case 'LESSON_COMPLETE':
         return <span>Đã học xong bài <strong className="text-slate-900">{activity.metadata?.lessonTitle || 'Một bài học'}</strong></span>;
       case 'CERTIFICATE_GENERATED':
-        return <span>Nhận chứng chỉ tốt nghiệp khóa <strong className="text-teal-600">{activity.metadata?.courseTitle || 'Một khóa học'}</strong></span>;
+        return <span>Nhận chứng nhận hoàn thành khóa <strong className="text-teal-600">{activity.metadata?.courseTitle || 'Một khóa học'}</strong></span>;
       case 'BADGE_EARNED':
         return <span>Chinh phục huy hiệu mới <strong className="text-orange-600">{activity.metadata?.badgeName || 'Mới'}</strong></span>;
       default:

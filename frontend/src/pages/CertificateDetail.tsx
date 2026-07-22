@@ -26,7 +26,7 @@ export default function CertificateDetail() {
       setCertificate(cert);
     } catch (error: any) {
       console.error('Failed to load certificate:', error);
-      toast.error('Không tìm thấy chứng chỉ');
+      toast.error('Không tìm thấy chứng nhận/chứng chỉ');
       navigate('/certificates');
     } finally {
       setLoading(false);
@@ -38,9 +38,9 @@ export default function CertificateDetail() {
     setDownloading(true);
     try {
       await learningService.downloadCertificate(certificateId);
-      toast.success('Đã tải chứng chỉ thành công!');
+      toast.success('Đã tải thành công!');
     } catch (error) {
-      toast.error('Tải chứng chỉ thất bại. Vui lòng thử lại.');
+      toast.error('Tải thất bại. Vui lòng thử lại.');
     } finally {
       setDownloading(false);
     }
@@ -70,7 +70,7 @@ export default function CertificateDetail() {
     <div className="max-w-5xl mx-auto px-4 py-8">
       {/* Back button */}
       <Link to="/certificates" className="inline-flex items-center gap-2 text-slate-600 hover:text-primary-600 mb-6 transition-colors font-medium text-sm">
-        <FiArrowLeft /> Quay lại danh sách chứng chỉ
+        <FiArrowLeft /> Quay lại danh sách
       </Link>
 
       {/* Certificate Visual */}
@@ -123,7 +123,7 @@ export default function CertificateDetail() {
               </div>
             </div>
 
-            <p className="text-xs text-slate-400 font-mono">Mã chứng chỉ: {certificate.certificateNumber}</p>
+            <p className="text-xs text-slate-400 font-mono">Mã: {certificate.certificateNumber}</p>
           </div>
         </div>
 

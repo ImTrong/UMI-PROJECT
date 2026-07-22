@@ -1,10 +1,11 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, CertificateType } from '@prisma/client';
 import axios, { AxiosResponse } from 'axios';
 import { ERROR_MESSAGES } from '../utils/constants';
 import { CertificateGenerator } from '../utils/certificate-generator';
 import { ActivityService } from './activity.service';
 import { ActivityAction, CourseDetails, UserDetails, CertificateMetadata } from '../types';
 import logger from '../utils/logger';
+import { minioInternalClient, BUCKETS } from '../config/minio.config';
 
 const prisma = new PrismaClient();
 
@@ -17,8 +18,13 @@ export class CertificateService {
     if (!courseProgress) throw new Error(ERROR_MESSAGES.PROGRESS_NOT_FOUND);
     if (courseProgress.progressPercentage < 100) throw new Error(ERROR_MESSAGES.COURSE_NOT_COMPLETED);
 
-    const existing = await prisma.certificate.findUnique({
-      where: { userId_courseId: { userId, courseId } },
+    // Check if course is passed (quiz score check)
+    if (courseProgress.passed === false) {
+      throw new Error(ERROR_MESSAGES.COURSE_NOT_PASSED);
+    }
+
+    const existing = await prisma.certificate.findFirst({
+      where: { userId, courseId, learningPathId: null },
     });
     if (existing) return existing;
 
@@ -60,6 +66,7 @@ export class CertificateService {
         courseTitle: course.title,
         issueDate,
         verificationUrl,
+        type: 'COURSE_COMPLETION',
       });
     } catch (error) {
       logger.error('Failed to generate PDF:', error);
@@ -78,8 +85,11 @@ export class CertificateService {
         certificateNumber,
         userId,
         courseId,
+        learningPathId: null,
         courseTitle: course.title,
         userName: user.fullName,
+        type: CertificateType.COURSE_COMPLETION,
+        averageScore: courseProgress.averageQuizScore,
         issueDate,
         expiresAt,
         certificateUrl: pdfPath,
@@ -94,6 +104,120 @@ export class CertificateService {
       courseId,
       action: ActivityAction.CERTIFICATE_GENERATED,
       metadata: { certificateNumber, courseTitle: course.title },
+    });
+
+    return certificate;
+  }
+
+  /**
+   * Generate a PATH_CERTIFICATE (chứng chỉ) for completing a learning path
+   * Requires: path completed + final project score ≥ 80%
+   */
+  static async generatePathCertificate(userId: string, pathId: string) {
+    const path = await prisma.learningPath.findUnique({ where: { id: pathId } });
+    if (!path) throw new Error('Learning path not found');
+
+    const enrollment = await prisma.userPathEnrollment.findUnique({
+      where: { userId_learningPathId: { userId, learningPathId: pathId } },
+    });
+
+    if (!enrollment || enrollment.status !== 'COMPLETED') {
+      throw new Error(ERROR_MESSAGES.PATH_NOT_COMPLETED);
+    }
+
+    // Check final project score
+    const finalProject = await prisma.finalProject.findUnique({
+      where: { learningPathId: pathId },
+    });
+
+    let finalProjectScore: number | undefined;
+
+    if (finalProject) {
+      const submission = await prisma.finalProjectSubmission.findFirst({
+        where: { finalProjectId: finalProject.id, userId },
+        orderBy: { attemptNumber: 'desc' }
+      });
+
+      if (!submission || submission.status !== 'GRADED') {
+        throw new Error('Final project has not been graded yet');
+      }
+
+      const submissionScore = submission.totalScore ?? submission.score ?? 0;
+      const scorePercent = (submissionScore / finalProject.maxScore) * 100;
+      if (scorePercent < finalProject.passingScore) {
+        throw new Error(ERROR_MESSAGES.PROJECT_SCORE_NOT_ENOUGH);
+      }
+
+      finalProjectScore = submissionScore;
+    }
+
+    // Check if path certificate already exists
+    const existing = await prisma.certificate.findFirst({
+      where: { userId, courseId: null, learningPathId: pathId },
+    });
+    if (existing) return existing;
+
+    const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+    let user: UserDetails;
+    try {
+      const userRes: AxiosResponse<{ data: UserDetails[] }> = await axios.post(`${userServiceUrl}/api/users/batch`, { ids: [userId] });
+      user = userRes.data.data?.[0];
+      if (!user) throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+    } catch {
+      throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    const certificateNumber = this.generateCertificateNumber(userId, pathId);
+    const baseUrl = process.env.BASE_URL || 'http://localhost:3006';
+    const verificationUrl = `${baseUrl}/api/learning/certificates/verify/${certificateNumber}`;
+    const issueDate = new Date();
+    const expiresAt = new Date();
+    expiresAt.setFullYear(expiresAt.getFullYear() + 2); // Path certificates valid for 2 years
+
+    let pdfPath = '';
+    try {
+      pdfPath = await CertificateGenerator.generate({
+        certificateNumber,
+        userName: user.fullName,
+        courseTitle: path.title,
+        issueDate,
+        verificationUrl,
+        type: 'PATH_CERTIFICATE',
+      });
+    } catch (error) {
+      logger.error('Failed to generate path certificate PDF:', error);
+    }
+
+    const metadata: CertificateMetadata = {
+      pathTitle: path.title,
+      completionDate: enrollment.completedAt || undefined,
+      finalProjectScore,
+      grade: 'Pass',
+    };
+
+    const certificate = await prisma.certificate.create({
+      data: {
+        certificateNumber,
+        userId,
+        courseId: null,
+        learningPathId: pathId,
+        courseTitle: path.title,
+        userName: user.fullName,
+        type: CertificateType.PATH_CERTIFICATE,
+        averageScore: finalProjectScore,
+        issueDate,
+        expiresAt,
+        certificateUrl: pdfPath,
+        verificationUrl,
+        metadata,
+        isVerified: true,
+      },
+    });
+
+    await ActivityService.logActivity({
+      userId,
+      action: ActivityAction.PATH_CERTIFICATE_GENERATED,
+      metadata: { certificateNumber, pathTitle: path.title },
     });
 
     return certificate;
@@ -147,19 +271,28 @@ export class CertificateService {
   }
 
   /**
-   * Get certificate file path for download; re-generate if missing
+   * Get certificate file key for download; re-generate if missing in MinIO
    */
-  static async getCertificateFilePath(certificateId: string, userId: string): Promise<string> {
+  static async getCertificateFileKey(certificateId: string, userId: string): Promise<string> {
     const certificate = await this.getCertificateById(certificateId, userId);
 
-    let filePath = certificate.certificateUrl || '';
+    let fileKey = certificate.certificateUrl || '';
 
     // If file doesn't exist, try to regenerate
-    const fs = await import('fs');
-    if (!filePath || !fs.existsSync(filePath)) {
+    let exists = false;
+    if (fileKey) {
+      try {
+        await minioInternalClient.statObject(BUCKETS.CERTIFICATES, fileKey);
+        exists = true;
+      } catch (e) {
+        exists = false;
+      }
+    }
+
+    if (!exists) {
       logger.warn(`Certificate file missing for ${certificate.certificateNumber}, regenerating...`);
       try {
-        filePath = await CertificateGenerator.generate({
+        fileKey = await CertificateGenerator.generate({
           certificateNumber: certificate.certificateNumber,
           userName: certificate.userName,
           courseTitle: certificate.courseTitle,
@@ -170,7 +303,7 @@ export class CertificateService {
         // Update DB with new path
         await prisma.certificate.update({
           where: { id: certificateId },
-          data: { certificateUrl: filePath },
+          data: { certificateUrl: fileKey },
         });
       } catch (error) {
         logger.error('Failed to regenerate certificate PDF:', error);
@@ -178,7 +311,7 @@ export class CertificateService {
       }
     }
 
-    return filePath;
+    return fileKey;
   }
 
   static async verifyCertificate(certificateNumber: string) {

@@ -49,6 +49,9 @@ import InstructorCourseAssignments from './pages/instructor/InstructorCourseAssi
 import LearningPaths from './pages/LearningPaths'
 import LearningAnalytics from './pages/LearningAnalytics'
 import AIAssistant from './pages/AIAssistant'
+import CourseExamResult from './pages/CourseExamResult'
+import FinalProjectPage from './pages/FinalProjectPage'
+import CareerPathAdvisor from './pages/CareerPathAdvisor'
 
 function App() {
   const { isAuthenticated, loading } = useAuth()
@@ -184,6 +187,11 @@ function App() {
               <AIAssistant />
             </ProtectedRoute>
           } />
+          <Route path="/career-advisor" element={
+            <ProtectedRoute>
+              <CareerPathAdvisor />
+            </ProtectedRoute>
+          } />
           <Route path="/purchased-courses" element={
             <ProtectedRoute>
               <PurchasedCourses />
@@ -224,6 +232,16 @@ function App() {
           <Route path="/tasks/:taskId/assignment" element={
             <ProtectedRoute>
               <AssignmentPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/course-exam/:courseId" element={
+            <ProtectedRoute>
+              <CourseExamResult />
+            </ProtectedRoute>
+          } />
+          <Route path="/learning-paths/:pathId/final-project" element={
+            <ProtectedRoute>
+              <FinalProjectPage />
             </ProtectedRoute>
           } />
           

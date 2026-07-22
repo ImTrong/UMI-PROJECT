@@ -168,8 +168,8 @@ export default function Home() {
           <div className="w-14 h-14 bg-teal-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
             <FiAward className="w-6 h-6 text-teal-600" />
           </div>
-          <h3 className="text-xl font-bold text-slate-800 mb-3">Chứng chỉ uy tín</h3>
-          <p className="text-slate-600 leading-relaxed">Đạt được chứng chỉ hoàn thành khóa học để khẳng định năng lực và thăng tiến trong sự nghiệp của bạn.</p>
+          <h3 className="text-xl font-bold text-slate-800 mb-3">Chứng nhận & Chứng chỉ</h3>
+          <p className="text-slate-600 leading-relaxed">Đạt được chứng nhận hoàn thành khóa học và chứng chỉ lộ trình để khẳng định năng lực và thăng tiến trong sự nghiệp của bạn.</p>
         </div>
         <div className="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm hover:shadow-sm transition-shadow group">
           <div className="w-14 h-14 bg-cyan-50 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">

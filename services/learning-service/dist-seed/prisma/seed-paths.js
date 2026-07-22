@@ -160,6 +160,8 @@ async function main() {
                     difficulty: pathDef.diff,
                     courseIds: courseIdsToUse,
                     imageUrl: images[i % images.length],
+                    status: 'PUBLISHED',
+                    recommended: i === 0, // Recommend the first path in each category
                 },
             });
             count++;

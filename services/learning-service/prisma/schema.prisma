@@ -39,6 +39,11 @@ model CourseProgress {
   completedLessons    Int      @default(0)
   timeSpentSeconds    Int      @default(0)
   lastAccessedAt      DateTime @default(now())
+  averageQuizScore    Float?              // Điểm trung bình quiz của khóa
+  passed              Boolean?            // Khóa học đạt/không đạt
+  allowRetake         Boolean  @default(false) // Cho phép học lại miễn phí
+  passingScore        Float    @default(60)    // Ngưỡng điểm đạt (mặc định 60%)
+  retakeCount         Int      @default(0)     // Số lần đã học lại
   
   lessons             LessonProgress[]
   userProgress        UserProgress @relation(fields: [userId], references: [userId], onDelete: Cascade)
@@ -71,26 +76,36 @@ model LessonProgress {
 }
 
 model Certificate {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  certificateNumber String @unique
-  userId          String   @db.ObjectId
-  courseId        String   @db.ObjectId
-  courseTitle     String
+  id              String          @id @default(auto()) @map("_id") @db.ObjectId
+  certificateNumber String        @unique
+  userId          String          @db.ObjectId
+  courseId        String?         @db.ObjectId  // nullable for path certificates
+  learningPathId  String?         @db.ObjectId  // for path certificates
+  courseTitle     String                        // course title or path title
   userName        String
-  issueDate       DateTime @default(now())
+  type            CertificateType @default(COURSE_COMPLETION)
+  averageScore    Float?                        // Điểm trung bình
+  issueDate       DateTime        @default(now())
   expiresAt       DateTime?
   certificateUrl  String?
   verificationUrl String?
-  isVerified      Boolean  @default(true)
-  metadata        Json     @default("{}")
-  createdAt       DateTime @default(now())
+  isVerified      Boolean         @default(true)
+  metadata        Json            @default("{}")
+  createdAt       DateTime        @default(now())
   
   userProgress    UserProgress @relation(fields: [userId], references: [userId], onDelete: Cascade)
   
-  @@unique([userId, courseId])
+  @@unique([userId, courseId, learningPathId])
   @@index([userId])
   @@index([courseId])
+  @@index([learningPathId])
+  @@index([type])
   @@map("certificates")
+}
+
+enum CertificateType {
+  COURSE_COMPLETION   // Chứng nhận hoàn thành khóa học
+  PATH_CERTIFICATE    // Chứng chỉ hoàn thành lộ trình
 }
 
 model Badge {
@@ -327,3 +342,71 @@ model StudySchedule {
 
   @@map("study_schedules")
 }
+
+// ==================== Final Project (Lộ trình) ====================
+
+model FinalProject {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  learningPathId  String   @db.ObjectId
+  title           String
+  description     String
+  instructions    String?
+  objectives      String?              // Mục tiêu đầu ra cần đạt
+  references      Json?                // Tài liệu tham khảo [{title, url}]
+  maxScore        Float    @default(100)
+  passingScore    Float    @default(80)   // ≥80% để nhận chứng chỉ
+  allowedFileTypes String[] @default(["pdf", "doc", "docx", "zip", "rar", "png", "jpg"])
+  maxFileSizeMB   Int      @default(50)
+  maxAttempts     Int      @default(3)    // Số lần được phép nộp lại
+  deadline        DateTime?              // Thời hạn nộp bài
+  evaluationPipeline Json?              // Evaluation Pipeline (Array of Stage objects)
+  // evaluationPipeline structure:
+  // [{
+  //   stageNumber: 1,
+  //   title: "Kiểm tra cấu trúc Project",
+  //   objective: "Đảm bảo project có cấu trúc folder chuẩn",
+  //   criteria: "README.md, src/, package.json tồn tại",
+  //   maxScore: 20,
+  //   weight: 0.15,
+  //   passCriteria: "Đạt ≥ 70% tiêu chí"
+  // }]
+  createdBy       String   @db.ObjectId
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  submissions     FinalProjectSubmission[]
+
+  @@unique([learningPathId])
+  @@map("final_projects")
+}
+
+model FinalProjectSubmission {
+  id              String           @id @default(auto()) @map("_id") @db.ObjectId
+  finalProjectId  String           @db.ObjectId
+  userId          String           @db.ObjectId
+  learningPathId  String           @db.ObjectId
+  attemptNumber   Int              @default(1)    // Lần nộp thứ mấy
+  content         String?          // Text content / description
+  githubUrl       String?          // Link GitHub repo
+  demoUrl         String?          // Link Demo
+  fileUrl         String?          // MinIO file URL
+  fileKey         String?          // MinIO file key
+  fileName        String?
+  status          SubmissionStatus @default(SUBMITTED)
+  score           Float?
+  totalScore      Float?           // Tổng điểm tính theo trọng số pipeline
+  stageResults    Json?            // Kết quả từng stage [{stageNumber, title, score, maxScore, weightedScore, passed, feedback, details}]
+  feedback        String?
+  aiFeedback      String?          // AI-generated feedback report
+  gradedBy        String?          @db.ObjectId
+  gradedAt        DateTime?
+  submittedAt     DateTime         @default(now())
+
+  finalProject    FinalProject @relation(fields: [finalProjectId], references: [id], onDelete: Cascade)
+
+  @@unique([finalProjectId, userId, attemptNumber])
+  @@index([userId])
+  @@index([learningPathId])
+  @@map("final_project_submissions")
+}
+

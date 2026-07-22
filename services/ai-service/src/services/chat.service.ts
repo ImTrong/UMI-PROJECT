@@ -6,6 +6,9 @@ import {
   LEARNING_SUMMARY_PROMPT,
   RECOMMENDATION_PROMPT,
   COACH_PROMPT,
+  CAREER_PATH_PROMPT,
+  EVALUATION_PIPELINE_PROMPT,
+  FEEDBACK_REPORT_PROMPT,
 } from '../utils/system-prompt';
 import logger from '../utils/logger';
 
@@ -292,7 +295,7 @@ export class ChatService {
     }
 
     const availablePathsString = availablePaths.map((p: any) => 
-      `- ID: ${p.id} | Tên lộ trình: "${p.title}" | Độ khó: ${p.difficulty} | Mục tiêu: ${p.careerGoal || 'N/A'}`
+      `- ID: ${p.id} | Tên lộ trình: "${p.title}" | Danh mục: ${p.category || 'N/A'} | Độ khó: ${p.difficulty} | Mục tiêu: ${p.careerGoal || 'N/A'} | Kỹ năng: [${(p.skills || []).join(', ')}]`
     ).join('\n');
 
     let prompt = require('../utils/system-prompt').RECOMMEND_PATHS_PROMPT;
@@ -334,5 +337,231 @@ export class ChatService {
       logger.error('Failed to parse AI path recommendations:', error);
       return [];
     }
+  }
+
+  /**
+   * Generate AI-powered career path recommendation
+   * Analyzes learner's current state + career goal → structured roadmap
+   */
+  static async generateCareerPathRecommendation(userId: string, careerGoal: string, token: string) {
+    // 1. Get extended context with quiz scores, certificates, and detailed paths
+    const context = await LearningContextService.getExtendedContext(userId, token);
+    const contextString = LearningContextService.buildContextString(context);
+
+    // 2. Build certificates string
+    const certificatesString = context.certificates.length > 0
+      ? context.certificates.map((c) =>
+          `- "${c.courseTitle}" (${c.type}) — Ngày cấp: ${c.issueDate}`
+        ).join('\n')
+      : '(Chưa có chứng nhận nào)';
+
+    // 3. Build quiz scores string
+    const quizScoresString = context.quizScores.length > 0
+      ? context.quizScores.map((q) =>
+          `- ${q.quizTitle} — Điểm: ${q.score}% — ${q.passed ? 'Đạt ✓' : 'Chưa đạt ✗'}`
+        ).join('\n')
+      : '(Chưa có kết quả quiz)';
+
+    // 4. Build detailed paths string (enriched with certificate & finalProject)
+    const detailedPathsString = context.detailedPaths.length > 0
+      ? context.detailedPaths.map((p) => {
+          const courses = p.courseDetails.map((c) =>
+            `    + CourseID: ${c.courseId} | "${c.title}" (${c.level})`
+          ).join('\n');
+          const certInfo = p.certificateName ? `\n  Chứng chỉ khi hoàn thành: "${p.certificateName}"` : '';
+          const projectInfo = p.finalProject
+            ? `\n  Final Project: "${p.finalProject.title}" — ${p.finalProject.objectives} (Ngưỡng đạt: ${p.finalProject.passingScore}%)`
+            : '';
+          const shortDescInfo = p.shortDescription ? `\n  Tóm tắt: ${p.shortDescription}` : '';
+          return `- PathID: ${p.id} | "${p.title}" | Danh mục: ${p.category} | Độ khó: ${p.difficulty} | Mục tiêu: ${p.careerGoal || 'N/A'} | Kỹ năng: [${p.skills.join(', ')}] | Thời lượng: ${p.totalDurationMinutes} phút${shortDescInfo}${certInfo}${projectInfo}\n  Các khóa học trong lộ trình (theo thứ tự học):\n${courses}`;
+        }).join('\n')
+      : '(Không có lộ trình nào)';
+
+    // 5. Build available courses string
+    const availableCoursesString = context.availableCourses.length > 0
+      ? context.availableCourses.map((c) =>
+          `- CourseID: ${c.id} | "${c.title}" | Danh mục: ${c.category} | Cấp độ: ${c.level}`
+        ).join('\n')
+      : '(Không có khóa học nào)';
+
+    // 6. Build prompt
+    let prompt = CAREER_PATH_PROMPT;
+    prompt = prompt.replace('{CAREER_GOAL}', careerGoal);
+    prompt = prompt.replace('{LEARNER_CONTEXT}', contextString);
+    prompt = prompt.replace('{CERTIFICATES}', certificatesString);
+    prompt = prompt.replace('{QUIZ_SCORES}', quizScoresString);
+    prompt = prompt.replace('{AVAILABLE_PATHS}', detailedPathsString);
+    prompt = prompt.replace('{AVAILABLE_COURSES}', availableCoursesString);
+
+    // 7. Call Gemini
+    const response = await geminiService.generateResponse(
+      prompt,
+      [],
+      `Hãy phân tích mục tiêu "${careerGoal}" và trả về lộ trình JSON.`
+    );
+
+    // 8. Parse JSON response (with cleanup)
+    let jsonStr = response.trim();
+    // Remove markdown code block wrapping if present
+    if (jsonStr.startsWith('```json')) {
+      jsonStr = jsonStr.substring(7);
+    } else if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.substring(3);
+    }
+    if (jsonStr.endsWith('```')) {
+      jsonStr = jsonStr.substring(0, jsonStr.length - 3);
+    }
+    jsonStr = jsonStr.trim();
+
+    try {
+      const result = JSON.parse(jsonStr);
+
+      // Validate essential fields exist
+      if (!result.careerGoal || !result.roadmap) {
+        throw new Error('Invalid response structure from AI');
+      }
+
+      return result;
+    } catch (parseError) {
+      logger.error('Failed to parse career path JSON:', parseError);
+      logger.error('Raw AI response:', response.substring(0, 500));
+
+      // Return a graceful fallback
+      return {
+        careerGoal,
+        matchedPath: null,
+        roadmap: [],
+        totalEstimatedHours: 0,
+        pathCertificate: null,
+        summary: 'Xin lỗi, AI không thể tạo lộ trình lúc này. Vui lòng thử lại.',
+        alternativePaths: [],
+        error: true,
+      };
+    }
+  }
+
+  /**
+   * Evaluate a submission through the AI evaluation pipeline
+   * Runs each stage sequentially, then generates a feedback report
+   */
+  static async evaluateSubmission(
+    submissionContent: string,
+    projectInfo: { title: string; description: string; instructions: string; objectives: string },
+    evaluationPipeline: {
+      stageNumber: number;
+      title: string;
+      objective: string;
+      criteria: string;
+      maxScore: number;
+      weight: number;
+      passCriteria: string;
+    }[],
+    passingScore: number = 80
+  ) {
+    logger.info(`Starting AI evaluation pipeline with ${evaluationPipeline.length} stages`);
+
+    const projectInfoStr = [
+      `Tên project: ${projectInfo.title}`,
+      `Mô tả: ${projectInfo.description}`,
+      projectInfo.instructions ? `Hướng dẫn: ${projectInfo.instructions}` : '',
+      projectInfo.objectives ? `Mục tiêu đầu ra: ${projectInfo.objectives}` : '',
+    ].filter(Boolean).join('\n');
+
+    const stageResults: any[] = [];
+
+    // Evaluate each stage sequentially
+    for (const stage of evaluationPipeline) {
+      logger.info(`Evaluating stage ${stage.stageNumber}: ${stage.title}`);
+
+      const stageConfigStr = [
+        `Stage ${stage.stageNumber}: ${stage.title}`,
+        `Mục tiêu: ${stage.objective}`,
+        `Tiêu chí đánh giá: ${stage.criteria}`,
+        `Điểm tối đa: ${stage.maxScore}`,
+        `Trọng số: ${stage.weight}`,
+        `Điều kiện đạt: ${stage.passCriteria}`,
+      ].join('\n');
+
+      let prompt = EVALUATION_PIPELINE_PROMPT;
+      prompt = prompt.replace('{PROJECT_INFO}', projectInfoStr);
+      prompt = prompt.replace('{SUBMISSION_CONTENT}', submissionContent);
+      prompt = prompt.replace('{STAGE_CONFIG}', stageConfigStr);
+
+      try {
+        const response = await geminiService.generateResponse(
+          prompt,
+          [],
+          `Đánh giá stage ${stage.stageNumber}: ${stage.title}`
+        );
+
+        // Parse JSON response
+        let jsonStr = response.trim();
+        if (jsonStr.startsWith('```json')) jsonStr = jsonStr.substring(7);
+        else if (jsonStr.startsWith('```')) jsonStr = jsonStr.substring(3);
+        if (jsonStr.endsWith('```')) jsonStr = jsonStr.substring(0, jsonStr.length - 3);
+        jsonStr = jsonStr.trim();
+
+        const stageResult = JSON.parse(jsonStr);
+
+        // Calculate weighted score
+        const weightedScore = (stageResult.score / stage.maxScore) * stage.weight * 100;
+        stageResult.weightedScore = Math.round(weightedScore * 100) / 100;
+        stageResult.maxScore = stage.maxScore;
+
+        stageResults.push(stageResult);
+        logger.info(`Stage ${stage.stageNumber} result: score=${stageResult.score}/${stage.maxScore}, passed=${stageResult.passed}`);
+      } catch (stageError: any) {
+        logger.error(`Failed to evaluate stage ${stage.stageNumber}:`, stageError);
+
+        // Add a failed stage result
+        stageResults.push({
+          stageNumber: stage.stageNumber,
+          title: stage.title,
+          score: 0,
+          maxScore: stage.maxScore,
+          weightedScore: 0,
+          passed: false,
+          feedback: 'Không thể đánh giá stage này. Vui lòng thử lại.',
+          details: ['❌ Lỗi hệ thống khi đánh giá'],
+        });
+      }
+    }
+
+    // Calculate total score (weighted sum)
+    const totalScore = Math.round(stageResults.reduce((sum, r) => sum + (r.weightedScore || 0), 0) * 100) / 100;
+    const passed = totalScore >= passingScore;
+
+    // Generate comprehensive feedback report
+    let feedbackReport = '';
+    try {
+      const stageResultsStr = stageResults.map(r =>
+        `Stage ${r.stageNumber} (${r.title}): ${r.score}/${r.maxScore} — ${r.passed ? 'ĐẠT' : 'CHƯA ĐẠT'}\n  ${r.feedback}`
+      ).join('\n\n');
+
+      let feedbackPrompt = FEEDBACK_REPORT_PROMPT;
+      feedbackPrompt = feedbackPrompt.replace('{PROJECT_INFO}', projectInfoStr);
+      feedbackPrompt = feedbackPrompt.replace('{STAGE_RESULTS}', stageResultsStr);
+      feedbackPrompt = feedbackPrompt.replace('{TOTAL_SCORE}', String(totalScore));
+      feedbackPrompt = feedbackPrompt.replace('{PASSING_SCORE}', String(passingScore));
+
+      feedbackReport = await geminiService.generateResponse(
+        feedbackPrompt,
+        [],
+        'Viết báo cáo phản hồi chi tiết cho học viên.'
+      );
+    } catch (feedbackError) {
+      logger.error('Failed to generate feedback report:', feedbackError);
+      feedbackReport = `Tổng điểm: ${totalScore}%. ${passed ? 'Chúc mừng bạn đã đạt!' : 'Bạn cần cải thiện để đạt yêu cầu.'}`;
+    }
+
+    const result = {
+      stageResults,
+      totalScore,
+      passed,
+      feedbackReport,
+    };
+
+    logger.info(`Evaluation complete: totalScore=${totalScore}%, passed=${passed}`);
+    return result;
   }
 }

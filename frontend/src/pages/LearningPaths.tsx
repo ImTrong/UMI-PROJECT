@@ -7,9 +7,9 @@ import {
   EnrolledPathSummary,
   PathFilters,
 } from '../services/recommendation.service';
-import { FiMap, FiArrowRight, FiBookOpen, FiAward, FiCompass, FiTarget, FiArrowLeft, FiLogOut, FiZap, FiClock } from 'react-icons/fi';
+import { FiMap, FiArrowRight, FiBookOpen, FiAward, FiCompass, FiTarget, FiArrowLeft, FiLogOut, FiZap, FiClock, FiStar } from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import LearningPathCard from '../components/learning/LearningPathCard';
 import SkillsChart from '../components/learning/SkillsChart';
 
@@ -45,10 +45,19 @@ export default function LearningPaths() {
   const [loading, setLoading] = useState(true);
   const [showCelebration, setShowCelebration] = useState(false);
 
+  const location = useLocation();
+
   useEffect(() => {
-    loadDashboardData();
+    loadDashboardData().then(() => {
+      // Check if navigated from Career Advisor with a specific path
+      if (location.state?.selectedPathId) {
+        handleSelectPath(location.state.selectedPathId);
+        // Clear state so it doesn't reopen if user goes back
+        window.history.replaceState({}, document.title);
+      }
+    });
     loadAIRecommendations();
-  }, []);
+  }, [location.state?.selectedPathId]);
 
   // Reload paths when filters change
   useEffect(() => {
@@ -167,8 +176,15 @@ export default function LearningPaths() {
     if (!selectedPath) return;
     try {
       setEnrolling(true);
-      await recommendationService.enrollInPath(selectedPath.id);
-      toast.success(`Đăng ký lộ trình "${selectedPath.title}" thành công!`);
+      const res = await recommendationService.enrollInPath(selectedPath.id);
+      
+      if (res?.status === 'COMPLETED') {
+        setShowCelebration(true);
+        toast.success(`Đăng ký thành công! Bạn đã hoàn thành tất cả khóa học trong lộ trình!`);
+      } else {
+        toast.success(`Đăng ký lộ trình "${selectedPath.title}" thành công!`);
+      }
+
       loadPathDetail(selectedPath.id);
       // Refresh enrolled paths
       const enrolled = await recommendationService.getMyEnrolledPaths().catch(() => []);
@@ -246,15 +262,17 @@ export default function LearningPaths() {
           }}
           onEnroll={handleEnroll}
           onUnenroll={handleUnenroll}
+          onShowCelebration={() => setShowCelebration(true)}
         />
       )}
 
       {/* Celebration Modal */}
-      <PathCompletionCelebration
-        isOpen={showCelebration}
-        pathTitle={selectedPath?.title || detail?.path.title || ''}
-        onClose={() => setShowCelebration(false)}
-      />
+        <PathCompletionCelebration
+          isOpen={showCelebration}
+          pathId={selectedPath?.id || ''}
+          pathTitle={selectedPath?.title || ''}
+          onClose={() => setShowCelebration(false)}
+        />
     </div>
   );
 }
@@ -326,6 +344,32 @@ function DashboardView({
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* AI Career Path Advisor Banner */}
+      <div className="mb-8 bg-gradient-to-r from-indigo-900 via-purple-900 to-indigo-900 rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-lg border border-indigo-500/30">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl -mr-20 -mt-20"></div>
+        <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center flex-shrink-0 border border-white/20">
+              <FiZap className="w-6 h-6 text-yellow-400" />
+            </div>
+            <div>
+              <h2 className="text-xl md:text-2xl font-bold mb-1.5 flex items-center gap-2">
+                AI Gợi Ý Lộ Trình Học Tập <span className="bg-gradient-to-r from-yellow-400 to-amber-500 text-transparent bg-clip-text text-sm font-black uppercase tracking-wider">Mới</span>
+              </h2>
+              <p className="text-indigo-200 text-sm md:text-base max-w-xl">
+                Bạn muốn trở thành chuyên gia trong lĩnh vực nào? Hãy để AI phân tích năng lực và xây dựng lộ trình học tập cá nhân hóa cho riêng bạn.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/career-advisor"
+            className="flex-shrink-0 inline-flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-white font-bold rounded-xl transition-all duration-300 shadow-[0_0_20px_rgba(168,85,247,0.3)] hover:shadow-[0_0_30px_rgba(168,85,247,0.5)] active:scale-95"
+          >
+            Tìm Lộ Trình Ngay <FiArrowRight className="w-5 h-5" />
+          </Link>
         </div>
       </div>
 
@@ -525,6 +569,7 @@ interface PathDetailViewProps {
   onSelectPath: (path: LearningPath) => void;
   onEnroll: () => void;
   onUnenroll: () => void;
+  onShowCelebration: () => void;
 }
 
 function PathDetailView({
@@ -538,6 +583,7 @@ function PathDetailView({
   onSelectPath,
   onEnroll,
   onUnenroll,
+  onShowCelebration,
 }: PathDetailViewProps) {
   return (
     <>
@@ -667,9 +713,12 @@ function PathDetailView({
                       {enrolling ? 'Đang đăng ký...' : 'Đăng Ký Theo Dõi Lộ Trình'}
                     </button>
                   ) : detail.enrollment.status === 'COMPLETED' ? (
-                    <div className="w-full py-2.5 text-center bg-emerald-500/20 text-emerald-300 rounded-xl text-xs font-bold border border-emerald-500/20">
-                      🏆 Đã hoàn thành lộ trình
-                    </div>
+                    <button
+                      onClick={onShowCelebration}
+                      className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-xl text-xs font-bold border border-amber-500/20 shadow-sm transition duration-200 active:scale-[0.98] cursor-pointer"
+                    >
+                      🏆 Nhận Chứng Chỉ Lộ Trình
+                    </button>
                   ) : (
                     <div className="space-y-2">
                       <div className="w-full py-2.5 text-center bg-emerald-500/20 text-emerald-300 rounded-xl text-xs font-bold border border-emerald-500/20">
@@ -710,6 +759,46 @@ function PathDetailView({
             milestones={detail?.milestones || []}
             isLoading={detailLoading}
           />
+
+          {/* Final Project Preview */}
+          {!detailLoading && detail?.finalProject && (
+            <div className="mt-8 pt-8 border-t border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <FiStar className="text-amber-500" /> Project Cuối Kỳ
+              </h3>
+              
+              <div className="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-100 rounded-2xl p-6 relative overflow-hidden">
+                <div className="absolute right-0 top-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                
+                <div className="relative z-10 flex flex-col md:flex-row gap-6 items-start">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center flex-shrink-0 text-white shadow-sm">
+                    <FiAward size={32} />
+                  </div>
+                  
+                  <div className="flex-1">
+                    <h4 className="text-xl font-bold text-slate-900 mb-2">{detail.finalProject.title}</h4>
+                    <p className="text-sm text-slate-600 mb-4">{detail.finalProject.description}</p>
+                    
+                    <div className="flex flex-wrap gap-3 mb-6">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-lg border border-indigo-100 text-xs font-semibold text-indigo-700">
+                        <FiTarget /> Ngưỡng qua môn: {detail.finalProject.passingScore}%
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-lg border border-indigo-100 text-xs font-semibold text-indigo-700">
+                        <FiClock /> Số lần nộp: {detail.finalProject.maxAttempts}
+                      </span>
+                    </div>
+
+                    <Link
+                      to={`/learning-paths/${detail.path.id}/final-project`}
+                      className="inline-flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl shadow-sm transition-all duration-300 active:scale-95 text-sm"
+                    >
+                      Xem chi tiết & Làm bài <FiArrowRight />
+                    </Link>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

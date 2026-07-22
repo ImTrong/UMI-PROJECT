@@ -40,7 +40,7 @@ export default function CertificateVerify() {
       const res = await learningService.verifyCertificate(searchNumber);
       setResult(res);
     } catch (error) {
-      setResult({ valid: false, message: 'Không thể xác minh chứng chỉ. Vui lòng kiểm tra lại mã.' });
+      setResult({ valid: false, message: 'Không thể xác minh. Vui lòng kiểm tra lại mã.' });
     } finally {
       setLoading(false);
     }
@@ -53,8 +53,8 @@ export default function CertificateVerify() {
         <div className="mx-auto w-16 h-16 bg-gradient-to-br from-primary-500 to-cyan-600 rounded-2xl flex items-center justify-center shadow-sm shadow-primary-500/20 mb-5">
           <FiAward className="text-white" size={30} />
         </div>
-        <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Xác minh Chứng chỉ</h1>
-        <p className="text-slate-500 max-w-md mx-auto">Nhập mã chứng chỉ để xác minh tính hợp lệ của chứng chỉ khóa học</p>
+        <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Xác minh Chứng nhận / Chứng chỉ</h1>
+        <p className="text-slate-500 max-w-md mx-auto">Nhập mã để xác minh tính hợp lệ của chứng nhận khóa học hoặc chứng chỉ lộ trình</p>
       </div>
 
       {/* Search box */}
@@ -66,7 +66,7 @@ export default function CertificateVerify() {
               type="text"
               value={certNumber}
               onChange={(e) => setCertNumber(e.target.value)}
-              placeholder="Nhập mã chứng chỉ (VD: CERT-1234...)"
+              placeholder="Nhập mã chứng nhận/chứng chỉ (VD: CERT-1234...)"
               className="w-full pl-11 pr-4 py-3.5 border border-slate-100 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-sm font-mono shadow-sm"
             />
           </div>
@@ -92,8 +92,8 @@ export default function CertificateVerify() {
               {/* Valid header */}
               <div className="bg-gradient-to-r from-green-500 to-emerald-500 p-6 text-center text-white">
                 <FiCheckCircle size={40} className="mx-auto mb-3" />
-                <h2 className="text-xl font-bold">Chứng chỉ hợp lệ ✓</h2>
-                <p className="text-green-100 text-sm mt-1">Chứng chỉ này đã được xác minh thành công</p>
+                <h2 className="text-xl font-bold">Hợp lệ ✓</h2>
+                <p className="text-green-100 text-sm mt-1">Chứng nhận / chứng chỉ này đã được xác minh thành công</p>
               </div>
 
               {/* Certificate info */}
@@ -148,12 +148,12 @@ export default function CertificateVerify() {
             <div className="bg-white rounded-2xl border border-red-200 shadow-sm shadow-red-500/10 overflow-hidden">
               <div className="bg-gradient-to-r from-red-500 to-rose-500 p-6 text-center text-white">
                 <FiXCircle size={40} className="mx-auto mb-3" />
-                <h2 className="text-xl font-bold">Chứng chỉ không hợp lệ</h2>
+                <h2 className="text-xl font-bold">Không hợp lệ</h2>
                 <p className="text-red-100 text-sm mt-1">{result.message}</p>
               </div>
               <div className="p-6 text-center">
                 <p className="text-slate-600 text-sm">
-                  Chứng chỉ với mã "<span className="font-mono font-bold">{certNumber}</span>" không tồn tại, đã bị thu hồi hoặc đã hết hạn.
+                  Mã "<span className="font-mono font-bold">{certNumber}</span>" không tồn tại, đã bị thu hồi hoặc đã hết hạn.
                 </p>
               </div>
             </div>

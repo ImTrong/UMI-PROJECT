@@ -63,6 +63,15 @@ export interface PathDetailResponse {
     progressPercentage: number;
   };
   summary: PathSummary;
+  finalProject?: {
+    id: string;
+    title: string;
+    description: string;
+    objectives?: string;
+    maxScore: number;
+    passingScore: number;
+    maxAttempts: number;
+  };
 }
 
 export interface CategoryInsight {

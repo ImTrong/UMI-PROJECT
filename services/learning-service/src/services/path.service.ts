@@ -124,6 +124,20 @@ export class PathService {
     let enrollment = null;
     let completedCoursesCount = 0;
 
+    // Get final project earlier so we can check it
+    const finalProject = await prisma.finalProject.findUnique({
+      where: { learningPathId: pathId },
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        objectives: true,
+        maxScore: true,
+        passingScore: true,
+        maxAttempts: true
+      }
+    });
+
     if (userId) {
       // Check path enrollment
       enrollment = await prisma.userPathEnrollment.findUnique({
@@ -139,7 +153,14 @@ export class PathService {
       });
 
       // Check if path is fully completed and update status
-      const prerequisiteRules: any[] = (path as any).prerequisiteRules || [];
+      let prerequisiteRules: any[] = [];
+      try {
+        if (Array.isArray((path as any).prerequisiteRules)) {
+          prerequisiteRules = (path as any).prerequisiteRules;
+        }
+      } catch (e) {
+        logger.warn('Failed to parse prerequisiteRules for path', path.id);
+      }
 
       milestones = milestones.map((m) => {
         const prog = progresses.find((p) => p.courseId === m.courseId);
@@ -189,10 +210,39 @@ export class PathService {
         completedCoursesCount === path.courseIds.length &&
         path.courseIds.length > 0
       ) {
-        enrollment = await prisma.userPathEnrollment.update({
-          where: { id: enrollment.id },
-          data: { status: 'COMPLETED', completedAt: new Date() },
-        });
+        let shouldComplete = true;
+
+        if (finalProject) {
+          // Check if there's a passing submission
+          const passingSubmission = await prisma.finalProjectSubmission.findFirst({
+            where: {
+              finalProjectId: finalProject.id,
+              userId,
+              status: 'GRADED',
+              totalScore: { gte: finalProject.passingScore }
+            }
+          });
+
+          if (!passingSubmission) {
+            shouldComplete = false;
+          }
+        }
+
+        if (shouldComplete) {
+          enrollment = await prisma.userPathEnrollment.update({
+            where: { id: enrollment.id },
+            data: { status: 'COMPLETED', completedAt: new Date() },
+          });
+
+          // Auto-generate certificate
+          try {
+            const { CertificateService } = require('./certificate.service');
+            await CertificateService.generatePathCertificate(userId, pathId);
+            logger.info(`Auto-generated certificate for user ${userId} completing path ${pathId} upon detail view`);
+          } catch (err) {
+            logger.error(`Error auto-generating certificate for path ${pathId}:`, err);
+          }
+        }
       }
     }
 
@@ -203,6 +253,8 @@ export class PathService {
     const totalEstimatedHours = milestones.reduce((sum, m) => sum + m.estimatedHours, 0);
     const totalPrice = milestones.reduce((sum, m) => sum + m.price, 0);
     const totalLessons = milestones.reduce((sum, m) => sum + m.totalLessons, 0);
+
+    // Final project was queried above
 
     return {
       path,
@@ -219,6 +271,7 @@ export class PathService {
         totalLessons,
         totalMilestones: path.courseIds.length,
       },
+      finalProject,
     };
   }
 
@@ -251,9 +304,30 @@ export class PathService {
     });
 
     const completedCount = progresses.filter((p) => p.progressPercentage >= 100).length;
-    const isCompleted = completedCount === path.courseIds.length && path.courseIds.length > 0;
+    let isCompleted = completedCount === path.courseIds.length && path.courseIds.length > 0;
 
-    return prisma.userPathEnrollment.create({
+    if (isCompleted) {
+      const finalProject = await prisma.finalProject.findUnique({
+        where: { learningPathId: pathId }
+      });
+      
+      if (finalProject) {
+        const passingSubmission = await prisma.finalProjectSubmission.findFirst({
+          where: {
+            finalProjectId: finalProject.id,
+            userId,
+            status: 'GRADED',
+            totalScore: { gte: finalProject.passingScore }
+          }
+        });
+        
+        if (!passingSubmission) {
+          isCompleted = false;
+        }
+      }
+    }
+
+    const enrollment = await prisma.userPathEnrollment.create({
       data: {
         userId,
         learningPathId: pathId,
@@ -261,6 +335,28 @@ export class PathService {
         completedAt: isCompleted ? new Date() : null,
       },
     });
+
+    if (isCompleted) {
+      try {
+        const { CertificateService } = require('./certificate.service');
+        await CertificateService.generatePathCertificate(userId, pathId);
+        logger.info(`Auto-generated certificate for user ${userId} completing path ${pathId} on enrollment`);
+        
+        // Notify user
+        const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+        await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+          userId,
+          title: '🎉 Lộ trình hoàn thành!',
+          message: `Chúc mừng bạn đã hoàn thành lộ trình "${path.title}". Chứng chỉ lộ trình của bạn đã được tạo!`,
+          type: 'SUCCESS',
+          link: '/certificates',
+        });
+      } catch (err: any) {
+        logger.error(`Error auto-generating certificate for path ${pathId}:`, err);
+      }
+    }
+
+    return enrollment;
   }
 
   /**
@@ -313,11 +409,40 @@ export class PathService {
         const completedCount = progresses.filter((p) => p.progressPercentage >= 100).length;
 
         if (completedCount === path.courseIds.length && path.courseIds.length > 0) {
+          // Check if path has a final project
+          const finalProject = await prisma.finalProject.findUnique({
+            where: { learningPathId: path.id }
+          });
+          
+          if (finalProject) {
+            // Path has final project, do not auto-complete path here.
+            // Completing all courses only unlocks the final project.
+            continue;
+          }
           await prisma.userPathEnrollment.update({
             where: { id: enrollment.id },
             data: { status: 'COMPLETED', completedAt: new Date() },
           });
           logger.info(`Path ${path.id} completed by user ${userId}`);
+
+          // Auto-generate certificate and notify
+          try {
+            const { CertificateService } = require('./certificate.service');
+            await CertificateService.generatePathCertificate(userId, path.id);
+            logger.info(`Auto-generated certificate for user ${userId} completing path ${path.id}`);
+            
+            // Notify user
+            const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+            await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+              userId,
+              title: '🎉 Lộ trình hoàn thành!',
+              message: `Chúc mừng bạn đã hoàn thành lộ trình "${path.title}". Chứng chỉ lộ trình của bạn đã được tạo!`,
+              type: 'SUCCESS',
+              link: '/certificates',
+            });
+          } catch (err: any) {
+            logger.error(`Error auto-generating certificate for path ${path.id}:`, err);
+          }
         }
       }
     } catch (error) {

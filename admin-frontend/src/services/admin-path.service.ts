@@ -74,5 +74,59 @@ export const adminPathService = {
   duplicatePath: async (id: string) => {
     const response = await learningApi.post(`/api/learning/admin/paths/${id}/duplicate`);
     return response.data.data;
-  }
+  },
+
+  // ==================== Final Project Admin Methods ====================
+
+  getFinalProject: async (pathId: string): Promise<AdminFinalProject | null> => {
+    try {
+      const response = await learningApi.get(`/api/learning/final-project/${pathId}`);
+      return response.data.data;
+    } catch (err: any) {
+      if (err.response?.status === 404) return null;
+      throw err;
+    }
+  },
+
+  createFinalProject: async (pathId: string, data: Partial<AdminFinalProject>): Promise<AdminFinalProject> => {
+    const response = await learningApi.post(`/api/learning/final-project/${pathId}`, {
+      ...data,
+      learningPathId: pathId,
+    });
+    return response.data.data;
+  },
+
+  updateFinalProject: async (projectId: string, data: Partial<AdminFinalProject>): Promise<AdminFinalProject> => {
+    const response = await learningApi.put(`/api/learning/final-project/${projectId}`, data);
+    return response.data.data;
+  },
 };
+
+export interface AdminFinalProject {
+  id: string;
+  learningPathId: string;
+  title: string;
+  description: string;
+  instructions?: string;
+  objectives?: string;
+  references?: { title: string; url: string }[];
+  maxScore: number;
+  passingScore: number;
+  allowedFileTypes: string[];
+  maxFileSizeMB: number;
+  maxAttempts: number;
+  deadline?: string;
+  evaluationPipeline?: EvaluationStageConfig[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface EvaluationStageConfig {
+  stageNumber: number;
+  title: string;
+  objective: string;
+  criteria: string;
+  maxScore: number;
+  weight: number;
+  passCriteria: string;
+}

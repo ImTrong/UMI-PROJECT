@@ -64,6 +64,12 @@ app.get('/api/ai/recommendations', insightLimiter, authenticateToken, AIControll
 app.post('/api/ai/coach', insightLimiter, authenticateToken, AIController.coach);                     // Calls Gemini
 app.get('/api/ai/recommended-paths', insightLimiter, authenticateToken, AIController.recommendedPaths); // Calls Gemini
 
+// ==================== Phase 3: AI Career Path Route ====================
+app.post('/api/ai/career-path', insightLimiter, authenticateToken, AIController.careerPathRecommendation); // Calls Gemini
+
+// ==================== Evaluation Pipeline Route ====================
+app.post('/api/ai/evaluate-submission', insightLimiter, authenticateToken, AIController.evaluateSubmission); // Calls Gemini
+
 // ==================== Global Error Handler ====================
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   logger.error('Unhandled error:', err);

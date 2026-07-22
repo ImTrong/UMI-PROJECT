@@ -48,9 +48,12 @@ export interface Certificate {
   id: string;
   certificateNumber: string;
   userId: string;
-  courseId: string;
+  courseId?: string;
+  learningPathId?: string;
   courseTitle: string;
   userName: string;
+  type: 'COURSE_COMPLETION' | 'PATH_CERTIFICATE';
+  averageScore?: number;
   issueDate: string;
   expiresAt?: string;
   certificateUrl?: string;
@@ -205,7 +208,7 @@ export const learningService = {
     courseId: string,
     lessonId: string,
     timeSpent?: number
-  ): Promise<{ lessonProgress: LessonProgress; courseProgress: CourseProgress; isNewCompletion: boolean; courseCompleted: boolean }> {
+  ): Promise<{ lessonProgress: LessonProgress; courseProgress: CourseProgress; isNewCompletion: boolean; courseCompleted: boolean; missingQuizzes: boolean }> {
     const response = await learningApi.post(`/api/learning/progress/${courseId}/${lessonId}/complete`, {
       timeSpent,
     });
@@ -341,7 +344,7 @@ export const learningService = {
     return response.data.data;
   },
 
-  async submitQuiz(attemptId: string, answers: any[]): Promise<{ attempt: QuizAttempt; results: any }> {
+  async submitQuiz(attemptId: string, answers: any[]): Promise<{ attempt: QuizAttempt; results: any; courseCompleted: boolean }> {
     const response = await learningApi.post(`/api/learning/quiz/attempt/${attemptId}/submit`, { answers });
     return response.data.data;
   },
@@ -495,4 +498,156 @@ export const learningService = {
     const response = await learningApi.get(`/api/learning/video-jobs/${jobId}/status`);
     return response.data;
   },
+
+  // ---------------------------------------------------------------------------
+  // COURSE EXAM (Tổng kết khóa học)
+  // ---------------------------------------------------------------------------
+
+  async getCourseExamResult(courseId: string): Promise<CourseExamResult> {
+    const response = await learningApi.get(`/api/learning/exam/course/${courseId}/result`);
+    return response.data.data;
+  },
+
+  async retakeCourse(courseId: string): Promise<{ message: string; retakeCount: number }> {
+    const response = await learningApi.post(`/api/learning/exam/course/${courseId}/retake`);
+    return response.data.data;
+  },
+
+  // ---------------------------------------------------------------------------
+  // FINAL PROJECTS (Project cuối lộ trình)
+  // ---------------------------------------------------------------------------
+
+  async getFinalProject(pathId: string): Promise<FinalProject | null> {
+    try {
+      const response = await learningApi.get(`/api/learning/final-project/${pathId}`);
+      return response.data.data;
+    } catch {
+      return null;
+    }
+  },
+
+  async submitFinalProject(projectId: string, data: { learningPathId: string; content?: string; githubUrl?: string; demoUrl?: string; fileUrl?: string; fileKey?: string; fileName?: string }): Promise<FinalProjectSubmission> {
+    const response = await learningApi.post(`/api/learning/final-project/${projectId}/submit`, data);
+    return response.data.data;
+  },
+
+  async getFinalProjectUploadUrl(projectId: string, fileName: string, contentType: string): Promise<{ uploadUrl: string; fileUrl: string; fileKey: string }> {
+    const response = await learningApi.post(`/api/learning/final-project/${projectId}/upload-url`, { fileName, contentType });
+    return response.data.data;
+  },
+
+  async getMyFinalProjectSubmission(projectId: string): Promise<FinalProjectSubmission | null> {
+    try {
+      const response = await learningApi.get(`/api/learning/final-project/${projectId}/submission/me`);
+      return response.data.data;
+    } catch {
+      return null;
+    }
+  },
+
+  async getMyAllFinalProjectSubmissions(projectId: string): Promise<FinalProjectSubmission[]> {
+    const response = await learningApi.get(`/api/learning/final-project/${projectId}/submissions/me`);
+    return response.data.data;
+  },
+
+  async evaluateSubmission(submissionId: string): Promise<any> {
+    const response = await learningApi.post(`/api/learning/final-project/${submissionId}/evaluate`);
+    return response.data.data;
+  },
+
+  async getFinalProjectUnlockStatus(pathId: string): Promise<{ unlocked: boolean; reasons: string[]; completedCourses: number; totalCourses: number }> {
+    const response = await learningApi.get(`/api/learning/final-project/${pathId}/unlock-status`);
+    return response.data.data;
+  },
+
+  async generatePathCertificate(pathId: string): Promise<Certificate> {
+    const response = await learningApi.post(`/api/learning/certificates/path/${pathId}/generate`);
+    return response.data.data;
+  },
 };
+
+// ==================== Course Exam Types ====================
+
+export interface CourseExamResult {
+  courseId: string;
+  courseTitle: string;
+  averageQuizScore: number;
+  passingScore: number;
+  passed: boolean;
+  totalQuizzes: number;
+  completedQuizzes: number;
+  quizResults: {
+    quizId: string;
+    lessonId: string;
+    lessonTitle: string;
+    bestScore: number;
+    passed: boolean;
+    attempts: number;
+  }[];
+  allowRetake: boolean;
+  retakeCount: number;
+}
+
+// ==================== Final Project Types ====================
+
+export interface EvaluationStage {
+  stageNumber: number;
+  title: string;
+  objective: string;
+  criteria: string;
+  maxScore: number;
+  weight: number;
+  passCriteria: string;
+}
+
+export interface StageResult {
+  stageNumber: number;
+  title: string;
+  score: number;
+  maxScore: number;
+  weightedScore: number;
+  passed: boolean;
+  feedback: string;
+  details: string[];
+}
+
+export interface FinalProject {
+  id: string;
+  learningPathId: string;
+  title: string;
+  description: string;
+  instructions?: string;
+  objectives?: string;
+  references?: { title: string; url: string }[];
+  maxScore: number;
+  passingScore: number;
+  allowedFileTypes: string[];
+  maxFileSizeMB: number;
+  maxAttempts: number;
+  deadline?: string;
+  evaluationPipeline?: EvaluationStage[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface FinalProjectSubmission {
+  id: string;
+  finalProjectId: string;
+  userId: string;
+  learningPathId: string;
+  attemptNumber: number;
+  content?: string;
+  githubUrl?: string;
+  demoUrl?: string;
+  fileUrl?: string;
+  fileName?: string;
+  status: 'SUBMITTED' | 'GRADING' | 'GRADED' | 'RETURNED';
+  score?: number;
+  totalScore?: number;
+  stageResults?: StageResult[];
+  feedback?: string;
+  aiFeedback?: string;
+  gradedAt?: string;
+  submittedAt: string;
+}
+

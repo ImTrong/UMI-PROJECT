@@ -42,37 +42,92 @@ export const adminPathService = {
     if (filters.page) params.append('page', filters.page.toString());
     if (filters.limit) params.append('limit', filters.limit.toString());
 
-    const response = await learningApi.get(`/learning/admin/paths?${params.toString()}`);
+    const response = await learningApi.get(`/api/learning/admin/paths?${params.toString()}`);
     return response.data;
   },
 
   getPathById: async (id: string): Promise<AdminLearningPath> => {
-    const response = await learningApi.get(`/learning/admin/paths/${id}`);
+    const response = await learningApi.get(`/api/learning/admin/paths/${id}`);
     return response.data.data;
   },
 
   createPath: async (data: Partial<AdminLearningPath>) => {
-    const response = await learningApi.post('/learning/admin/paths', data);
+    const response = await learningApi.post('/api/learning/admin/paths', data);
     return response.data.data;
   },
 
   updatePath: async (id: string, data: Partial<AdminLearningPath>) => {
-    const response = await learningApi.put(`/learning/admin/paths/${id}`, data);
+    const response = await learningApi.put(`/api/learning/admin/paths/${id}`, data);
     return response.data.data;
   },
 
   updateStatus: async (id: string, status: string) => {
-    const response = await learningApi.put(`/learning/admin/paths/${id}/status`, { status });
+    const response = await learningApi.put(`/api/learning/admin/paths/${id}/status`, { status });
     return response.data.data;
   },
 
   deletePath: async (id: string) => {
-    const response = await learningApi.delete(`/learning/admin/paths/${id}`);
+    const response = await learningApi.delete(`/api/learning/admin/paths/${id}`);
     return response.data;
   },
 
   duplicatePath: async (id: string) => {
-    const response = await learningApi.post(`/learning/admin/paths/${id}/duplicate`);
+    const response = await learningApi.post(`/api/learning/admin/paths/${id}/duplicate`);
     return response.data.data;
-  }
+  },
+
+  // ==================== Final Project Admin Methods ====================
+
+  getFinalProject: async (pathId: string): Promise<AdminFinalProject | null> => {
+    try {
+      const response = await learningApi.get(`/api/learning/final-project/${pathId}`);
+      return response.data.data;
+    } catch (err: any) {
+      if (err.response?.status === 404) return null;
+      throw err;
+    }
+  },
+
+  createFinalProject: async (pathId: string, data: Partial<AdminFinalProject>): Promise<AdminFinalProject> => {
+    const response = await learningApi.post(`/api/learning/final-project/${pathId}`, {
+      ...data,
+      learningPathId: pathId,
+    });
+    return response.data.data;
+  },
+
+  updateFinalProject: async (projectId: string, data: Partial<AdminFinalProject>): Promise<AdminFinalProject> => {
+    const response = await learningApi.put(`/api/learning/final-project/${projectId}`, data);
+    return response.data.data;
+  },
 };
+
+export interface AdminFinalProject {
+  id: string;
+  learningPathId: string;
+  title: string;
+  description: string;
+  instructions?: string;
+  objectives?: string;
+  references?: { title: string; url: string }[];
+  maxScore: number;
+  passingScore: number;
+  allowedFileTypes: string[];
+  maxFileSizeMB: number;
+  maxAttempts: number;
+  deadline?: string;
+  evaluationPipeline?: EvaluationStageConfig[];
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface EvaluationStageConfig {
+  stageNumber: number;
+  title: string;
+  objective: string;
+  criteria: string;
+  maxScore: number;
+  weight: number;
+  passCriteria: string;
+}
+

@@ -4,7 +4,7 @@ import { adminPathService, AdminLearningPath } from '../../services/admin-path.s
 import { courseApi } from '../../services/api';
 import { courseService } from '../../services/course.service';
 import toast from 'react-hot-toast';
-import { FiArrowLeft, FiSave, FiPlus, FiTrash2, FiArrowUp, FiArrowDown, FiUploadCloud } from 'react-icons/fi';
+import { FiArrowLeft, FiSave, FiPlus, FiTrash2, FiArrowUp, FiArrowDown, FiUploadCloud, FiAward } from 'react-icons/fi';
 
 export default function AdminLearningPathForm() {
   const { id } = useParams<{ id: string }>();
@@ -42,12 +42,88 @@ export default function AdminLearningPathForm() {
   const imageInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
+  const [projectData, setProjectData] = useState<Partial<any> | null>(null);
+  const [projectLoading, setProjectLoading] = useState(false);
+  const [projectSaving, setProjectSaving] = useState(false);
+
   useEffect(() => {
     loadCourses();
     if (isEdit && id) {
       loadPath(id);
+      loadProject(id);
     }
   }, [id]);
+
+  const loadProject = async (pathId: string) => {
+    try {
+      setProjectLoading(true);
+      const project = await adminPathService.getFinalProject(pathId);
+      if (project) {
+        setProjectData(project);
+      } else {
+        setProjectData(null);
+      }
+    } catch {
+      // It's okay if not found
+    } finally {
+      setProjectLoading(false);
+    }
+  };
+
+  const handleSaveProject = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!id || !projectData) return;
+    try {
+      setProjectSaving(true);
+      if (projectData.id) {
+        await adminPathService.updateFinalProject(projectData.id, projectData);
+        toast.success('Cập nhật project thành công');
+      } else {
+        const newProject = await adminPathService.createFinalProject(id, projectData);
+        setProjectData(newProject);
+        toast.success('Tạo project thành công');
+      }
+    } catch {
+      toast.error('Lưu project thất bại');
+    } finally {
+      setProjectSaving(false);
+    }
+  };
+
+  const handleAddEvaluationStage = () => {
+    const newStage = {
+      stageNumber: (projectData?.evaluationPipeline?.length || 0) + 1,
+      title: '',
+      objective: '',
+      criteria: '',
+      maxScore: 20,
+      weight: 0.2,
+      passCriteria: 'Đạt ≥ 70%',
+    };
+    setProjectData((prev: any) => ({
+      ...prev,
+      evaluationPipeline: [...(prev?.evaluationPipeline || []), newStage],
+    }));
+  };
+
+  const handleUpdateEvaluationStage = (index: number, field: string, value: any) => {
+    setProjectData((prev: any) => {
+      const newPipeline = [...(prev.evaluationPipeline || [])];
+      newPipeline[index] = { ...newPipeline[index], [field]: value };
+      return { ...prev, evaluationPipeline: newPipeline };
+    });
+  };
+
+  const handleRemoveEvaluationStage = (index: number) => {
+    setProjectData((prev: any) => {
+      const newPipeline = [...(prev.evaluationPipeline || [])];
+      newPipeline.splice(index, 1);
+      newPipeline.forEach((stage, idx) => {
+        stage.stageNumber = idx + 1;
+      });
+      return { ...prev, evaluationPipeline: newPipeline };
+    });
+  };
 
   const loadCourses = async () => {
     try {
@@ -217,18 +293,24 @@ export default function AdminLearningPathForm() {
           <h1 className="text-2xl font-bold text-slate-900">{isEdit ? 'Chỉnh sửa Lộ trình' : 'Tạo Lộ trình mới'}</h1>
         </div>
         <button
-          onClick={() => handleSubmit()}
-          disabled={saving}
+          onClick={() => {
+            if (activeTab === 'final-project') {
+              handleSaveProject();
+            } else {
+              handleSubmit();
+            }
+          }}
+          disabled={saving || projectSaving}
           className="flex items-center gap-2 bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-lg font-bold transition-colors disabled:opacity-70"
         >
-          <FiSave /> {saving ? 'Đang lưu...' : 'Lưu Lộ trình'}
+          <FiSave /> {(saving || projectSaving) ? 'Đang lưu...' : 'Lưu'}
         </button>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Tabs */}
         <div className="flex border-b border-slate-200 overflow-x-auto">
-          {['basic', 'courses', 'prerequisites', 'settings'].map(tab => (
+          {['basic', 'courses', 'prerequisites', 'settings', 'final-project'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -236,7 +318,7 @@ export default function AdminLearningPathForm() {
                 activeTab === tab ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              {tab === 'basic' ? 'Thông tin cơ bản' : tab === 'courses' ? 'Khóa học & Tiến trình' : tab === 'prerequisites' ? 'Điều kiện tiên quyết' : 'Cài đặt & Luật'}
+              {tab === 'basic' ? 'Thông tin cơ bản' : tab === 'courses' ? 'Khóa học & Tiến trình' : tab === 'prerequisites' ? 'Điều kiện tiên quyết' : tab === 'settings' ? 'Cài đặt & Luật' : 'Dự án cuối kỳ'}
             </button>
           ))}
         </div>
@@ -612,6 +694,200 @@ export default function AdminLearningPathForm() {
                 </select>
               </div>
 
+            </div>
+          )}
+
+          {/* TAB 5: Final Project */}
+          {activeTab === 'final-project' && (
+            <div className="space-y-8 animate-fadeIn">
+              {!isEdit ? (
+                <div className="text-center p-8 bg-amber-50 text-amber-800 rounded-xl border border-amber-200">
+                  <FiAward className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <h3 className="font-bold text-lg mb-2">Lưu lộ trình trước</h3>
+                  <p>Bạn cần phải lưu lộ trình học tập cơ bản trước khi cấu hình dự án cuối kỳ.</p>
+                </div>
+              ) : projectLoading ? (
+                <div className="text-center p-8 text-slate-500">Đang tải dự án cuối kỳ...</div>
+              ) : (
+                <div className="bg-white rounded-xl">
+                  {!projectData && (
+                    <div className="mb-6 p-4 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center justify-between">
+                      <div>
+                        <h4 className="font-bold text-indigo-900">Chưa có dự án cuối kỳ</h4>
+                        <p className="text-sm text-indigo-700">Lộ trình này hiện tại chưa được định cấu hình dự án cuối kỳ.</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setProjectData({
+                          title: 'Dự án cuối kỳ: ' + formData.title,
+                          description: '',
+                          maxScore: 100,
+                          passingScore: 80,
+                          maxAttempts: 3,
+                          evaluationPipeline: []
+                        })}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700"
+                      >
+                        Tạo dự án cuối kỳ
+                      </button>
+                    </div>
+                  )}
+
+                  {projectData && (
+                    <div className="space-y-8">
+                      {/* Basic Info */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-bold text-slate-700 mb-1">Tiêu đề dự án *</label>
+                          <input
+                            type="text"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 font-medium"
+                            value={projectData.title || ''}
+                            onChange={e => setProjectData({ ...projectData, title: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-bold text-slate-700 mb-1">Mô tả & Hướng dẫn *</label>
+                          <textarea
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 min-h-[100px]"
+                            value={projectData.description || ''}
+                            onChange={e => setProjectData({ ...projectData, description: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-bold text-slate-700 mb-1">Mục tiêu đầu ra (Objectives)</label>
+                          <textarea
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 min-h-[80px]"
+                            value={projectData.objectives || ''}
+                            onChange={e => setProjectData({ ...projectData, objectives: e.target.value })}
+                            placeholder="Nhập mục tiêu học viên cần đạt được..."
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">Điểm tối đa</label>
+                          <input
+                            type="number"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500"
+                            value={projectData.maxScore || 100}
+                            onChange={e => setProjectData({ ...projectData, maxScore: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">Ngưỡng điểm đạt (%)</label>
+                          <input
+                            type="number"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500"
+                            value={projectData.passingScore || 80}
+                            onChange={e => setProjectData({ ...projectData, passingScore: Number(e.target.value) })}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-slate-700 mb-1">Số lần nộp lại tối đa</label>
+                          <input
+                            type="number"
+                            className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500"
+                            value={projectData.maxAttempts || 3}
+                            onChange={e => setProjectData({ ...projectData, maxAttempts: Number(e.target.value) })}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Evaluation Pipeline */}
+                      <div className="border-t border-slate-200 pt-8">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h3 className="font-bold text-lg text-slate-900">AI Evaluation Pipeline (Các giai đoạn chấm điểm bằng AI)</h3>
+                            <p className="text-sm text-slate-500">Cấu hình các bước AI sẽ dùng để đánh giá và chấm điểm dự án.</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleAddEvaluationStage}
+                            className="flex items-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-4 py-2 rounded-lg font-bold text-sm transition-colors"
+                          >
+                            <FiPlus /> Thêm giai đoạn
+                          </button>
+                        </div>
+
+                        {(!projectData.evaluationPipeline || projectData.evaluationPipeline.length === 0) ? (
+                          <div className="text-center p-8 bg-slate-50 text-slate-500 rounded-lg border border-dashed border-slate-300">
+                            Chưa cấu hình các giai đoạn chấm điểm.
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {projectData.evaluationPipeline.map((stage: any, index: number) => (
+                              <div key={index} className="bg-slate-50 border border-slate-200 rounded-xl p-5 relative">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveEvaluationStage(index)}
+                                  className="absolute top-4 right-4 p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                  <FiTrash2 />
+                                </button>
+                                
+                                <h4 className="font-bold text-slate-900 mb-4">Giai đoạn {stage.stageNumber}</h4>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Tiêu đề giai đoạn *</label>
+                                    <input
+                                      type="text"
+                                      className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm"
+                                      value={stage.title}
+                                      onChange={(e) => handleUpdateEvaluationStage(index, 'title', e.target.value)}
+                                      placeholder="VD: Kiểm tra cấu trúc thư mục"
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Mục tiêu kiểm tra (Objective)</label>
+                                    <input
+                                      type="text"
+                                      className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm"
+                                      value={stage.objective}
+                                      onChange={(e) => handleUpdateEvaluationStage(index, 'objective', e.target.value)}
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Tiêu chí chi tiết cho AI chấm (Criteria) *</label>
+                                    <textarea
+                                      className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm min-h-[60px]"
+                                      value={stage.criteria}
+                                      onChange={(e) => handleUpdateEvaluationStage(index, 'criteria', e.target.value)}
+                                      placeholder="Mô tả chi tiết những tiêu chí kiểm tra cho AI..."
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Điểm tối đa</label>
+                                    <input
+                                      type="number"
+                                      className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm"
+                                      value={stage.maxScore}
+                                      onChange={(e) => handleUpdateEvaluationStage(index, 'maxScore', Number(e.target.value))}
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Trọng số (Weight từ 0 đến 1)</label>
+                                    <input
+                                      type="number"
+                                      step="0.1"
+                                      max="1"
+                                      min="0"
+                                      className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm"
+                                      value={stage.weight}
+                                      onChange={(e) => handleUpdateEvaluationStage(index, 'weight', Number(e.target.value))}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

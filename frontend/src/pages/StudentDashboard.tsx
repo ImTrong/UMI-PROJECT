@@ -245,7 +245,7 @@ export default function StudentDashboard() {
               </div>
               <div className="mt-4 pt-3 border-t">
                 <Link to="/certificates" className="flex items-center justify-between text-sm text-primary-600 hover:underline">
-                  <span>Xem chứng chỉ</span>
+                  <span>Xem chứng nhận</span>
                   <span>→</span>
                 </Link>
                 <Link to="/badges" className="flex items-center justify-between text-sm text-primary-600 hover:underline mt-2">

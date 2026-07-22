@@ -338,4 +338,89 @@ export class AIController {
       });
     }
   }
+
+  /**
+   * POST /api/ai/career-path
+   * AI-generated personalized career learning path recommendation
+   */
+  static async careerPathRecommendation(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+
+      const { goal } = req.body;
+
+      if (!goal || typeof goal !== 'string' || goal.trim().length === 0) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Vui lòng nhập mục tiêu nghề nghiệp của bạn.',
+        });
+      }
+
+      if (goal.trim().length > 500) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Mục tiêu không được vượt quá 500 ký tự.',
+        });
+      }
+
+      const token = extractToken(req);
+      const recommendation = await ChatService.generateCareerPathRecommendation(
+        userId,
+        goal.trim(),
+        token
+      );
+
+      return res.status(HTTP_STATUS.OK).json({
+        message: 'Career path recommendation generated successfully',
+        data: recommendation,
+      });
+    } catch (error: any) {
+      logger.error('Career path recommendation error:', error);
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to generate career path recommendation',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
+
+  /**
+   * POST /api/ai/evaluate-submission
+   * Evaluate a final project submission through the AI pipeline
+   */
+  static async evaluateSubmission(req: AuthRequest, res: Response) {
+    try {
+      const { submissionContent, projectInfo, evaluationPipeline, passingScore } = req.body;
+
+      if (!submissionContent || !projectInfo || !evaluationPipeline) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Missing required fields: submissionContent, projectInfo, evaluationPipeline',
+        });
+      }
+
+      if (!Array.isArray(evaluationPipeline) || evaluationPipeline.length === 0) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'evaluationPipeline must be a non-empty array of stages',
+        });
+      }
+
+      const result = await ChatService.evaluateSubmission(
+        submissionContent,
+        projectInfo,
+        evaluationPipeline,
+        passingScore || 80
+      );
+
+      return res.status(HTTP_STATUS.OK).json({
+        message: 'Evaluation completed successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Evaluate submission error:', error);
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to evaluate submission',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
 }

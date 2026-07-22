@@ -18,19 +18,32 @@ export const ERROR_MESSAGES = {
   CERTIFICATE_NOT_FOUND: 'Certificate not found',
   CERTIFICATE_ALREADY_EXISTS: 'Certificate already exists for this course',
   COURSE_NOT_COMPLETED: 'Course not completed yet',
+  COURSE_NOT_PASSED: 'Course exam not passed. You need to retake the course.',
+  RETAKE_NOT_ALLOWED: 'Course retake is not allowed. You have already passed.',
   INVALID_ACTION: 'Invalid action',
   UNAUTHORIZED: 'Unauthorized access',
   FORBIDDEN: 'Access forbidden',
   BADGE_NOT_FOUND: 'Badge not found',
+  FINAL_PROJECT_NOT_FOUND: 'Final project not found',
+  FINAL_PROJECT_EXISTS: 'A final project already exists for this learning path',
+  SUBMISSION_NOT_FOUND: 'Submission not found',
+  PATH_NOT_COMPLETED: 'Learning path not completed yet',
+  PATH_CERTIFICATE_EXISTS: 'Path certificate already exists',
+  PROJECT_SCORE_NOT_ENOUGH: 'Final project score is below 80%. Certificate cannot be issued.',
 } as const;
 
 export const SUCCESS_MESSAGES = {
   LESSON_COMPLETED: 'Lesson marked as completed',
   COURSE_COMPLETED: 'Course completed successfully',
-  CERTIFICATE_GENERATED: 'Certificate generated successfully',
+  CERTIFICATE_GENERATED: 'Chứng nhận đã được tạo thành công',
   CERTIFICATE_VERIFIED: 'Certificate verified successfully',
   ACTIVITY_LOGGED: 'Activity logged successfully',
   BADGE_EARNED: 'Badge earned successfully',
+  COURSE_RETAKE_SUCCESS: 'Đã reset tiến độ khóa học. Bạn có thể học lại miễn phí.',
+  FINAL_PROJECT_CREATED: 'Final project created successfully',
+  FINAL_PROJECT_SUBMITTED: 'Bài nộp đã được gửi thành công',
+  FINAL_PROJECT_GRADED: 'Bài nộp đã được chấm điểm',
+  PATH_CERTIFICATE_GENERATED: 'Chứng chỉ lộ trình đã được tạo thành công',
 } as const;
 
 // ==================== Video Streaming Constants ====================

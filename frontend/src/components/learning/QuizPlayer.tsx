@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { learningService, Quiz, QuizAttempt } from '../../services/learning.service';
 import { FiClock, FiCheckCircle, FiXCircle, FiAlertCircle, FiAward, FiRefreshCw } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 interface PastAttempt {
   id: string;
@@ -131,7 +132,12 @@ export const QuizPlayer = ({
         submittedAt: new Date().toISOString(),
         timeTakenSeconds: res.results.timeTakenSeconds,
       }, ...prev]);
-      if (res.attempt.passed) {
+      if (res.courseCompleted) {
+        toast.success('🎉 Chúc mừng! Bạn đã hoàn thành khóa học. Xem kết quả tổng kết!');
+        setTimeout(() => {
+          window.location.href = `/course-exam/${quiz.courseId}`;
+        }, 2000);
+      } else if (res.attempt.passed) {
         onComplete();
       }
     } catch (err: any) {

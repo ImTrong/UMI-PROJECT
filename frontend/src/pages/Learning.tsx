@@ -234,12 +234,13 @@ export default function Learning() {
       setProgress(result.courseProgress);
       
       if (result.courseCompleted) {
-        try {
-          await learningService.generateCertificate(courseId!);
-          toast.success('🎉 Chúc mừng! Bạn đã hoàn thành khóa học và nhận chứng chỉ.');
-        } catch {
-          toast.success('🎉 Đã hoàn thành khóa học! Bạn có thể nhận chứng chỉ trong mục Chứng chỉ.');
-        }
+        toast.success('🎉 Chúc mừng! Bạn đã hoàn thành khóa học. Xem kết quả tổng kết!');
+        // Navigate to exam result page instead of auto-generating certificate
+        setTimeout(() => {
+          window.location.href = `/course-exam/${courseId}`;
+        }, 2000);
+      } else if (result.missingQuizzes) {
+        toast.error('Bạn cần hoàn thành tất cả các bài kiểm tra (Quiz) để hoàn thành khóa học!', { duration: 5000 });
       } else {
         toast.success('Đã hoàn thành bài học!');
       }
