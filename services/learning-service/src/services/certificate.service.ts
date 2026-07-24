@@ -55,8 +55,7 @@ export class CertificateService {
     const baseUrl = process.env.BASE_URL || 'http://localhost:3006';
     const verificationUrl = `${baseUrl}/api/learning/certificates/verify/${certificateNumber}`;
     const issueDate = new Date();
-    const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 1);
+    const expiresAt = null;
 
     let pdfPath = '';
     try {
@@ -172,7 +171,7 @@ export class CertificateService {
     const verificationUrl = `${baseUrl}/api/learning/certificates/verify/${certificateNumber}`;
     const issueDate = new Date();
     const expiresAt = new Date();
-    expiresAt.setFullYear(expiresAt.getFullYear() + 2); // Path certificates valid for 2 years
+    expiresAt.setFullYear(expiresAt.getFullYear() + 5); // Path certificates valid for 5 years
 
     let pdfPath = '';
     try {

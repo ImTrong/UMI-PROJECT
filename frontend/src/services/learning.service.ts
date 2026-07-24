@@ -526,7 +526,7 @@ export const learningService = {
     }
   },
 
-  async submitFinalProject(projectId: string, data: { learningPathId: string; content?: string; githubUrl?: string; demoUrl?: string; fileUrl?: string; fileKey?: string; fileName?: string }): Promise<FinalProjectSubmission> {
+  async submitFinalProject(projectId: string, data: { learningPathId: string; content?: string; githubUrl?: string; demoUrl?: string; fileUrl?: string; fileKey?: string; fileName?: string; submissionData?: SubmissionDataItem[] }): Promise<FinalProjectSubmission> {
     const response = await learningApi.post(`/api/learning/final-project/${projectId}/submit`, data);
     return response.data.data;
   },
@@ -590,6 +590,36 @@ export interface CourseExamResult {
 
 // ==================== Final Project Types ====================
 
+export type SubmissionFieldType =
+  | 'FILE'
+  | 'IMAGE'
+  | 'VIDEO'
+  | 'AUDIO'
+  | 'GITHUB_LINK'
+  | 'DEMO_LINK'
+  | 'FIGMA_LINK'
+  | 'TEXT'
+  | 'CUSTOM';
+
+export interface SubmissionTypeConfig {
+  type: SubmissionFieldType;
+  label: string;
+  description?: string;
+  required: boolean;
+  accept?: string;
+  maxSizeMB?: number;
+  placeholder?: string;
+}
+
+export interface SubmissionDataItem {
+  type: SubmissionFieldType;
+  label: string;
+  value: string;
+  fileName?: string;
+  fileKey?: string;
+  fileSize?: number;
+}
+
 export interface EvaluationStage {
   stageNumber: number;
   title: string;
@@ -598,6 +628,7 @@ export interface EvaluationStage {
   maxScore: number;
   weight: number;
   passCriteria: string;
+  expectedOutput?: string;
 }
 
 export interface StageResult {
@@ -625,6 +656,7 @@ export interface FinalProject {
   maxFileSizeMB: number;
   maxAttempts: number;
   deadline?: string;
+  submissionTypes?: SubmissionTypeConfig[];
   evaluationPipeline?: EvaluationStage[];
   createdBy: string;
   createdAt: string;
@@ -641,6 +673,7 @@ export interface FinalProjectSubmission {
   demoUrl?: string;
   fileUrl?: string;
   fileName?: string;
+  submissionData?: SubmissionDataItem[];
   status: 'SUBMITTED' | 'GRADING' | 'GRADED' | 'RETURNED';
   score?: number;
   totalScore?: number;

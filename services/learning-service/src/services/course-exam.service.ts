@@ -66,7 +66,7 @@ export class CourseExamService {
         ? quizResults.reduce((sum, q) => sum + q.bestScore, 0) / totalQuizzes
         : 0;
 
-    const passingScore = courseProgress.passingScore ?? 60;
+    const passingScore = courseProgress.passingScore ?? 80;
     const passed = courseProgress.progressPercentage >= 100 && averageQuizScore >= passingScore;
 
     // Update course progress with exam result

@@ -455,6 +455,7 @@ export class ChatService {
       maxScore: number;
       weight: number;
       passCriteria: string;
+      expectedOutput?: string;
     }[],
     passingScore: number = 80
   ) {
@@ -480,7 +481,8 @@ export class ChatService {
         `Điểm tối đa: ${stage.maxScore}`,
         `Trọng số: ${stage.weight}`,
         `Điều kiện đạt: ${stage.passCriteria}`,
-      ].join('\n');
+        stage.expectedOutput ? `Kết quả đầu ra mong muốn: ${stage.expectedOutput}` : '',
+      ].filter(Boolean).join('\n');
 
       let prompt = EVALUATION_PIPELINE_PROMPT;
       prompt = prompt.replace('{PROJECT_INFO}', projectInfoStr);

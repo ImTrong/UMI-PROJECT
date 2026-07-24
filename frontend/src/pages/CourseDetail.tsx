@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { SecurePDFViewer } from '../components/learning/SecurePDFViewer';
 import { courseService, Course, Lesson, Review } from '../services/course.service';
 import { RatingStars } from '../components/course/RatingStars';
 import { ReviewCard } from '../components/course/ReviewCard';
@@ -32,7 +33,7 @@ export default function CourseDetail() {
   const [cartLoading, setCartLoading] = useState(false);
   const [buyNowLoading, setBuyNowLoading] = useState(false);
   const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null);
-  const [pdfHeight, setPdfHeight] = useState(2500);
+
 
   // Kích hoạt tính năng bảo mật chuột phải, phím tắt và kéo thả khi đang xem thử bài giảng
   const { isDevToolsOpen } = useFileProtection(Boolean(previewLesson));
@@ -528,34 +529,10 @@ export default function CourseDetail() {
               ) : previewLesson.videoUrl.toLowerCase().endsWith('.pdf') ? (
                 <div className="flex flex-col bg-white w-full">
                   <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border-b select-none">
-                    <span className="text-xs text-slate-500 font-medium">Bảo mật tài liệu (Cuộn chuột để xem)</span>
-                    <div className="flex items-center gap-2">
-                      <button 
-                        onClick={() => setPdfHeight(Math.max(1000, pdfHeight - 1000))} 
-                        disabled={pdfHeight <= 1000}
-                        className="px-2 py-1 text-xs bg-white border border-slate-100 rounded hover:bg-slate-100 disabled:opacity-50 font-medium text-slate-700 transition"
-                      >
-                        Thu nhỏ
-                      </button>
-                      <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded">
-                        Chiều cao: {pdfHeight}px
-                      </span>
-                      <button 
-                        onClick={() => setPdfHeight(Math.min(8000, pdfHeight + 1000))}
-                        disabled={pdfHeight >= 8000}
-                        className="px-2 py-1 text-xs bg-white border border-slate-100 rounded hover:bg-slate-100 disabled:opacity-50 font-medium text-slate-700 transition"
-                      >
-                        Mở rộng
-                      </button>
-                    </div>
+                    <span className="text-xs text-slate-500 font-medium">Bảo mật tài liệu (Không thể nhấp chuột phải)</span>
                   </div>
                   <div className="w-full h-[65vh] overflow-y-auto bg-slate-100 relative">
-                    <iframe
-                      src={`${previewLesson.videoUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                      title={previewLesson.title}
-                      className="w-full block"
-                      style={{ pointerEvents: 'none', height: `${pdfHeight}px`, border: 'none' }}
-                    />
+                    <SecurePDFViewer url={previewLesson.videoUrl} />
                   </div>
                 </div>
               ) : (

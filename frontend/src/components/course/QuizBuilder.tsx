@@ -462,13 +462,13 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
         {/* =============== Cài Đặt Chung =============== */}
         <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 mb-8">
            <h4 className="font-semibold text-slate-800 mb-4 pb-2 border-b">1. Thiết lập chung</h4>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="md:col-span-2">
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-3">
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Tiêu đề bài trắc nghiệm <span className="text-red-500">*</span></label>
                 <input required value={title} onChange={e => setTitle(e.target.value)} className="input-field shadow-sm" placeholder="VD: Kiểm tra kiến thức cuối phần 1" />
               </div>
               
-              <div className="md:col-span-2">
+              <div className="md:col-span-3">
                 <label className="block text-sm font-semibold text-slate-700 mb-1">Mô tả (Tùy chọn)</label>
                 <textarea value={description} onChange={e => setDescription(e.target.value)} className="input-field shadow-sm" rows={2} placeholder="Nhập một số ghi chú hoặc lời khuyên..." />
               </div>
@@ -487,6 +487,14 @@ export const QuizBuilder = ({ courseId, lessonId, onClose }: QuizBuilderProps) =
                 <div className="relative">
                    <input type="number" min="1" max="100" required value={passingScore} onChange={e => setPassingScore(Number(e.target.value))} className="input-field shadow-sm pr-12 text-primary-700 font-semibold" />
                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">%</span>
+                </div>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1">Số lần làm bài tối đa <span className="text-red-500">*</span></label>
+                <div className="relative">
+                   <input type="number" min="1" required value={maxAttempts} onChange={e => setMaxAttempts(Number(e.target.value))} className="input-field shadow-sm pr-12 font-semibold" />
+                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold">Lần</span>
                 </div>
               </div>
            </div>

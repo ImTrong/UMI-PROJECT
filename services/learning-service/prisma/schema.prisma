@@ -42,7 +42,7 @@ model CourseProgress {
   averageQuizScore    Float?              // Điểm trung bình quiz của khóa
   passed              Boolean?            // Khóa học đạt/không đạt
   allowRetake         Boolean  @default(false) // Cho phép học lại miễn phí
-  passingScore        Float    @default(60)    // Ngưỡng điểm đạt (mặc định 60%)
+  passingScore        Float    @default(80)    // Ngưỡng điểm đạt (mặc định 80%)
   retakeCount         Int      @default(0)     // Số lần đã học lại
   
   lessons             LessonProgress[]
@@ -359,6 +359,17 @@ model FinalProject {
   maxFileSizeMB   Int      @default(50)
   maxAttempts     Int      @default(3)    // Số lần được phép nộp lại
   deadline        DateTime?              // Thời hạn nộp bài
+  submissionTypes Json?                  // Cấu hình loại bài nộp do Admin thiết lập
+  // submissionTypes structure:
+  // [{
+  //   type: "FILE" | "IMAGE" | "VIDEO" | "AUDIO" | "GITHUB_LINK" | "DEMO_LINK" | "FIGMA_LINK" | "TEXT" | "CUSTOM",
+  //   label: "Tệp tin PDF",
+  //   description?: "Upload file báo cáo dạng PDF",
+  //   required: true,
+  //   accept?: ".pdf,.doc,.docx",  // For FILE/IMAGE/VIDEO/AUDIO types
+  //   maxSizeMB?: 50,              // For file uploads
+  //   placeholder?: "https://github.com/...",  // For link/text types
+  // }]
   evaluationPipeline Json?              // Evaluation Pipeline (Array of Stage objects)
   // evaluationPipeline structure:
   // [{
@@ -392,6 +403,16 @@ model FinalProjectSubmission {
   fileUrl         String?          // MinIO file URL
   fileKey         String?          // MinIO file key
   fileName        String?
+  submissionData  Json?            // Dữ liệu bài nộp đa loại theo cấu hình Admin
+  // submissionData structure:
+  // [{
+  //   type: "FILE" | "IMAGE" | "VIDEO" | "AUDIO" | "GITHUB_LINK" | "DEMO_LINK" | "FIGMA_LINK" | "TEXT" | "CUSTOM",
+  //   label: "Tệp tin PDF",
+  //   value: "url hoặc text content",
+  //   fileName?: "report.pdf",
+  //   fileKey?: "final-projects/xxx/report.pdf",
+  //   fileSize?: 1024000
+  // }]
   status          SubmissionStatus @default(SUBMITTED)
   score           Float?
   totalScore      Float?           // Tổng điểm tính theo trọng số pipeline

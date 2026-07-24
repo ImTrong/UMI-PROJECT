@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { adminPathService, AdminLearningPath } from '../../services/admin-path.service';
+import { adminPathService, AdminLearningPath, SubmissionFieldType } from '../../services/admin-path.service';
 import { courseApi } from '../../services/api';
 import { courseService } from '../../services/course.service';
 import toast from 'react-hot-toast';
@@ -122,6 +122,52 @@ export default function AdminLearningPathForm() {
         stage.stageNumber = idx + 1;
       });
       return { ...prev, evaluationPipeline: newPipeline };
+    });
+  };
+
+  // ========== Submission Types Handlers ==========
+  const SUBMISSION_TYPE_OPTIONS: { value: SubmissionFieldType; label: string; icon: string; defaultAccept?: string; defaultPlaceholder?: string }[] = [
+    { value: 'FILE', label: 'Tệp tin (PDF, Word, ZIP...)', icon: '📎', defaultAccept: '.pdf,.doc,.docx,.zip,.rar' },
+    { value: 'IMAGE', label: 'Hình ảnh', icon: '🖼️', defaultAccept: '.png,.jpg,.jpeg,.gif,.webp' },
+    { value: 'VIDEO', label: 'Video', icon: '🎬', defaultAccept: '.mp4,.mov,.avi,.webm' },
+    { value: 'AUDIO', label: 'Âm thanh', icon: '🎵', defaultAccept: '.mp3,.wav,.ogg,.m4a' },
+    { value: 'GITHUB_LINK', label: 'Link GitHub', icon: '💻', defaultPlaceholder: 'https://github.com/...' },
+    { value: 'DEMO_LINK', label: 'Link Demo', icon: '🔗', defaultPlaceholder: 'https://...' },
+    { value: 'FIGMA_LINK', label: 'Link Figma', icon: '🎨', defaultPlaceholder: 'https://figma.com/...' },
+    { value: 'TEXT', label: 'Văn bản', icon: '📝', defaultPlaceholder: 'Nhập nội dung...' },
+    { value: 'CUSTOM', label: 'Loại khác (Custom)', icon: '📌', defaultPlaceholder: '' },
+  ];
+
+  const handleAddSubmissionType = (type: SubmissionFieldType) => {
+    const option = SUBMISSION_TYPE_OPTIONS.find(o => o.value === type);
+    if (!option) return;
+    const newItem = {
+      type,
+      label: option.label,
+      required: true,
+      accept: option.defaultAccept || '',
+      placeholder: option.defaultPlaceholder || '',
+      maxSizeMB: 50,
+    };
+    setProjectData((prev: any) => ({
+      ...prev,
+      submissionTypes: [...(prev?.submissionTypes || []), newItem],
+    }));
+  };
+
+  const handleUpdateSubmissionType = (index: number, field: string, value: any) => {
+    setProjectData((prev: any) => {
+      const arr = [...(prev.submissionTypes || [])];
+      arr[index] = { ...arr[index], [field]: value };
+      return { ...prev, submissionTypes: arr };
+    });
+  };
+
+  const handleRemoveSubmissionType = (index: number) => {
+    setProjectData((prev: any) => {
+      const arr = [...(prev.submissionTypes || [])];
+      arr.splice(index, 1);
+      return { ...prev, submissionTypes: arr };
     });
   };
 
@@ -724,6 +770,7 @@ export default function AdminLearningPathForm() {
                           maxScore: 100,
                           passingScore: 80,
                           maxAttempts: 3,
+                          submissionTypes: [],
                           evaluationPipeline: []
                         })}
                         className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-bold text-sm hover:bg-indigo-700"
@@ -794,25 +841,140 @@ export default function AdminLearningPathForm() {
                         </div>
                       </div>
 
+                      {/* Submission Types Config */}
+                      <div className="border-t border-slate-200 pt-8">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <h3 className="font-bold text-lg text-slate-900">Cấu hình loại bài nộp</h3>
+                            <p className="text-sm text-slate-500">Thiết lập các loại dữ liệu mà học viên cần nộp. Hỗ trợ nhiều lĩnh vực: lập trình, thiết kế, marketing, ngoại ngữ...</p>
+                          </div>
+                          <div className="relative group">
+                            <button
+                              type="button"
+                              className="flex items-center gap-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-4 py-2 rounded-lg font-bold text-sm transition-colors"
+                            >
+                              <FiPlus /> Thêm loại bài nộp
+                            </button>
+                            <div className="hidden group-hover:block absolute right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-10 min-w-[280px]">
+                              {SUBMISSION_TYPE_OPTIONS.map(opt => (
+                                <button
+                                  key={opt.value}
+                                  type="button"
+                                  onClick={() => handleAddSubmissionType(opt.value)}
+                                  className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-left text-sm transition-colors"
+                                >
+                                  <span className="text-lg">{opt.icon}</span>
+                                  <span>{opt.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        {(!projectData.submissionTypes || projectData.submissionTypes.length === 0) ? (
+                          <div className="text-center p-8 bg-slate-50 text-slate-500 rounded-lg border border-dashed border-slate-300">
+                            Chưa cấu hình loại bài nộp. Mặc định học viên sẽ nộp bằng link và văn bản.
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {projectData.submissionTypes.map((st: any, index: number) => {
+                              const opt = SUBMISSION_TYPE_OPTIONS.find(o => o.value === st.type);
+                              return (
+                                <div key={index} className="bg-emerald-50/50 border border-emerald-200 rounded-xl p-4 relative">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveSubmissionType(index)}
+                                    className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                                  >
+                                    <FiTrash2 size={14} />
+                                  </button>
+                                  <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-lg">{opt?.icon || '📌'}</span>
+                                    <span className="font-bold text-sm text-slate-700">{st.type}</span>
+                                    {st.required && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-bold">Bắt buộc</span>}
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-slate-600 mb-1">Tên hiển thị</label>
+                                      <input
+                                        type="text"
+                                        className="w-full px-3 py-1.5 border border-slate-300 rounded outline-none focus:border-emerald-500 text-sm"
+                                        value={st.label}
+                                        onChange={e => handleUpdateSubmissionType(index, 'label', e.target.value)}
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-bold text-slate-600 mb-1">Bắt buộc?</label>
+                                      <select
+                                        className="w-full px-3 py-1.5 border border-slate-300 rounded outline-none focus:border-emerald-500 text-sm"
+                                        value={st.required ? 'true' : 'false'}
+                                        onChange={e => handleUpdateSubmissionType(index, 'required', e.target.value === 'true')}
+                                      >
+                                        <option value="true">Có</option>
+                                        <option value="false">Không</option>
+                                      </select>
+                                    </div>
+                                    {['FILE', 'IMAGE', 'VIDEO', 'AUDIO'].includes(st.type) && (
+                                      <>
+                                        <div>
+                                          <label className="block text-xs font-bold text-slate-600 mb-1">Định dạng chấp nhận</label>
+                                          <input
+                                            type="text"
+                                            className="w-full px-3 py-1.5 border border-slate-300 rounded outline-none focus:border-emerald-500 text-sm"
+                                            value={st.accept || ''}
+                                            onChange={e => handleUpdateSubmissionType(index, 'accept', e.target.value)}
+                                            placeholder=".pdf,.doc,.zip"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-bold text-slate-600 mb-1">Dung lượng tối đa (MB)</label>
+                                          <input
+                                            type="number"
+                                            className="w-full px-3 py-1.5 border border-slate-300 rounded outline-none focus:border-emerald-500 text-sm"
+                                            value={st.maxSizeMB || 50}
+                                            onChange={e => handleUpdateSubmissionType(index, 'maxSizeMB', Number(e.target.value))}
+                                          />
+                                        </div>
+                                      </>
+                                    )}
+                                    {['GITHUB_LINK', 'DEMO_LINK', 'FIGMA_LINK', 'TEXT', 'CUSTOM'].includes(st.type) && (
+                                      <div className="md:col-span-2">
+                                        <label className="block text-xs font-bold text-slate-600 mb-1">Placeholder</label>
+                                        <input
+                                          type="text"
+                                          className="w-full px-3 py-1.5 border border-slate-300 rounded outline-none focus:border-emerald-500 text-sm"
+                                          value={st.placeholder || ''}
+                                          onChange={e => handleUpdateSubmissionType(index, 'placeholder', e.target.value)}
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
                       {/* Evaluation Pipeline */}
                       <div className="border-t border-slate-200 pt-8">
                         <div className="flex items-center justify-between mb-4">
                           <div>
-                            <h3 className="font-bold text-lg text-slate-900">AI Evaluation Pipeline (Các giai đoạn chấm điểm bằng AI)</h3>
-                            <p className="text-sm text-slate-500">Cấu hình các bước AI sẽ dùng để đánh giá và chấm điểm dự án.</p>
+                            <h3 className="font-bold text-lg text-slate-900">Bộ tiêu chí đánh giá (Evaluation Rubric)</h3>
+                            <p className="text-sm text-slate-500">Xây dựng bộ tiêu chí để AI đánh giá bài nộp. Mỗi tiêu chí gồm: tên, mô tả, trọng số, điều kiện đạt, kết quả đầu ra mong muốn.</p>
                           </div>
                           <button
                             type="button"
                             onClick={handleAddEvaluationStage}
                             className="flex items-center gap-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-4 py-2 rounded-lg font-bold text-sm transition-colors"
                           >
-                            <FiPlus /> Thêm giai đoạn
+                            <FiPlus /> Thêm tiêu chí
                           </button>
                         </div>
 
                         {(!projectData.evaluationPipeline || projectData.evaluationPipeline.length === 0) ? (
                           <div className="text-center p-8 bg-slate-50 text-slate-500 rounded-lg border border-dashed border-slate-300">
-                            Chưa cấu hình các giai đoạn chấm điểm.
+                            Chưa cấu hình tiêu chí đánh giá. AI sẽ không thể chấm điểm.
                           </div>
                         ) : (
                           <div className="space-y-4">
@@ -826,11 +988,11 @@ export default function AdminLearningPathForm() {
                                   <FiTrash2 />
                                 </button>
                                 
-                                <h4 className="font-bold text-slate-900 mb-4">Giai đoạn {stage.stageNumber}</h4>
+                                <h4 className="font-bold text-slate-900 mb-4">Tiêu chí {stage.stageNumber}</h4>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                   <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold text-slate-700 mb-1">Tiêu đề giai đoạn *</label>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Tên tiêu chí *</label>
                                     <input
                                       type="text"
                                       className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm"
@@ -840,7 +1002,7 @@ export default function AdminLearningPathForm() {
                                     />
                                   </div>
                                   <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold text-slate-700 mb-1">Mục tiêu kiểm tra (Objective)</label>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Mô tả yêu cầu cần đạt (Objective)</label>
                                     <input
                                       type="text"
                                       className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm"
@@ -849,12 +1011,21 @@ export default function AdminLearningPathForm() {
                                     />
                                   </div>
                                   <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold text-slate-700 mb-1">Tiêu chí chi tiết cho AI chấm (Criteria) *</label>
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Tiêu chí đánh giá chi tiết (Criteria) *</label>
                                     <textarea
                                       className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm min-h-[60px]"
                                       value={stage.criteria}
                                       onChange={(e) => handleUpdateEvaluationStage(index, 'criteria', e.target.value)}
                                       placeholder="Mô tả chi tiết những tiêu chí kiểm tra cho AI..."
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Kết quả đầu ra mong muốn (Expected Output)</label>
+                                    <textarea
+                                      className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm min-h-[60px]"
+                                      value={stage.expectedOutput || ''}
+                                      onChange={(e) => handleUpdateEvaluationStage(index, 'expectedOutput', e.target.value)}
+                                      placeholder="Mô tả kết quả đầu ra mong muốn của tiêu chí này. VD: Phải có file README.md hoàn chỉnh với hướng dẫn cài đặt..."
                                     />
                                   </div>
                                   <div>
@@ -876,6 +1047,16 @@ export default function AdminLearningPathForm() {
                                       className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm"
                                       value={stage.weight}
                                       onChange={(e) => handleUpdateEvaluationStage(index, 'weight', Number(e.target.value))}
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-slate-700 mb-1">Điều kiện đạt (Pass Criteria)</label>
+                                    <input
+                                      type="text"
+                                      className="w-full px-3 py-2 border border-slate-300 rounded outline-none focus:border-indigo-500 text-sm"
+                                      value={stage.passCriteria || ''}
+                                      onChange={(e) => handleUpdateEvaluationStage(index, 'passCriteria', e.target.value)}
+                                      placeholder="VD: Đạt ≥ 70% tiêu chí"
                                     />
                                   </div>
                                 </div>
