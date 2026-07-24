@@ -116,9 +116,31 @@ export interface AdminFinalProject {
   maxFileSizeMB: number;
   maxAttempts: number;
   deadline?: string;
+  submissionTypes?: SubmissionTypeConfig[];
   evaluationPipeline?: EvaluationStageConfig[];
   createdBy: string;
   createdAt: string;
+}
+
+export type SubmissionFieldType =
+  | 'FILE'
+  | 'IMAGE'
+  | 'VIDEO'
+  | 'AUDIO'
+  | 'GITHUB_LINK'
+  | 'DEMO_LINK'
+  | 'FIGMA_LINK'
+  | 'TEXT'
+  | 'CUSTOM';
+
+export interface SubmissionTypeConfig {
+  type: SubmissionFieldType;
+  label: string;
+  description?: string;
+  required: boolean;
+  accept?: string;
+  maxSizeMB?: number;
+  placeholder?: string;
 }
 
 export interface EvaluationStageConfig {
@@ -129,5 +151,5 @@ export interface EvaluationStageConfig {
   maxScore: number;
   weight: number;
   passCriteria: string;
+  expectedOutput?: string;
 }
-

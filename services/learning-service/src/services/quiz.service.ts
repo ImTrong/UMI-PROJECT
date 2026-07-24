@@ -4,14 +4,19 @@ import logger from '../utils/logger';
 
 let fileStorage: any = null;
 try {
-  const fileStorageModule = require('../../../shared/file-storage/src');
+  const fileStorageModule = require('@umi/file-storage');
   fileStorage = fileStorageModule.fileStorage;
-} catch {
+} catch (e1) {
   try {
-    const fileStorageModule = require('../../shared/file-storage/src');
+    const fileStorageModule = require('../../../shared/file-storage/src');
     fileStorage = fileStorageModule.fileStorage;
-  } catch {
-    logger.warn('FileStorageService not available for quiz attachments');
+  } catch (e2) {
+    try {
+      const fileStorageModule = require('../../shared/file-storage/src');
+      fileStorage = fileStorageModule.fileStorage;
+    } catch (e3) {
+      logger.warn('FileStorageService not available for quiz attachments');
+    }
   }
 }
 

@@ -203,7 +203,8 @@ export class FinalProjectController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { submissionId } = req.params;
-      const result = await FinalProjectService.evaluateSubmission(submissionId);
+      const token = req.headers.authorization;
+      const result = await FinalProjectService.evaluateSubmission(submissionId, token);
       res.status(HTTP_STATUS.OK).json({
         message: 'Đánh giá bài nộp thành công',
         data: result,

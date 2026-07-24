@@ -12,6 +12,7 @@ import { useSocket } from '../contexts/SocketContext';
 import toast from 'react-hot-toast';
 import { FiCheckCircle, FiClock, FiFileText, FiCheckSquare, FiVideo, FiMessageCircle } from 'react-icons/fi';
 import { DynamicWatermark } from '../components/learning/DynamicWatermark';
+import { SecurePDFViewer } from '../components/learning/SecurePDFViewer';
 
 interface LessonResource {
   title?: string;
@@ -45,7 +46,7 @@ export default function Learning() {
   const [lessonType, setLessonType] = useState<'VIDEO' | 'QUIZ' | 'ASSIGNMENT' | 'PDF' | 'TEXT'>('VIDEO');
   const [tasks, setTasks] = useState<Record<string, Array<'QUIZ' | 'ASSIGNMENT'>>>({});
   const [hasTaskAttached, setHasTaskAttached] = useState<Array<'QUIZ' | 'ASSIGNMENT'>>([]);
-  const [pdfHeight, setPdfHeight] = useState(2500);
+
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
   const { socket } = useSocket();
@@ -388,26 +389,7 @@ export default function Learning() {
             ) : lessonType === 'PDF' ? (
               <div className="flex-1 bg-white p-4 overflow-hidden flex flex-col" onContextMenu={(e) => e.preventDefault()}>
                 <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border rounded-t-lg select-none">
-                  <span className="text-xs text-slate-500 font-medium">Bảo mật tài liệu (Cuộn chuột để xem)</span>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => setPdfHeight(Math.max(1000, pdfHeight - 1000))} 
-                      disabled={pdfHeight <= 1000}
-                      className="px-2 py-1 text-xs bg-white border border-slate-100 rounded hover:bg-slate-100 disabled:opacity-50 font-medium text-slate-700 transition"
-                    >
-                      Thu nhỏ
-                    </button>
-                    <span className="text-xs font-semibold text-slate-700 bg-slate-100 px-2.5 py-1 rounded">
-                      Chiều cao: {pdfHeight}px
-                    </span>
-                    <button 
-                      onClick={() => setPdfHeight(Math.min(8000, pdfHeight + 1000))}
-                      disabled={pdfHeight >= 8000}
-                      className="px-2 py-1 text-xs bg-white border border-slate-100 rounded hover:bg-slate-100 disabled:opacity-50 font-medium text-slate-700 transition"
-                    >
-                      Mở rộng
-                    </button>
-                  </div>
+                  <span className="text-xs text-slate-500 font-medium">Bảo mật tài liệu (Không thể nhấp chuột phải)</span>
                 </div>
                 <div className="flex-1 border-x border-b rounded-b-lg overflow-y-auto bg-slate-100 relative">
                   <DynamicWatermark />
@@ -416,12 +398,7 @@ export default function Learning() {
                       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
                     </div>
                   ) : pdfBlobUrl ? (
-                    <iframe
-                      src={`${pdfBlobUrl}#toolbar=0&navpanes=0&scrollbar=0`}
-                      title={currentLesson.title}
-                      className="w-full block"
-                      style={{ pointerEvents: 'none', height: `${pdfHeight}px`, border: 'none' }}
-                    />
+                    <SecurePDFViewer url={pdfBlobUrl} />
                   ) : (
                     <div className="flex items-center justify-center h-full text-slate-500">
                       Không thể tải tài liệu

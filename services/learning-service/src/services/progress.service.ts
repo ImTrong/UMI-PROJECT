@@ -367,7 +367,7 @@ export class ProgressService {
         );
 
         const avgScore = quizScores.reduce((a, b) => a + b, 0) / quizzesWithScore.length;
-        const currentPassingScore = courseProgress.passingScore ?? 60;
+        const currentPassingScore = courseProgress.passingScore ?? 80;
         const passed = avgScore >= currentPassingScore;
 
         await prisma.courseProgress.update({

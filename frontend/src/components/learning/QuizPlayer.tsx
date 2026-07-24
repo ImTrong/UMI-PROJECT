@@ -92,16 +92,18 @@ export const QuizPlayer = ({
     }
   };
 
-  const handleAnswerChange = (questionId: string, value: string, type: string) => {
-    if (type === 'MULTI_SELECT' || type === 'MULTIPLE_CHOICE') {
-      const current = (answers[questionId] as string[]) || [];
+  const handleAnswerChange = (question: any, value: string) => {
+    const isMulti = question.type === 'MULTI_SELECT' || (!question.type && question.questionType === 'MULTIPLE_CHOICE');
+    
+    if (isMulti) {
+      const current = (answers[question.id] as string[]) || [];
       if (current.includes(value)) {
-        setAnswers({ ...answers, [questionId]: current.filter((v) => v !== value) });
+        setAnswers({ ...answers, [question.id]: current.filter((v) => v !== value) });
       } else {
-        setAnswers({ ...answers, [questionId]: [...current, value] });
+        setAnswers({ ...answers, [question.id]: [...current, value] });
       }
     } else {
-      setAnswers({ ...answers, [questionId]: value });
+      setAnswers({ ...answers, [question.id]: value });
     }
   };
 
@@ -356,7 +358,7 @@ export const QuizPlayer = ({
 
       <div className="space-y-8 mb-8">
         {quiz.questions.map((q, index) => {
-          const isMulti = q.type === 'MULTI_SELECT' || q.questionType === 'MULTIPLE_CHOICE';
+          const isMulti = q.type === 'MULTI_SELECT' || (!q.type && q.questionType === 'MULTIPLE_CHOICE');
           const selectedValues = isMulti
             ? ((answers[q.id] as string[]) || [])
             : [answers[q.id] as string].filter(Boolean);
@@ -375,14 +377,14 @@ export const QuizPlayer = ({
                   return (
                     <label
                       key={opt.id}
-                      className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all ${
+                      className={`relative flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-all ${
                         isSelected
                           ? 'border-primary-500 bg-primary-50 shadow-sm'
                           : 'border-slate-100 hover:border-slate-200 hover:bg-slate-50'
                       }`}
                     >
                       {/* Custom visual indicator */}
-                      <div className={`flex-shrink-0 w-5 h-5 rounded-${isMulti ? 'md' : 'full'} border-2 flex items-center justify-center transition-all ${
+                      <div className={`flex-shrink-0 w-5 h-5 ${isMulti ? 'rounded-md' : 'rounded-full'} border-2 flex items-center justify-center transition-all ${
                         isSelected
                           ? 'border-primary-600 bg-primary-600'
                           : 'border-slate-200 bg-white'
@@ -403,7 +405,7 @@ export const QuizPlayer = ({
                         name={q.id}
                         className="sr-only"
                         checked={isSelected}
-                        onChange={() => handleAnswerChange(q.id, opt.id, q.type || q.questionType || 'MULTIPLE_CHOICE')}
+                        onChange={() => handleAnswerChange(q, opt.id)}
                       />
                       <span className={`text-slate-700 ${isSelected ? 'font-medium text-slate-900' : ''}`}>{opt.text}</span>
                     </label>

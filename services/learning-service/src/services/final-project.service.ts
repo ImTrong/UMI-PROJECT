@@ -1,19 +1,24 @@
 import { PrismaClient } from '@prisma/client';
 import { ERROR_MESSAGES } from '../utils/constants';
 import { ActivityService } from './activity.service';
-import { ActivityAction, FinalProjectData, EvaluationResult } from '../types';
+import { ActivityAction, FinalProjectData, EvaluationResult, SubmissionDataItem } from '../types';
 import logger from '../utils/logger';
 
 let fileStorage: any = null;
 try {
-  const fileStorageModule = require('../../../shared/file-storage/src');
+  const fileStorageModule = require('@umi/file-storage');
   fileStorage = fileStorageModule.fileStorage;
-} catch {
+} catch (e1) {
   try {
-    const fileStorageModule = require('../../shared/file-storage/src');
+    const fileStorageModule = require('../../../shared/file-storage/src');
     fileStorage = fileStorageModule.fileStorage;
-  } catch {
-    logger.warn('FileStorageService not available for final project attachments');
+  } catch (e2) {
+    try {
+      const fileStorageModule = require('../../shared/file-storage/src');
+      fileStorage = fileStorageModule.fileStorage;
+    } catch (e3) {
+      logger.warn('FileStorageService not available for final project attachments');
+    }
   }
 }
 
@@ -56,6 +61,7 @@ export class FinalProjectService {
         maxFileSizeMB: data.maxFileSizeMB ?? 50,
         maxAttempts: data.maxAttempts ?? 3,
         deadline: data.deadline ? new Date(data.deadline) : undefined,
+        submissionTypes: data.submissionTypes ? JSON.parse(JSON.stringify(data.submissionTypes)) : undefined,
         evaluationPipeline: data.evaluationPipeline ? JSON.parse(JSON.stringify(data.evaluationPipeline)) : undefined,
         createdBy,
       },
@@ -101,6 +107,7 @@ export class FinalProjectService {
         maxFileSizeMB: data.maxFileSizeMB,
         maxAttempts: data.maxAttempts,
         deadline: data.deadline ? new Date(data.deadline) : undefined,
+        submissionTypes: data.submissionTypes ? JSON.parse(JSON.stringify(data.submissionTypes)) : undefined,
         evaluationPipeline: data.evaluationPipeline ? JSON.parse(JSON.stringify(data.evaluationPipeline)) : undefined,
       },
     });
@@ -193,6 +200,7 @@ export class FinalProjectService {
       fileUrl?: string;
       fileKey?: string;
       fileName?: string;
+      submissionData?: SubmissionDataItem[];
     }
   ) {
     const project = await prisma.finalProject.findUnique({ where: { id: projectId } });
@@ -233,6 +241,19 @@ export class FinalProjectService {
       throw new Error(`Bạn đã hết số lần nộp bài (${project.maxAttempts} lần)`);
     }
 
+    // Validate required submission types
+    const submissionTypes = (project.submissionTypes as any[]) || [];
+    if (submissionTypes.length > 0 && data.submissionData) {
+      for (const st of submissionTypes) {
+        if (st.required) {
+          const found = data.submissionData.find((sd: SubmissionDataItem) => sd.type === st.type && sd.label === st.label && sd.value);
+          if (!found) {
+            throw new Error(`Vui lòng điền đầy đủ mục bắt buộc: "${st.label}"`);
+          }
+        }
+      }
+    }
+
     const attemptNumber = existingCount + 1;
 
     const submission = await prisma.finalProjectSubmission.create({
@@ -247,6 +268,7 @@ export class FinalProjectService {
         fileUrl: data.fileUrl,
         fileKey: data.fileKey,
         fileName: data.fileName,
+        submissionData: data.submissionData ? JSON.parse(JSON.stringify(data.submissionData)) : undefined,
         status: 'SUBMITTED',
       },
     });
@@ -269,7 +291,7 @@ export class FinalProjectService {
   /**
    * Evaluate submission using AI pipeline
    */
-  static async evaluateSubmission(submissionId: string) {
+  static async evaluateSubmission(submissionId: string, token?: string) {
     const submission = await prisma.finalProjectSubmission.findUnique({
       where: { id: submissionId },
       include: { finalProject: true },
@@ -294,13 +316,39 @@ export class FinalProjectService {
       const axios = require('axios');
       const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:3007';
 
-      // Build submission content for AI
-      const submissionContent = [
-        submission.content ? `Nội dung bài nộp:\n${submission.content}` : '',
-        submission.githubUrl ? `Link tài liệu / Bài làm: ${submission.githubUrl}` : '',
-        submission.demoUrl ? `Link Video / Demo: ${submission.demoUrl}` : '',
-        submission.fileName ? `File đính kèm: ${submission.fileName}` : '',
-      ].filter(Boolean).join('\n\n');
+      // Build submission content for AI — include both legacy fields and new submissionData
+      const contentParts: string[] = [];
+
+      // Process new submissionData if available
+      const submissionDataArr = (submission.submissionData as any[]) || [];
+      if (submissionDataArr.length > 0) {
+        contentParts.push('=== BÀI NỘP CỦA HỌC VIÊN ===');
+        for (const item of submissionDataArr) {
+          const typeLabels: Record<string, string> = {
+            'FILE': '📎 Tệp tin',
+            'IMAGE': '🖼️ Hình ảnh',
+            'VIDEO': '🎬 Video',
+            'AUDIO': '🎵 Âm thanh',
+            'GITHUB_LINK': '💻 Link GitHub',
+            'DEMO_LINK': '🔗 Link Demo',
+            'FIGMA_LINK': '🎨 Link Figma',
+            'TEXT': '📝 Văn bản',
+            'CUSTOM': '📌 Khác',
+          };
+          const prefix = typeLabels[item.type] || '📌';
+          contentParts.push(`\n${prefix} — ${item.label}:`);
+          if (item.fileName) contentParts.push(`  Tên file: ${item.fileName}`);
+          contentParts.push(`  Nội dung/Link: ${item.value}`);
+        }
+      } else {
+        // Fallback to legacy fields
+        if (submission.content) contentParts.push(`Nội dung bài nộp:\n${submission.content}`);
+        if (submission.githubUrl) contentParts.push(`Link tài liệu / Bài làm: ${submission.githubUrl}`);
+        if (submission.demoUrl) contentParts.push(`Link Video / Demo: ${submission.demoUrl}`);
+        if (submission.fileName) contentParts.push(`File đính kèm: ${submission.fileName}`);
+      }
+
+      const submissionContent = contentParts.filter(Boolean).join('\n');
 
       const projectInfo = {
         title: project.title,
@@ -315,6 +363,7 @@ export class FinalProjectService {
         projectInfo,
         evaluationPipeline: pipeline,
       }, {
+        headers: token ? { Authorization: token } : undefined,
         timeout: 120000, // 2 minutes timeout for AI evaluation
       });
 
@@ -330,7 +379,6 @@ export class FinalProjectService {
           score: result.totalScore, // Also set legacy score field
           aiFeedback: result.feedbackReport,
           gradedAt: new Date(),
-          gradedBy: 'AI_EVALUATOR',
         },
       });
 
@@ -339,6 +387,17 @@ export class FinalProjectService {
       // If passed, auto-generate path certificate
       if (isPassed) {
         try {
+          // Update enrollment to COMPLETED before generating certificate
+          const enrollment = await prisma.userPathEnrollment.findUnique({
+            where: { userId_learningPathId: { userId: submission.userId, learningPathId: submission.learningPathId } }
+          });
+          if (enrollment && enrollment.status !== 'COMPLETED') {
+             await prisma.userPathEnrollment.update({
+               where: { id: enrollment.id },
+               data: { status: 'COMPLETED', completedAt: new Date() }
+             });
+          }
+
           const { CertificateService } = require('./certificate.service');
           await CertificateService.generatePathCertificate(submission.userId, submission.learningPathId);
           logger.info(`Auto-generated path certificate for user ${submission.userId} on path ${submission.learningPathId}`);

@@ -181,6 +181,36 @@ export interface CourseExamResult {
 
 // ==================== Final Project Types ====================
 
+export type SubmissionFieldType =
+  | 'FILE'
+  | 'IMAGE'
+  | 'VIDEO'
+  | 'AUDIO'
+  | 'GITHUB_LINK'
+  | 'DEMO_LINK'
+  | 'FIGMA_LINK'
+  | 'TEXT'
+  | 'CUSTOM';
+
+export interface SubmissionTypeConfig {
+  type: SubmissionFieldType;
+  label: string;
+  description?: string;
+  required: boolean;
+  accept?: string;       // For FILE/IMAGE/VIDEO/AUDIO: e.g. ".pdf,.doc,.docx"
+  maxSizeMB?: number;    // For file uploads
+  placeholder?: string;  // For link/text types
+}
+
+export interface SubmissionDataItem {
+  type: SubmissionFieldType;
+  label: string;
+  value: string;         // URL or text content
+  fileName?: string;
+  fileKey?: string;
+  fileSize?: number;
+}
+
 export interface EvaluationStage {
   stageNumber: number;
   title: string;
@@ -189,6 +219,7 @@ export interface EvaluationStage {
   maxScore: number;
   weight: number;
   passCriteria: string;
+  expectedOutput?: string;  // Kết quả đầu ra mong muốn
 }
 
 export interface StageResult {
@@ -222,6 +253,7 @@ export interface FinalProjectData {
   maxFileSizeMB?: number;
   maxAttempts?: number;
   deadline?: string;
+  submissionTypes?: SubmissionTypeConfig[];
   evaluationPipeline?: EvaluationStage[];
 }
 
