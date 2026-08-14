@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { learningService } from '../services/learning.service';
 import { format } from 'date-fns';
-import { FiSearch, FiCheckCircle, FiXCircle, FiAward, FiCalendar, FiUser, FiBookOpen } from 'react-icons/fi';
+import { FiSearch, FiCheckCircle, FiXCircle, FiAward, FiCalendar, FiUser, FiBookOpen, FiMap } from 'react-icons/fi';
 
 interface VerificationResult {
   valid: boolean;
@@ -13,6 +13,8 @@ interface VerificationResult {
     courseTitle: string;
     issueDate: string;
     expiresAt?: string;
+    type?: 'COURSE_COMPLETION' | 'PATH_CERTIFICATE';
+    metadata?: any;
   };
 }
 
@@ -107,10 +109,18 @@ export default function CertificateVerify() {
                 </div>
 
                 <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl">
-                  <FiBookOpen className="text-cyan-500 mt-0.5 flex-shrink-0" size={18} />
+                  {result.certificate?.type === 'PATH_CERTIFICATE' ? (
+                    <FiMap className="text-amber-500 mt-0.5 flex-shrink-0" size={18} />
+                  ) : (
+                    <FiBookOpen className="text-cyan-500 mt-0.5 flex-shrink-0" size={18} />
+                  )}
                   <div>
-                    <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Khóa học</p>
-                    <p className="font-semibold text-slate-900">{result.certificate?.courseTitle}</p>
+                    <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">
+                      {result.certificate?.type === 'PATH_CERTIFICATE' ? 'Lộ trình' : 'Khóa học'}
+                    </p>
+                    <p className="font-semibold text-slate-900">
+                      {result.certificate?.metadata?.certificateConfig?.title || result.certificate?.courseTitle}
+                    </p>
                   </div>
                 </div>
 

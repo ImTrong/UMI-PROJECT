@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { ChatService } from '../services/chat.service';
+import { CareerAdvisorService } from '../services/career-advisor.service';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 
@@ -419,6 +420,140 @@ export class AIController {
       logger.error('Evaluate submission error:', error);
       return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to evaluate submission',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
+
+  // ==================== Career Advisor Pipeline ====================
+
+  /**
+   * POST /api/ai/career-advisor
+   * Start a new career advisor session (Prompt 1 → optional assessment → Prompt 2)
+   */
+  static async careerAdvisorStart(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+
+      const { goal } = req.body;
+
+      if (!goal || typeof goal !== 'string' || goal.trim().length === 0) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Vui lòng nhập mục tiêu nghề nghiệp của bạn.',
+        });
+      }
+
+      if (goal.trim().length > 500) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Mục tiêu không được vượt quá 500 ký tự.',
+        });
+      }
+
+      const token = extractToken(req);
+      const result = await CareerAdvisorService.startSession(userId, goal.trim(), token);
+
+      return res.status(HTTP_STATUS.OK).json({
+        message: 'Career advisor session started',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Career advisor start error:', error);
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to start career advisor session',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
+
+  /**
+   * POST /api/ai/career-advisor/:sessionId/submit
+   * Submit assessment answers for an existing session
+   */
+  static async careerAdvisorSubmit(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+
+      const { sessionId } = req.params;
+      const { answers } = req.body;
+
+      if (!sessionId) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Session ID is required.',
+        });
+      }
+
+      if (!answers || !Array.isArray(answers) || answers.length === 0) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Answers array is required and must not be empty.',
+        });
+      }
+
+      const token = extractToken(req);
+      const result = await CareerAdvisorService.submitAnswers(userId, sessionId, answers, token);
+
+      return res.status(HTTP_STATUS.OK).json({
+        message: 'Assessment answers submitted',
+        data: result,
+      });
+    } catch (error: any) {
+      if (error.message === 'SESSION_NOT_FOUND') {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'Session not found.' });
+      }
+      if (error.message === 'SESSION_ALREADY_COMPLETE') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Session already completed.' });
+      }
+
+      logger.error('Career advisor submit error:', error);
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to process assessment answers',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
+
+  /**
+   * POST /api/ai/career-advisor/:sessionId/skip
+   * Skip assessment and generate a foundation-first roadmap
+   */
+  static async careerAdvisorSkip(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+
+      const { sessionId } = req.params;
+
+      if (!sessionId) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Session ID is required.',
+        });
+      }
+
+      const token = extractToken(req);
+      const result = await CareerAdvisorService.skipAssessment(userId, sessionId, token);
+
+      return res.status(HTTP_STATUS.OK).json({
+        message: 'Assessment skipped, roadmap generated',
+        data: result,
+      });
+    } catch (error: any) {
+      if (error.message === 'SESSION_NOT_FOUND') {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'Session not found.' });
+      }
+      if (error.message === 'SESSION_ALREADY_COMPLETE') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Session already completed.' });
+      }
+
+      logger.error('Career advisor skip error:', error);
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to skip assessment and generate roadmap',
         details: process.env.NODE_ENV === 'development' ? error.message : undefined,
       });
     }

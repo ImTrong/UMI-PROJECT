@@ -28,7 +28,7 @@ export class CertificateService {
     });
     if (existing) return existing;
 
-    const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+    const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
     const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://localhost:3003';
 
     let user: UserDetails;
@@ -38,9 +38,11 @@ export class CertificateService {
       const userRes: AxiosResponse<{ data: UserDetails[] }> = await axios.post(`${userServiceUrl}/api/users/batch`, { ids: [userId] });
       user = userRes.data.data?.[0];
       if (!user) {
+        logger.error(`User not found in batch lookup for userId: ${userId}`);
         throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
       }
-    } catch {
+    } catch (err: any) {
+      logger.error(`Failed to fetch user for certificate generation. userId: ${userId}, URL: ${userServiceUrl}, error:`, err.message);
       throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
@@ -57,6 +59,9 @@ export class CertificateService {
     const issueDate = new Date();
     const expiresAt = null;
 
+    // Get certificate config from course if available
+    const certificateConfig = (course as any).certificateConfig || null;
+
     let pdfPath = '';
     try {
       pdfPath = await CertificateGenerator.generate({
@@ -66,6 +71,7 @@ export class CertificateService {
         issueDate,
         verificationUrl,
         type: 'COURSE_COMPLETION',
+        certificateConfig,
       });
     } catch (error) {
       logger.error('Failed to generate PDF:', error);
@@ -77,6 +83,7 @@ export class CertificateService {
       completionDate: courseProgress.completedAt || undefined,
       totalStudyTime: courseProgress.timeSpentSeconds,
       grade: 'Pass',
+      certificateConfig,
     };
 
     const certificate = await prisma.certificate.create({
@@ -156,13 +163,17 @@ export class CertificateService {
     });
     if (existing) return existing;
 
-    const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+    const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
     let user: UserDetails;
     try {
       const userRes: AxiosResponse<{ data: UserDetails[] }> = await axios.post(`${userServiceUrl}/api/users/batch`, { ids: [userId] });
       user = userRes.data.data?.[0];
-      if (!user) throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
-    } catch {
+      if (!user) {
+        logger.error(`User not found in batch lookup for path certificate. userId: ${userId}`);
+        throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+      }
+    } catch (err: any) {
+      logger.error(`Failed to fetch user for path certificate generation. userId: ${userId}, URL: ${userServiceUrl}, error:`, err.message);
       throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
     }
 
@@ -173,6 +184,14 @@ export class CertificateService {
     const expiresAt = new Date();
     expiresAt.setFullYear(expiresAt.getFullYear() + 5); // Path certificates valid for 5 years
 
+    // Get certificate config from learning path if available
+    const certificateConfig = (path as any).certificateConfig || null;
+
+    // Use validity years from config or default to 5 years
+    if (certificateConfig?.validityYears) {
+      expiresAt.setFullYear(expiresAt.getFullYear() - 5 + certificateConfig.validityYears);
+    }
+
     let pdfPath = '';
     try {
       pdfPath = await CertificateGenerator.generate({
@@ -182,6 +201,7 @@ export class CertificateService {
         issueDate,
         verificationUrl,
         type: 'PATH_CERTIFICATE',
+        certificateConfig,
       });
     } catch (error) {
       logger.error('Failed to generate path certificate PDF:', error);
@@ -192,6 +212,7 @@ export class CertificateService {
       completionDate: enrollment.completedAt || undefined,
       finalProjectScore,
       grade: 'Pass',
+      certificateConfig,
     };
 
     const certificate = await prisma.certificate.create({

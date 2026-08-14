@@ -14,7 +14,7 @@ import { HLSController } from './controllers/hls.controller';
 import { RecommendationController } from './controllers/recommendation.controller';
 import { AdminPathController } from './controllers/admin-path.controller';
 import { AnalyticsController } from './controllers/analytics.controller';
-import { authenticateToken } from './middleware/auth.middleware';
+import { authenticateToken, authenticateOptional } from './middleware/auth.middleware';
 import {
   validateLessonComplete,
   validateCourseId,
@@ -41,7 +41,7 @@ const limiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
   skip: (req) => {
     const path = req.originalUrl || req.path;
-    return path.includes('/internal') || path.includes('/health');
+    return path.includes('/internal') || path.includes('/health') || req.headers['x-internal-service'] === 'true';
   }
 });
 app.use('/api/learning', limiter);
@@ -118,15 +118,7 @@ app.post('/api/learning/analytics/my-schedule', authenticateToken, AnalyticsCont
 app.get('/api/learning/analytics/content-recommendations', authenticateToken, AnalyticsController.getContentRecommendations);
 
 // ==================== Recommendation & Learning Paths Routes ====================
-app.get('/api/learning/recommendations/home', (req, res, next) => {
-  // Optional auth — try to parse JWT but don't require it
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    authenticateToken(req as any, res, next);
-  } else {
-    next();
-  }
-}, RecommendationController.getHomeRecommendations);
+app.get('/api/learning/recommendations/home', authenticateOptional, RecommendationController.getHomeRecommendations);
 app.get('/api/learning/recommendations', authenticateToken, RecommendationController.getPersonalizedRecommendations);
 app.get('/api/learning/recommendations/insights', authenticateToken, RecommendationController.getLearningInsights);
 app.get('/api/learning/recommendations/next-actions', authenticateToken, RecommendationController.getSmartNextActions);

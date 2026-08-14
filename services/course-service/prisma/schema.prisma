@@ -29,6 +29,7 @@ model Course {
   rating            Float             @default(0)
   totalReviews      Int               @default(0)
   enrolledCount     Int               @default(0)
+  certificateConfig Json?             // Custom certificate config (title, subtitle, signer, org, skills)
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   

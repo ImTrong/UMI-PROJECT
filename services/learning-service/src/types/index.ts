@@ -39,6 +39,7 @@ export interface CertificateMetadata {
   revokedReason?: string;
   pathTitle?: string;
   finalProjectScore?: number;
+  certificateConfig?: any;
   [key: string]: any;
 }
 

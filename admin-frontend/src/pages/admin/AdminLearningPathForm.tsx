@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { adminPathService, AdminLearningPath, SubmissionFieldType } from '../../services/admin-path.service';
+import { adminPathService, AdminLearningPath, SubmissionFieldType, CertificateConfig } from '../../services/admin-path.service';
 import { courseApi } from '../../services/api';
 import { courseService } from '../../services/course.service';
 import toast from 'react-hot-toast';
@@ -33,7 +33,45 @@ export default function AdminLearningPathForm() {
     completionRule: 'ALL_COURSES',
     recommended: false,
     status: 'DRAFT',
+    certificateConfig: {
+      title: '',
+      subtitle: '',
+      description: '',
+      signerName: '',
+      signerTitle: '',
+      organizationName: '',
+      validityYears: 5,
+      skills: [],
+    },
   });
+
+  const [certSkillInput, setCertSkillInput] = useState('');
+
+  const handleCertConfigChange = (field: keyof CertificateConfig, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      certificateConfig: {
+        ...(prev.certificateConfig || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleAddCertSkill = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && certSkillInput.trim()) {
+      e.preventDefault();
+      const currentSkills = formData.certificateConfig?.skills || [];
+      if (!currentSkills.includes(certSkillInput.trim())) {
+        handleCertConfigChange('skills', [...currentSkills, certSkillInput.trim()]);
+      }
+      setCertSkillInput('');
+    }
+  };
+
+  const handleRemoveCertSkill = (skill: string) => {
+    const currentSkills = formData.certificateConfig?.skills || [];
+    handleCertConfigChange('skills', currentSkills.filter(s => s !== skill));
+  };
 
   const [availableCourses, setAvailableCourses] = useState<any[]>([]);
   const [searchCourse, setSearchCourse] = useState('');
@@ -356,7 +394,7 @@ export default function AdminLearningPathForm() {
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Tabs */}
         <div className="flex border-b border-slate-200 overflow-x-auto">
-          {['basic', 'courses', 'prerequisites', 'settings', 'final-project'].map(tab => (
+          {['basic', 'courses', 'prerequisites', 'settings', 'certificate', 'final-project'].map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -364,7 +402,7 @@ export default function AdminLearningPathForm() {
                 activeTab === tab ? 'text-primary-600 border-b-2 border-primary-600 bg-primary-50/50' : 'text-slate-500 hover:text-slate-800'
               }`}
             >
-              {tab === 'basic' ? 'Thông tin cơ bản' : tab === 'courses' ? 'Khóa học & Tiến trình' : tab === 'prerequisites' ? 'Điều kiện tiên quyết' : tab === 'settings' ? 'Cài đặt & Luật' : 'Dự án cuối kỳ'}
+              {tab === 'basic' ? 'Thông tin cơ bản' : tab === 'courses' ? 'Khóa học & Tiến trình' : tab === 'prerequisites' ? 'Điều kiện tiên quyết' : tab === 'settings' ? 'Cài đặt & Luật' : tab === 'certificate' ? '🏅 Chứng chỉ' : 'Dự án cuối kỳ'}
             </button>
           ))}
         </div>
@@ -743,7 +781,158 @@ export default function AdminLearningPathForm() {
             </div>
           )}
 
-          {/* TAB 5: Final Project */}
+          {/* TAB 5: Certificate Config */}
+          {activeTab === 'certificate' && (
+            <div className="max-w-3xl space-y-8 animate-fadeIn">
+              <div className="flex items-center gap-3 mb-2">
+                <FiAward className="w-6 h-6 text-amber-500" />
+                <div>
+                  <h3 className="font-bold text-lg text-slate-900">Cấu hình Chứng chỉ Lộ trình</h3>
+                  <p className="text-sm text-slate-500">Tùy chỉnh thông tin hiển thị trên chứng chỉ khi học viên hoàn thành lộ trình. Nếu để trống, hệ thống sẽ dùng tên lộ trình làm mặc định.</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50/50 border border-amber-200 rounded-xl p-6 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Tên chứng chỉ</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 transition-shadow"
+                      value={formData.certificateConfig?.title || ''}
+                      onChange={e => handleCertConfigChange('title', e.target.value)}
+                      placeholder={`Mặc định: ${formData.title || 'Tên lộ trình'}`}
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Tên hiển thị chính trên chứng chỉ. Để trống để dùng tên lộ trình.</p>
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Phụ đề</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 transition-shadow"
+                      value={formData.certificateConfig?.subtitle || ''}
+                      onChange={e => handleCertConfigChange('subtitle', e.target.value)}
+                      placeholder="VD: Chương trình đào tạo chuyên sâu Frontend Developer"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Mô tả chứng chỉ</label>
+                    <textarea
+                      rows={2}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 transition-shadow"
+                      value={formData.certificateConfig?.description || ''}
+                      onChange={e => handleCertConfigChange('description', e.target.value)}
+                      placeholder="Mô tả ngắn gọn về chứng chỉ (không bắt buộc)"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-6 shadow-sm">
+                <h4 className="font-bold text-slate-900 flex items-center gap-2">
+                  <span className="text-lg">✍️</span> Thông tin Người ký & Tổ chức
+                </h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Tên người ký</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 transition-shadow"
+                      value={formData.certificateConfig?.signerName || ''}
+                      onChange={e => handleCertConfigChange('signerName', e.target.value)}
+                      placeholder="VD: TS. Nguyễn Văn A"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Chức danh người ký</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 transition-shadow"
+                      value={formData.certificateConfig?.signerTitle || ''}
+                      onChange={e => handleCertConfigChange('signerTitle', e.target.value)}
+                      placeholder="VD: Giám đốc đào tạo"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Tên tổ chức</label>
+                    <input
+                      type="text"
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 transition-shadow"
+                      value={formData.certificateConfig?.organizationName || ''}
+                      onChange={e => handleCertConfigChange('organizationName', e.target.value)}
+                      placeholder="VD: UMI Education"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-slate-700 mb-1">Thời hạn hiệu lực (năm)</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-primary-500 transition-shadow"
+                      value={formData.certificateConfig?.validityYears || 5}
+                      onChange={e => handleCertConfigChange('validityYears', Number(e.target.value))}
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Mặc định: 5 năm. Chứng chỉ sẽ hết hạn sau thời gian này.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl p-6 space-y-4 shadow-sm">
+                <h4 className="font-bold text-slate-900 flex items-center gap-2">
+                  <span className="text-lg">🎯</span> Kỹ năng ghi nhận trên chứng chỉ
+                </h4>
+                <p className="text-sm text-slate-500">Danh sách kỹ năng sẽ hiển thị trên chứng chỉ khi hoàn thành. Riêng biệt với kỹ năng của lộ trình.</p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {(formData.certificateConfig?.skills || []).map((skill: string) => (
+                    <span key={skill} className="bg-amber-50 text-amber-700 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1 border border-amber-200">
+                      {skill}
+                      <button type="button" onClick={() => handleRemoveCertSkill(skill)} className="hover:text-red-500 transition-colors">&times;</button>
+                    </span>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  className="w-full px-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-amber-500 transition-shadow"
+                  value={certSkillInput}
+                  onChange={e => setCertSkillInput(e.target.value)}
+                  onKeyDown={handleAddCertSkill}
+                  placeholder="Gõ tên kỹ năng và nhấn Enter..."
+                />
+              </div>
+
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                <h4 className="font-bold text-slate-700 mb-3">👁️ Xem trước thông tin chứng chỉ</h4>
+                <div className="bg-white border border-slate-200 rounded-lg p-6 text-center space-y-2">
+                  <p className="text-xs text-amber-600 font-bold tracking-widest">CHỨNG CHỈ HOÀN THÀNH LỘ TRÌNH</p>
+                  <p className="text-2xl font-bold text-slate-900">CERTIFICATE OF ACHIEVEMENT</p>
+                  {formData.certificateConfig?.subtitle && (
+                    <p className="text-sm text-slate-500 italic">{formData.certificateConfig.subtitle}</p>
+                  )}
+                  <div className="w-24 h-0.5 bg-amber-400 mx-auto my-3" />
+                  <p className="text-slate-500">Chứng nhận rằng</p>
+                  <p className="text-xl font-bold text-amber-700">[Tên học viên]</p>
+                  <p className="text-slate-500">đã hoàn thành xuất sắc lộ trình học tập</p>
+                  <p className="text-lg font-bold text-slate-900">{formData.certificateConfig?.title || formData.title || '[Tên lộ trình]'}</p>
+                  {formData.certificateConfig?.signerName && (
+                    <div className="pt-4 border-t border-dashed border-slate-200 mt-4">
+                      <div className="w-32 h-px bg-amber-400 mx-auto mb-1" />
+                      <p className="font-bold text-sm text-slate-800">{formData.certificateConfig.signerName}</p>
+                      {formData.certificateConfig.signerTitle && <p className="text-xs text-slate-500">{formData.certificateConfig.signerTitle}</p>}
+                      {formData.certificateConfig.organizationName && <p className="text-xs text-slate-500">{formData.certificateConfig.organizationName}</p>}
+                    </div>
+                  )}
+                  {(formData.certificateConfig?.skills || []).length > 0 && (
+                    <p className="text-xs text-slate-400 pt-2">Kỹ năng: {formData.certificateConfig!.skills!.join(' • ')}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 6: Final Project */}
           {activeTab === 'final-project' && (
             <div className="space-y-8 animate-fadeIn">
               {!isEdit ? (

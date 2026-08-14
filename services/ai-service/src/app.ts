@@ -67,6 +67,11 @@ app.get('/api/ai/recommended-paths', insightLimiter, authenticateToken, AIContro
 // ==================== Phase 3: AI Career Path Route ====================
 app.post('/api/ai/career-path', insightLimiter, authenticateToken, AIController.careerPathRecommendation); // Calls Gemini
 
+// ==================== Career Advisor Pipeline (Prompt 1 + Prompt 2) ====================
+app.post('/api/ai/career-advisor', insightLimiter, authenticateToken, AIController.careerAdvisorStart);              // Calls Gemini (Prompt 1 → optional Prompt 2)
+app.post('/api/ai/career-advisor/:sessionId/submit', insightLimiter, authenticateToken, AIController.careerAdvisorSubmit); // Calls Gemini (Prompt 1 continue → optional Prompt 2)
+app.post('/api/ai/career-advisor/:sessionId/skip', insightLimiter, authenticateToken, AIController.careerAdvisorSkip); // Calls Gemini (Prompt 2 with foundation-first)
+
 // ==================== Evaluation Pipeline Route ====================
 app.post('/api/ai/evaluate-submission', insightLimiter, authenticateToken, AIController.evaluateSubmission); // Calls Gemini
 

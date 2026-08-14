@@ -141,7 +141,10 @@ export class LearningContextService {
 
     logger.info(`Fetching fresh learning context for user ${userId}`);
 
-    const authHeaders = { Authorization: `Bearer ${token}` };
+    const authHeaders = { 
+      Authorization: `Bearer ${token}`,
+      'x-internal-service': 'true'
+    };
 
     // Fetch all data in parallel for speed
     const [
@@ -246,7 +249,10 @@ export class LearningContextService {
    */
   static async getExtendedContext(userId: string, token: string): Promise<LearnerContext> {
     const context = await this.getContext(userId, token);
-    const authHeaders = { Authorization: `Bearer ${token}` };
+    const authHeaders = { 
+      Authorization: `Bearer ${token}`,
+      'x-internal-service': 'true'
+    };
 
     // Fetch extended data in parallel
     const [

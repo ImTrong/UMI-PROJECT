@@ -1,5 +1,15 @@
 import { courseApi } from './api';
 
+export interface CertificateConfig {
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  signerName?: string;
+  signerTitle?: string;
+  organizationName?: string;
+  skills?: string[];
+}
+
 export interface Course {
   id: string;
   title: string;
@@ -29,6 +39,7 @@ export interface Course {
   };
   lessons?: Lesson[];
   reviews?: Review[];
+  certificateConfig?: CertificateConfig;
 }
 
 export interface Lesson {
@@ -81,6 +92,7 @@ export interface CreateCourseData {
   requirements?: string[];
   targetAudience?: string[];
   thumbnail?: string;
+  certificateConfig?: CertificateConfig;
 }
 
 export interface UpdateCourseData extends Partial<CreateCourseData> {

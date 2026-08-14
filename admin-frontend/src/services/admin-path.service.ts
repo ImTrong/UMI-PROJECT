@@ -1,5 +1,16 @@
 import { learningApi } from './api';
 
+export interface CertificateConfig {
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  signerName?: string;
+  signerTitle?: string;
+  organizationName?: string;
+  validityYears?: number;
+  skills?: string[];
+}
+
 export interface AdminLearningPath {
   id: string;
   title: string;
@@ -19,6 +30,7 @@ export interface AdminLearningPath {
   totalDurationMinutes: number;
   enrollmentCount: number;
   courseIds: string[];
+  certificateConfig?: CertificateConfig;
   createdAt: string;
   updatedAt: string;
 }

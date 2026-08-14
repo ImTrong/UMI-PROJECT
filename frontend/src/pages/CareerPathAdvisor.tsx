@@ -6,7 +6,14 @@ import {
   FiRefreshCw, FiMapPin, FiMoon, FiSun
 } from 'react-icons/fi';
 import toast from 'react-hot-toast';
-import { aiService, CareerPathRecommendation, CareerPathCourse } from '../services/ai.service';
+import {
+  aiService,
+  CareerPathRecommendation,
+  CareerPathCourse,
+  AssessmentQuestion,
+  SkillProfileEntry,
+} from '../services/ai.service';
+import SkillAssessmentModal from '../components/ai/SkillAssessmentModal';
 
 // ==================== Quick Suggestion Chips ====================
 const CAREER_SUGGESTIONS = [
@@ -20,29 +27,7 @@ const CAREER_SUGGESTIONS = [
   { label: 'UI/UX Designer', icon: '🎨' },
 ];
 
-// ==================== Circular Progress Component ====================
-function CircularProgress({ score, size = 80, strokeWidth = 6 }: { score: number; size?: number; strokeWidth?: number }) {
-  const radius = (size - strokeWidth) / 2;
-  const circumference = radius * 2 * Math.PI;
-  const offset = circumference - (score / 100) * circumference;
-  const color = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : '#ef4444';
 
-  return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="transform -rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={radius} className="stroke-slate-200 dark:stroke-gray-800" strokeWidth={strokeWidth} fill="none" />
-        <circle
-          cx={size / 2} cy={size / 2} r={radius}
-          stroke={color} strokeWidth={strokeWidth} fill="none"
-          strokeDasharray={circumference} strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-1000 ease-out"
-        />
-      </svg>
-      <span className="absolute text-lg font-bold dark:text-white text-slate-800" style={{ color }}>{score}%</span>
-    </div>
-  );
-}
 
 // ==================== Skeleton Loading ====================
 function LoadingSkeleton() {
@@ -208,11 +193,40 @@ export default function CareerPathAdvisor() {
   const resultRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
 
+  // Restore recommendation from sessionStorage (Bug fix: courses disappear on navigate back)
+  useEffect(() => {
+    const saved = sessionStorage.getItem('career-advisor-recommendation');
+    const savedGoal = sessionStorage.getItem('career-advisor-goal');
+    if (saved) {
+      try {
+        setRecommendation(JSON.parse(saved));
+        if (savedGoal) setGoal(savedGoal);
+      } catch { /* ignore parse errors */ }
+    }
+  }, []);
+
+  // Save recommendation to sessionStorage whenever it changes
+  useEffect(() => {
+    if (recommendation) {
+      sessionStorage.setItem('career-advisor-recommendation', JSON.stringify(recommendation));
+      sessionStorage.setItem('career-advisor-goal', goal);
+    }
+  }, [recommendation, goal]);
+
   // Theme state
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('theme') === 'dark' || 
       (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches);
   });
+
+  // ---- Assessment Modal State ----
+  const [assessmentOpen, setAssessmentOpen] = useState(false);
+  const [assessmentSessionId, setAssessmentSessionId] = useState('');
+  const [assessmentQuestions, setAssessmentQuestions] = useState<AssessmentQuestion[]>([]);
+  const [assessmentSkillProfile, setAssessmentSkillProfile] = useState<SkillProfileEntry[]>([]);
+  const [assessmentProfile, setAssessmentProfile] = useState({ profileCompleteness: 0, summary: '' });
+  const [assessmentSkillsToAssess, setAssessmentSkillsToAssess] = useState<string[]>([]);
+  const [assessmentReason, setAssessmentReason] = useState('');
 
   // Apply theme
   useEffect(() => {
@@ -236,27 +250,53 @@ export default function CareerPathAdvisor() {
     setRecommendation(null);
 
     try {
-      const result = await aiService.getCareerPathRecommendation(targetGoal.trim());
-      setRecommendation(result);
+      // Use the new Career Advisor Pipeline (Prompt 1 → optional Assessment → Prompt 2)
+      const result = await aiService.startCareerAdvisor(targetGoal.trim());
 
-      if (result.error) {
-        toast.error('AI không thể tạo lộ trình. Vui lòng thử lại!');
-      } else {
+      if (result.status === 'ROADMAP_READY') {
+        // Profile was complete — roadmap generated directly
+        const roadmapResult = result as any;
+        setRecommendation(roadmapResult.roadmap);
         toast.success('Lộ trình học tập đã được tạo thành công!');
-        // Scroll to results
         setTimeout(() => {
           resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }, 200);
+      } else if (result.status === 'ASSESSMENT_REQUIRED' || result.status === 'ASSESSMENT_CONTINUE') {
+        // Need assessment — open the modal
+        const assessResult = result as any;
+        setAssessmentSessionId(assessResult.sessionId);
+        setAssessmentQuestions(assessResult.assessment?.questions || []);
+        setAssessmentSkillProfile(assessResult.skillProfile || []);
+        setAssessmentProfile(assessResult.overallProfile || { profileCompleteness: 0, summary: '' });
+        setAssessmentSkillsToAssess(assessResult.assessment?.skillsToAssess || []);
+        setAssessmentReason(assessResult.assessment?.reason || '');
+        setAssessmentOpen(true);
+        toast('Cần đánh giá năng lực trước khi tạo lộ trình', { icon: '📝' });
+      } else if (result.status === 'PROFILE_COMPLETE') {
+        // Profile complete but roadmap failed — show message
+        toast.error('Đánh giá hoàn tất nhưng chưa thể tạo lộ trình. Vui lòng thử lại!');
       }
     } catch (err: any) {
-      console.error('Career path error:', err);
+      console.error('Career advisor error:', err);
       toast.error(err?.response?.data?.error || 'Có lỗi xảy ra. Vui lòng thử lại!');
     } finally {
       setLoading(false);
     }
   };
 
+  // Handle roadmap ready from assessment modal
+  const handleRoadmapReady = (roadmap: CareerPathRecommendation) => {
+    setRecommendation(roadmap);
+    setAssessmentOpen(false);
+    toast.success('Lộ trình học tập đã được tạo thành công!');
+    setTimeout(() => {
+      resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 300);
+  };
+
   const handleViewPathDetails = (pathId: string) => {
+    if (!pathId) return;
+    // Save state before navigating so recommendation persists on back
     navigate('/learning-paths', { state: { selectedPathId: pathId } });
   };
 
@@ -385,10 +425,20 @@ export default function CareerPathAdvisor() {
           {recommendation.matchedPath && (
             <div className="bg-white dark:bg-gradient-to-br dark:from-gray-800/80 dark:via-gray-800/60 dark:to-gray-900/80 rounded-3xl border border-slate-200 dark:border-gray-700/50 p-6 sm:p-8 backdrop-blur-sm shadow-xl shadow-slate-200/50 dark:shadow-2xl">
               <div className="flex flex-col sm:flex-row items-start gap-6">
-                {/* Match Score */}
+                {/* Match Level Badge */}
                 <div className="flex-shrink-0">
-                  <CircularProgress score={recommendation.matchedPath.matchScore} size={90} strokeWidth={7} />
-                  <p className="text-xs font-bold text-slate-500 dark:text-gray-400 text-center mt-2 uppercase tracking-wider">Độ phù hợp</p>
+                  <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-white font-black text-lg shadow-lg
+                    ${recommendation.matchedPath.matchLevel === 'HIGH' ? 'bg-gradient-to-br from-emerald-500 to-green-600 shadow-emerald-500/30' : ''}
+                    ${recommendation.matchedPath.matchLevel === 'MEDIUM' ? 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-500/30' : ''}
+                    ${recommendation.matchedPath.matchLevel === 'LOW' ? 'bg-gradient-to-br from-red-400 to-rose-500 shadow-red-500/30' : ''}
+                  `}>
+                    {recommendation.matchedPath.matchLevel === 'HIGH' && '✓'}
+                    {recommendation.matchedPath.matchLevel === 'MEDIUM' && '~'}
+                    {recommendation.matchedPath.matchLevel === 'LOW' && '!'}
+                  </div>
+                  <p className="text-xs font-bold text-slate-500 dark:text-gray-400 text-center mt-2 uppercase tracking-wider">
+                    {recommendation.matchedPath.matchLevel === 'HIGH' ? 'Rất phù hợp' : recommendation.matchedPath.matchLevel === 'MEDIUM' ? 'Phù hợp' : 'Tham khảo'}
+                  </p>
                 </div>
 
                 {/* Path Info */}
@@ -407,6 +457,18 @@ export default function CareerPathAdvisor() {
                     </p>
                   </div>
 
+                  {/* Limitations */}
+                  {recommendation.platformCoverage?.limitations && recommendation.platformCoverage.limitations.length > 0 && (
+                    <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl">
+                      <p className="text-xs font-bold text-amber-700 dark:text-amber-400 uppercase mb-1">⚠️ Giới hạn của UMI</p>
+                      <ul className="text-sm text-amber-800 dark:text-amber-300 space-y-1">
+                        {recommendation.platformCoverage.limitations.map((lim, i) => (
+                          <li key={i} className="font-medium">• {lim}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
                   {/* Stats row */}
                   <div className="flex flex-wrap items-center gap-5 mt-5 pt-5 border-t border-slate-100 dark:border-gray-700/50">
                     <div className="flex items-center gap-2 text-sm font-semibold">
@@ -424,14 +486,16 @@ export default function CareerPathAdvisor() {
                   </div>
 
                   {/* View Path Detail Button */}
-                  <div className="mt-6 pt-5 border-t border-slate-100 dark:border-gray-700/50">
-                    <button
-                      onClick={() => handleViewPathDetails(recommendation.matchedPath!.pathId)}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-sm font-bold rounded-xl transition-colors shadow-md shadow-primary-500/20 active:scale-95"
-                    >
-                      Xem chi tiết lộ trình <FiArrowRight />
-                    </button>
-                  </div>
+                  {recommendation.matchedPath.pathId && (
+                    <div className="mt-6 pt-5 border-t border-slate-100 dark:border-gray-700/50">
+                      <button
+                        onClick={() => handleViewPathDetails(recommendation.matchedPath!.pathId!)}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-500 hover:bg-primary-600 text-white text-sm font-bold rounded-xl transition-colors shadow-md shadow-primary-500/20 active:scale-95"
+                      >
+                        Xem chi tiết lộ trình <FiArrowRight />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -514,9 +578,13 @@ export default function CareerPathAdvisor() {
                       <h3 className="text-lg font-bold text-slate-900 dark:text-white group-hover:text-purple-600 dark:group-hover:text-purple-300 transition-colors pr-2">
                         {alt.title}
                       </h3>
-                      <div className="flex-shrink-0 ml-2">
-                        <CircularProgress score={alt.matchScore} size={48} strokeWidth={4} />
-                      </div>
+                      <span className={`flex-shrink-0 ml-2 px-2.5 py-1 rounded-full text-xs font-bold
+                        ${alt.matchLevel === 'HIGH' ? 'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : ''}
+                        ${alt.matchLevel === 'MEDIUM' ? 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-400' : ''}
+                        ${alt.matchLevel === 'LOW' ? 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-400' : ''}
+                      `}>
+                        {alt.matchLevel === 'HIGH' ? 'Rất phù hợp' : alt.matchLevel === 'MEDIUM' ? 'Phù hợp' : 'Tham khảo'}
+                      </span>
                     </div>
                     <p className="text-sm text-slate-600 dark:text-gray-400 font-medium leading-relaxed mb-4">{alt.reason}</p>
                     <div className="flex items-center gap-1 mt-auto text-sm font-bold text-purple-600 dark:text-purple-400 group-hover:text-purple-700 dark:group-hover:text-purple-300">
@@ -591,6 +659,20 @@ export default function CareerPathAdvisor() {
           </div>
         </section>
       )}
+
+      {/* ==================== Assessment Modal ==================== */}
+      <SkillAssessmentModal
+        isOpen={assessmentOpen}
+        onClose={() => setAssessmentOpen(false)}
+        goal={goal}
+        sessionId={assessmentSessionId}
+        initialQuestions={assessmentQuestions}
+        initialSkillProfile={assessmentSkillProfile}
+        initialProfile={assessmentProfile}
+        skillsToAssess={assessmentSkillsToAssess}
+        assessmentReason={assessmentReason}
+        onRoadmapReady={handleRoadmapReady}
+      />
     </div>
   );
 }
