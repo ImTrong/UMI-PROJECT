@@ -52,7 +52,7 @@ export const CertificateCard = ({ certificate, onDownload, onShare }: Certificat
             </div>
 
             <h3 className="font-bold text-slate-900 text-lg leading-tight group-hover:text-primary-700 transition-colors">
-              {certificate.courseTitle}
+              {certificate.metadata?.certificateConfig?.title || certificate.courseTitle}
             </h3>
             <p className="text-sm text-slate-500 mt-1">
               Cấp cho: <span className="font-medium text-slate-700">{certificate.userName}</span>

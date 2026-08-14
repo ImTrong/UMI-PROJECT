@@ -34,3 +34,21 @@ model Message {
   @@index([conversationId])
   @@map("messages")
 }
+
+// ==================== Skill Assessment System ====================
+
+model SkillAssessmentSession {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String   @db.ObjectId
+  careerGoal        String
+  status            String   @default("PENDING") // PENDING | ASSESSMENT_REQUIRED | ASSESSMENT_CONTINUE | PROFILE_COMPLETE | ROADMAP_READY
+  skillProfile      Json?    // Learner Skill Profile JSON from Prompt 1
+  assessmentHistory Json[]   // Array of {round, questions, answers}
+  roadmapResult     Json?    // Final roadmap from Prompt 2
+  currentRound      Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@map("skill_assessment_sessions")
+}

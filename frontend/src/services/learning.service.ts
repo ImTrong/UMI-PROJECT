@@ -59,6 +59,7 @@ export interface Certificate {
   certificateUrl?: string;
   verificationUrl: string;
   isVerified: boolean;
+  metadata?: any;
 }
 
 export interface Badge {

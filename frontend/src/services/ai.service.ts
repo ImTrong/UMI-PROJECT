@@ -67,29 +67,122 @@ export interface CareerPathCourse {
   skills: string[];
   estimatedHours: number;
   certificate: string;
+  prerequisiteNote?: string | null;
 }
 
 export interface CareerPathRecommendation {
   careerGoal: string;
+  goalAnalysis?: {
+    goalType: 'CAREER_POSITION' | 'SKILL_DEVELOPMENT' | 'CAREER_TRANSITION' | 'CERTIFICATION' | 'COMBINED';
+    targetRole: string | null;
+    keyTechnologies: string[];
+    targetLevel: 'junior' | 'mid' | 'senior' | 'lead' | null;
+    requiredCompetencies: string[];
+  };
+  gapAnalysis?: {
+    met: string[];
+    needReinforcement: string[];
+    missing: string[];
+    unverified: string[];
+    unavailableOnPlatform: string[];
+  };
+  platformCoverage?: {
+    coverageLevel: 'FULL_COVERAGE' | 'PARTIAL_COVERAGE' | 'NOT_SUPPORTED';
+    coveredSkills: string[];
+    uncoveredSkills: string[];
+    coverageSummary: string;
+    externalRequirements: string[];
+    limitations: string[];
+  };
+  certifications?: {
+    umiCertificates: string[];
+    externalCertifications: string[];
+  };
   matchedPath: {
-    pathId: string;
-    title: string;
-    description: string;
-    matchScore: number;
+    pathId: string | null;
+    title: string | null;
+    description: string | null;
+    matchLevel: 'HIGH' | 'MEDIUM' | 'LOW';
     matchReason: string;
   } | null;
   roadmap: CareerPathCourse[];
   totalEstimatedHours: number;
+  estimatedWeeks?: string;
   pathCertificate: string | null;
   summary: string;
   alternativePaths: Array<{
     pathId: string;
     title: string;
-    matchScore: number;
+    matchLevel: 'HIGH' | 'MEDIUM' | 'LOW';
     reason: string;
   }>;
   error?: boolean;
 }
+
+// ==================== Career Advisor Pipeline Types ====================
+
+export interface AssessmentQuestion {
+  id: string;
+  skill: string;
+  difficulty: 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  question: string;
+  options: string[];
+  correctAnswer: string;
+}
+
+export interface AssessmentAnswer {
+  questionId: string;
+  skill: string;
+  answer: string;
+  correctAnswer: string;
+}
+
+export interface SkillProfileEntry {
+  skill: string;
+  level: 'NO_EVIDENCE' | 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED';
+  confidence: number;
+  status: 'MET' | 'NEEDS_REINFORCEMENT' | 'MISSING' | 'UNVERIFIED';
+  evidences: string[];
+}
+
+export interface CareerAdvisorAssessmentRequired {
+  status: 'ASSESSMENT_REQUIRED' | 'ASSESSMENT_CONTINUE';
+  sessionId: string;
+  assessment: {
+    questions: AssessmentQuestion[];
+    totalQuestions: number;
+    reason: string;
+    skillsToAssess: string[];
+    round: number;
+    questionsAnswered: number;
+    maxQuestions: number;
+  };
+  skillProfile: SkillProfileEntry[];
+  overallProfile: {
+    profileCompleteness: number;
+    summary: string;
+  };
+}
+
+export interface CareerAdvisorRoadmapReady {
+  status: 'ROADMAP_READY';
+  sessionId: string;
+  skillProfile: any;
+  roadmap: CareerPathRecommendation;
+}
+
+export interface CareerAdvisorProfileComplete {
+  status: 'PROFILE_COMPLETE';
+  sessionId: string;
+  skillProfile: any;
+  roadmap: null;
+  error?: string;
+}
+
+export type CareerAdvisorResponse =
+  | CareerAdvisorAssessmentRequired
+  | CareerAdvisorRoadmapReady
+  | CareerAdvisorProfileComplete;
 
 // ==================== AI Service ====================
 
@@ -176,5 +269,32 @@ export const aiService = {
     const response = await aiApi.post('/api/ai/career-path', { goal });
     return response.data.data;
   },
-};
 
+  // ========== Career Advisor Pipeline (Prompt 1 + Prompt 2) ==========
+
+  /**
+   * Start a career advisor session
+   * Runs Prompt 1 (Skill Assessment) → may return assessment questions or roadmap directly
+   */
+  startCareerAdvisor: async (goal: string): Promise<CareerAdvisorResponse> => {
+    const response = await aiApi.post('/api/ai/career-advisor', { goal });
+    return response.data.data;
+  },
+
+  /**
+   * Submit assessment answers for an existing session
+   * Continues Prompt 1 → may return more questions or complete with roadmap
+   */
+  submitAssessmentAnswers: async (sessionId: string, answers: AssessmentAnswer[]): Promise<CareerAdvisorResponse> => {
+    const response = await aiApi.post(`/api/ai/career-advisor/${sessionId}/submit`, { answers });
+    return response.data.data;
+  },
+
+  /**
+   * Skip assessment and get foundation-first roadmap
+   */
+  skipAssessment: async (sessionId: string): Promise<CareerAdvisorResponse> => {
+    const response = await aiApi.post(`/api/ai/career-advisor/${sessionId}/skip`);
+    return response.data.data;
+  },
+};

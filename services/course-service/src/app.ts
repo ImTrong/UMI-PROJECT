@@ -47,7 +47,13 @@ const limiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
   skip: (req) => {
     const path = req.originalUrl || req.path;
-    return path.includes('/internal') || path.includes('/health');
+    // Skip internal paths and health checks
+    if (path.includes('/internal') || path.includes('/health')) return true;
+    // Skip requests marked as internal service calls
+    if (req.headers['x-internal-service'] === 'true') return true;
+    // Skip service-to-service calls (no Origin/Referer = not from browser)
+    if (!req.headers.origin && !req.headers.referer) return true;
+    return false;
   }
 });
 app.use('/api/courses', limiter);

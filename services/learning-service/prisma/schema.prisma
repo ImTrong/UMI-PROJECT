@@ -305,6 +305,7 @@ model LearningPath {
   enrollmentCount Int                  @default(0)
   createdBy       String?              @db.ObjectId
   courseIds       String[]             // List of Course IDs in milestone order
+  certificateConfig Json?              // Custom certificate configuration (title, subtitle, signer, org, etc.)
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
   

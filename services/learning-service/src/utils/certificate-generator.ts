@@ -4,6 +4,17 @@ import path from 'path';
 import logger from './logger';
 import { minioInternalClient, BUCKETS } from '../config/minio.config';
 
+export interface CertificateConfig {
+  title?: string;
+  subtitle?: string;
+  description?: string;
+  signerName?: string;
+  signerTitle?: string;
+  organizationName?: string;
+  validityYears?: number;
+  skills?: string[];
+}
+
 export interface CertificateData {
   certificateNumber: string;
   userName: string;
@@ -11,6 +22,7 @@ export interface CertificateData {
   issueDate: Date;
   verificationUrl: string;
   type?: 'COURSE_COMPLETION' | 'PATH_CERTIFICATE';
+  certificateConfig?: CertificateConfig | null;
 }
 
 export class CertificateGenerator {
@@ -18,6 +30,7 @@ export class CertificateGenerator {
     try {
       const filename = `${data.certificateNumber}.pdf`;
       const isPathCert = data.type === 'PATH_CERTIFICATE';
+      const config = data.certificateConfig || {};
 
       const qrCodeDataUrl = await QRCode.toDataURL(data.verificationUrl);
       const doc = new PDFDocument({ size: 'A4', layout: 'landscape' });
@@ -55,6 +68,9 @@ export class CertificateGenerator {
 
       const centerX = doc.page.width / 2;
 
+      // Use custom title or default
+      const certTitle = config.title || data.courseTitle;
+
       // Background
       doc.rect(0, 0, doc.page.width, doc.page.height).fill('#ffffff');
 
@@ -86,26 +102,39 @@ export class CertificateGenerator {
            .fillColor('#78350f')
            .text('CERTIFICATE OF ACHIEVEMENT', 0, 110, { align: 'center' });
 
+        // Subtitle (custom or none)
+        let currentY = 175;
+        if (config.subtitle) {
+          doc.font('Roboto').fontSize(14)
+             .fillColor('#92400e')
+             .text(config.subtitle, 0, 155, { align: 'center' });
+          currentY = 185;
+        }
+
         // Gold separator
         const lineGradGold = doc.linearGradient(centerX - 80, 0, centerX + 80, 0);
         lineGradGold.stop(0, '#f59e0b').stop(0.5, '#d97706').stop(1, '#f59e0b');
-        doc.rect(centerX - 80, 175, 160, 3).fill(lineGradGold);
+        doc.rect(centerX - 80, currentY, 160, 3).fill(lineGradGold);
 
+        currentY += 35;
         doc.font('Roboto').fontSize(16)
            .fillColor('#78350f')
-           .text('Chứng nhận rằng', 0, 210, { align: 'center' });
+           .text('Chứng nhận rằng', 0, currentY, { align: 'center' });
 
+        currentY += 40;
         doc.font('Roboto-Bold').fontSize(34)
            .fillColor('#92400e')
-           .text(data.userName, 0, 250, { align: 'center' });
+           .text(data.userName, 0, currentY, { align: 'center' });
 
+        currentY += 60;
         doc.font('Roboto').fontSize(16)
            .fillColor('#78350f')
-           .text('đã hoàn thành xuất sắc lộ trình học tập', 0, 310, { align: 'center' });
+           .text('đã hoàn thành xuất sắc lộ trình học tập', 0, currentY, { align: 'center' });
 
+        currentY += 40;
         doc.font('Roboto-Bold').fontSize(26)
            .fillColor('#451a03')
-           .text(data.courseTitle, 0, 350, { align: 'center' });
+           .text(certTitle, 0, currentY, { align: 'center' });
 
       } else {
         // === COURSE COMPLETION (Chứng nhận) — Original cyan/teal design ===
@@ -127,25 +156,38 @@ export class CertificateGenerator {
            .fillColor('#1f2937')
            .text('CERTIFICATE OF COMPLETION', 0, 130, { align: 'center' });
 
+        // Subtitle (custom or none)
+        let currentY = 190;
+        if (config.subtitle) {
+          doc.font('Roboto').fontSize(13)
+             .fillColor('#64748b')
+             .text(config.subtitle, 0, 175, { align: 'center' });
+          currentY = 200;
+        }
+
         const lineGrad = doc.linearGradient(centerX - 50, 0, centerX + 50, 0);
         lineGrad.stop(0, '#38bdf8').stop(1, '#22d3ee');
-        doc.rect(centerX - 50, 190, 100, 3).fill(lineGrad);
+        doc.rect(centerX - 50, currentY, 100, 3).fill(lineGrad);
 
+        currentY += 40;
         doc.font('Roboto').fontSize(16)
            .fillColor('#64748b')
-           .text('Chứng nhận rằng', 0, 230, { align: 'center' });
+           .text('Chứng nhận rằng', 0, currentY, { align: 'center' });
 
+        currentY += 40;
         doc.font('Roboto-Bold').fontSize(32)
            .fillColor('#0284c7')
-           .text(data.userName, 0, 270, { align: 'center' });
+           .text(data.userName, 0, currentY, { align: 'center' });
 
+        currentY += 60;
         doc.font('Roboto').fontSize(16)
            .fillColor('#64748b')
-           .text('đã hoàn thành xuất sắc khóa học', 0, 330, { align: 'center' });
+           .text('đã hoàn thành xuất sắc khóa học', 0, currentY, { align: 'center' });
 
+        currentY += 40;
         doc.font('Roboto-Bold').fontSize(24)
            .fillColor('#1e293b')
-           .text(data.courseTitle, 0, 370, { align: 'center' });
+           .text(certTitle, 0, currentY, { align: 'center' });
       }
          
       // Date formatting (shared)
@@ -159,10 +201,51 @@ export class CertificateGenerator {
       const dateValueColor = isPathCert ? '#451a03' : '#0f172a';
       const codeColor = isPathCert ? '#92400e' : '#94a3b8';
 
+      // Signer & organization section
+      const signerY = 420;
+      if (config.signerName || config.organizationName) {
+        const signerNameColor = isPathCert ? '#451a03' : '#1e293b';
+        const signerTitleColor = isPathCert ? '#78350f' : '#64748b';
+
+        if (config.signerName) {
+          // Signature line
+          doc.moveTo(centerX - 80, signerY).lineTo(centerX + 80, signerY)
+             .lineWidth(1).strokeColor(isPathCert ? '#d97706' : '#94a3b8').stroke();
+
+          doc.font('Roboto-Bold').fontSize(14)
+             .fillColor(signerNameColor)
+             .text(config.signerName, 0, signerY + 8, { align: 'center' });
+          
+          if (config.signerTitle) {
+            doc.font('Roboto').fontSize(11)
+               .fillColor(signerTitleColor)
+               .text(config.signerTitle, 0, signerY + 26, { align: 'center' });
+          }
+        }
+
+        if (config.organizationName) {
+          const orgY = config.signerName ? signerY + (config.signerTitle ? 44 : 30) : signerY + 8;
+          doc.font('Roboto').fontSize(11)
+             .fillColor(signerTitleColor)
+             .text(config.organizationName, 0, orgY, { align: 'center' });
+        }
+      }
+
+      // Date
+      const dateY = (config.signerName || config.organizationName) ? 480 : 440;
       doc.font('Roboto').fontSize(14)
          .fillColor(dateColor)
-         .text(`Ngày cấp: `, centerX - 60, 440, { continued: true })
+         .text(`Ngày cấp: `, centerX - 60, dateY, { continued: true })
          .font('Roboto-Bold').fillColor(dateValueColor).text(dateStr);
+
+      // Skills badges (if provided)
+      if (config.skills && config.skills.length > 0) {
+        const skillsY = dateY + 25;
+        const skillsText = config.skills.join(' • ');
+        doc.font('Roboto').fontSize(10)
+           .fillColor(isPathCert ? '#92400e' : '#64748b')
+           .text(`Kỹ năng: ${skillsText}`, 0, skillsY, { align: 'center' });
+      }
 
       const codeLabel = isPathCert ? 'Mã chứng chỉ' : 'Mã chứng nhận';
       doc.font('Roboto').fontSize(12)
@@ -192,3 +275,4 @@ export class CertificateGenerator {
     }
   }
 }
+

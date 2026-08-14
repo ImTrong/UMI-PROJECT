@@ -66,10 +66,11 @@ export class ProgressService {
     return courseProgress;
   }
   static async initializeUserProgress(userId: string) {
-    const existing = await prisma.userProgress.findUnique({ where: { userId } });
-    if (!existing) {
-      return prisma.userProgress.create({
-        data: {
+    try {
+      return await prisma.userProgress.upsert({
+        where: { userId },
+        update: {},
+        create: {
           userId,
           totalCoursesEnrolled: 0,
           totalCoursesCompleted: 0,
@@ -78,8 +79,14 @@ export class ProgressService {
           streakDays: 0,
         },
       });
+    } catch (error: any) {
+      // Fallback in case of extreme concurrency where even upsert throws
+      if (error.code === 'P2002') {
+        const existing = await prisma.userProgress.findUnique({ where: { userId } });
+        if (existing) return existing;
+      }
+      throw error;
     }
-    return existing;
   }
 
   static async getUserProgress(userId: string) {

@@ -84,7 +84,11 @@ export class PathService {
         try {
           const response = await axios.get(`${this.courseServiceUrl}/api/courses/${courseId}`);
           return response.data.data;
-        } catch {
+        } catch (err: any) {
+          logger.warn(`Failed to fetch course ${courseId} from course-service: ${err.message}`, {
+            status: err.response?.status,
+            url: `${this.courseServiceUrl}/api/courses/${courseId}`,
+          });
           return {
             id: courseId,
             title: 'Khóa học chưa được định cấu hình',

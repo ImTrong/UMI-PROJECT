@@ -15,6 +15,7 @@ export default function EditCourse() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
 
+
   useEffect(() => {
     const loadCourse = async () => {
       if (!slug) return;
@@ -77,6 +78,7 @@ export default function EditCourse() {
       setUpdating(false);
     }
   };
+
 
   if (loading) {
     return (
@@ -215,6 +217,8 @@ export default function EditCourse() {
           initialLessons={course.lessons || []}
         />
       </div>
+
+
     </div>
   );
 }

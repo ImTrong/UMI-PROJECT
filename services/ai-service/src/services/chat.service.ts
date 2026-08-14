@@ -7,6 +7,7 @@ import {
   RECOMMENDATION_PROMPT,
   COACH_PROMPT,
   CAREER_PATH_PROMPT,
+  SKILL_ASSESSMENT_PROMPT,
   EVALUATION_PIPELINE_PROMPT,
   FEEDBACK_REPORT_PROMPT,
 } from '../utils/system-prompt';
@@ -288,7 +289,10 @@ export class ChatService {
     const contextString = LearningContextService.buildContextString(context);
     
     // Fetch all paths available on platform
-    const availablePaths = await LearningContextService.fetchAvailablePaths({ Authorization: `Bearer ${token}` });
+    const availablePaths = await LearningContextService.fetchAvailablePaths({ 
+      Authorization: `Bearer ${token}`,
+      'x-internal-service': 'true'
+    });
     
     if (!availablePaths || availablePaths.length === 0) {
       return [];
@@ -340,10 +344,112 @@ export class ChatService {
   }
 
   /**
+   * Generate Skill Assessment (Prompt 1)
+   * Evaluates learner capabilities → Learner Skill Profile or Assessment Questions
+   */
+  static async generateSkillAssessment(
+    userId: string,
+    careerGoal: string,
+    assessmentHistory: any[],
+    assessmentState: any,
+    token: string
+  ) {
+    // 1. Get extended context
+    const context = await LearningContextService.getExtendedContext(userId, token);
+    const contextString = LearningContextService.buildContextString(context);
+
+    // 2. Build certificates string
+    const certificatesString = context.certificates.length > 0
+      ? context.certificates.map((c) =>
+          `- "${c.courseTitle}" (${c.type}) — Ngày cấp: ${c.issueDate}`
+        ).join('\n')
+      : '(Chưa có chứng nhận nào)';
+
+    // 3. Build quiz scores string
+    const quizScoresString = context.quizScores.length > 0
+      ? context.quizScores.map((q) =>
+          `- ${q.quizTitle} — Điểm: ${q.score}% — ${q.passed ? 'Đạt ✓' : 'Chưa đạt ✗'}`
+        ).join('\n')
+      : '(Chưa có kết quả quiz)';
+
+    // 4. Build available courses string
+    const availableCoursesString = context.availableCourses.length > 0
+      ? context.availableCourses.map((c) =>
+          `- CourseID: ${c.id} | "${c.title}" | Danh mục: ${c.category} | Cấp độ: ${c.level}`
+        ).join('\n')
+      : '(Không có khóa học nào)';
+
+    // 5. Build assessment history string
+    const assessmentHistoryString = assessmentHistory.length > 0
+      ? assessmentHistory.map((round, idx) => {
+          const answers = (round.answers || []).map((a: any) =>
+            `  - Câu ${a.questionId}: Kỹ năng "${a.skill}" | Đáp án: ${a.answer} | Đúng: ${a.correctAnswer} | ${a.answer === a.correctAnswer ? 'Đúng ✓' : 'Sai ✗'}`
+          ).join('\n');
+          return `### Vòng ${idx + 1}\n${answers}`;
+        }).join('\n\n')
+      : '(Chưa có lịch sử assessment)';
+
+    // 6. Build prompt
+    let prompt = SKILL_ASSESSMENT_PROMPT;
+    prompt = prompt.replace('{CAREER_GOAL}', careerGoal);
+    prompt = prompt.replace('{LEARNER_CONTEXT}', contextString);
+    prompt = prompt.replace('{CERTIFICATES}', certificatesString);
+    prompt = prompt.replace('{QUIZ_SCORES}', quizScoresString);
+    prompt = prompt.replace('{AVAILABLE_COURSES}', availableCoursesString);
+    prompt = prompt.replace('{ASSESSMENT_HISTORY}', assessmentHistoryString);
+    prompt = prompt.replace('{ASSESSMENT_STATE}', JSON.stringify(assessmentState, null, 2));
+
+    // 7. Call Gemini
+    const response = await geminiService.generateResponse(
+      prompt,
+      [],
+      `Hãy đánh giá năng lực của học viên cho mục tiêu "${careerGoal}" và trả về JSON.`
+    );
+
+    // 8. Parse JSON response
+    let jsonStr = response.trim();
+    if (jsonStr.startsWith('```json')) {
+      jsonStr = jsonStr.substring(7);
+    } else if (jsonStr.startsWith('```')) {
+      jsonStr = jsonStr.substring(3);
+    }
+    if (jsonStr.endsWith('```')) {
+      jsonStr = jsonStr.substring(0, jsonStr.length - 3);
+    }
+    jsonStr = jsonStr.trim();
+
+    try {
+      const result = JSON.parse(jsonStr);
+
+      // Validate essential fields
+      if (!result.mode || !result.skillProfile) {
+        throw new Error('Invalid response structure from AI');
+      }
+
+      return result;
+    } catch (parseError) {
+      logger.error('Failed to parse skill assessment JSON:', parseError);
+      logger.error('Raw AI response:', response.substring(0, 500));
+
+      // Return a graceful fallback (assume max reached if parsing fails to avoid infinite loops)
+      return {
+        mode: 'ASSESSMENT_MAX_REACHED',
+        goalAnalysis: { goalType: 'CAREER_POSITION', targetRole: careerGoal, keyTechnologies: [], targetLevel: null },
+        requiredSkills: [],
+        skillProfile: [],
+        assessment: null,
+        overallProfile: { profileCompleteness: 0, summary: 'Không thể đánh giá chính xác do lỗi xử lý AI. Sẽ tiếp tục với dữ liệu hiện tại.' },
+        error: true,
+      };
+    }
+  }
+
+  /**
    * Generate AI-powered career path recommendation
    * Analyzes learner's current state + career goal → structured roadmap
+   * Receives skillProfile from Prompt 1 (Skill Assessment) as primary input
    */
-  static async generateCareerPathRecommendation(userId: string, careerGoal: string, token: string) {
+  static async generateCareerPathRecommendation(userId: string, careerGoal: string, token: string, skillProfile?: any) {
     // 1. Get extended context with quiz scores, certificates, and detailed paths
     const context = await LearningContextService.getExtendedContext(userId, token);
     const contextString = LearningContextService.buildContextString(context);
@@ -384,9 +490,15 @@ export class ChatService {
         ).join('\n')
       : '(Không có khóa học nào)';
 
-    // 6. Build prompt
+    // 6. Build Learner Skill Profile string (from Prompt 1 output)
+    const skillProfileString = skillProfile
+      ? JSON.stringify(skillProfile, null, 2)
+      : '(Không có dữ liệu Skill Profile — đánh giá dựa trên dữ liệu học tập hiện có)';
+
+    // 7. Build prompt
     let prompt = CAREER_PATH_PROMPT;
     prompt = prompt.replace('{CAREER_GOAL}', careerGoal);
+    prompt = prompt.replace('{LEARNER_SKILL_PROFILE}', skillProfileString);
     prompt = prompt.replace('{LEARNER_CONTEXT}', contextString);
     prompt = prompt.replace('{CERTIFICATES}', certificatesString);
     prompt = prompt.replace('{QUIZ_SCORES}', quizScoresString);
