@@ -799,6 +799,47 @@ function PathDetailView({
               </div>
             </div>
           )}
+
+          {/* Certificate Preview */}
+          {!detailLoading && detail?.path?.certificateConfig && (
+            <div className="mt-8 pt-8 border-t border-slate-100">
+              <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <FiAward className="text-amber-500" /> Chứng Chỉ Hoàn Thành
+              </h3>
+              
+              <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-100 rounded-2xl p-6 relative overflow-hidden">
+                <div className="absolute right-0 top-0 w-32 h-32 bg-amber-500/10 rounded-full blur-3xl -mr-10 -mt-10"></div>
+                
+                <div className="relative z-10 flex flex-col md:flex-row gap-6 items-start">
+                  <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0 text-white shadow-sm">
+                    <FiAward size={32} />
+                  </div>
+                  
+                  <div className="flex-1">
+                    <h4 className="text-xl font-bold text-slate-900 mb-2">{detail.path.certificateConfig.title || 'Chứng nhận hoàn thành lộ trình'}</h4>
+                    {detail.path.certificateConfig.subtitle && (
+                      <p className="text-sm text-slate-600 mb-4">{detail.path.certificateConfig.subtitle}</p>
+                    )}
+                    
+                    {(detail.path.certificateConfig.signer || detail.path.certificateConfig.org) && (
+                      <div className="flex flex-wrap gap-3 mb-2 mt-4 pt-4 border-t border-amber-200/50">
+                        {detail.path.certificateConfig.org && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-lg border border-amber-100 text-xs font-semibold text-amber-700">
+                            Cấp bởi: {detail.path.certificateConfig.org}
+                          </span>
+                        )}
+                        {detail.path.certificateConfig.signer && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-lg border border-amber-100 text-xs font-semibold text-amber-700">
+                            Ký bởi: {detail.path.certificateConfig.signer}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -85,6 +85,7 @@ export interface LearnerContext {
     courseIds: string[];
     totalDurationMinutes: number;
     certificateName: string;
+    certificateConfig?: any;
     courseDetails: Array<{
       courseId: string;
       title: string;
@@ -97,6 +98,19 @@ export interface LearnerContext {
       passingScore: number;
     } | null;
   }>;
+  // Phase 3A: Skill Profile from project evaluations
+  skillProfile: {
+    skills: Array<{
+      skill: string;
+      category: string;
+      level: string;
+      confidence: number;
+    }>;
+    strengths: string[];
+    weaknesses: string[];
+    overallLevel: string;
+    profileCompleteness: number;
+  } | null;
 }
 
 // In-memory cache: userId -> { data, expiry }
@@ -235,6 +249,7 @@ export class LearningContextService {
       quizScores: [],
       certificates: [],
       detailedPaths: [],
+      skillProfile: null,
     };
 
     // Store in cache
@@ -259,10 +274,12 @@ export class LearningContextService {
       quizScores,
       certificates,
       detailedPaths,
+      skillProfile,
     ] = await Promise.all([
       this.fetchQuizScores(authHeaders),
       this.fetchCertificates(authHeaders),
       this.fetchDetailedPaths(authHeaders),
+      this.fetchSkillProfile(userId),
     ]);
 
     // Enrich course details in paths using available courses
@@ -276,7 +293,9 @@ export class LearningContextService {
 
       // Extract certificate name from finalProject instructions or shortDescription
       let certificateName = '';
-      if (path.finalProject?.instructions) {
+      if (path.certificateConfig && path.certificateConfig.title) {
+        certificateName = path.certificateConfig.title;
+      } else if (path.finalProject?.instructions) {
         const certMatch = path.finalProject.instructions.match(/"([^"]*Chứng chỉ[^"]*)"/)
           || path.finalProject.instructions.match(/"([^"]*UMI Academy[^"]*)"/)
           || path.finalProject.description?.match(/"([^"]*Chứng chỉ[^"]*)"/)
@@ -299,6 +318,7 @@ export class LearningContextService {
         courseIds: path.courseIds || [],
         totalDurationMinutes: path.totalDurationMinutes || 0,
         certificateName,
+        certificateConfig: path.certificateConfig || null,
         courseDetails,
         finalProject: path.finalProject ? {
           title: path.finalProject.title || '',
@@ -324,6 +344,18 @@ export class LearningContextService {
         issueDate: c.issueDate || c.createdAt || '',
       })),
       detailedPaths: enrichedPaths,
+      skillProfile: skillProfile ? {
+        skills: ((skillProfile.skills as any[]) || []).map((s: any) => ({
+          skill: s.displayName || s.skill,
+          category: s.category || '',
+          level: s.level || 'NO_EVIDENCE',
+          confidence: s.confidence || 0,
+        })),
+        strengths: skillProfile.strengths || [],
+        weaknesses: skillProfile.weaknesses || [],
+        overallLevel: skillProfile.overallLevel || 'NO_EVIDENCE',
+        profileCompleteness: skillProfile.profileCompleteness || 0,
+      } : null,
     };
   }
 
@@ -397,6 +429,26 @@ export class LearningContextService {
       ctx.availableCourses.slice(0, 100).forEach(c => {
         lines.push(`- "${c.title}" (${c.category}, ${c.level}, ${c.enrollmentCount} đã đăng ký)`);
       });
+    }
+
+    // Skill Profile (Phase 3A)
+    const sp = (ctx as any).skillProfile;
+    if (sp && sp.skills && sp.skills.length > 0) {
+      lines.push(`\n## Hồ sơ Kỹ năng (từ đánh giá đồ án)`);
+      lines.push(`- Trình độ tổng thể: ${sp.overallLevel}`);
+      lines.push(`- Độ hoàn thiện: ${sp.profileCompleteness}%`);
+      if (sp.skills.length > 0) {
+        lines.push(`- Kỹ năng:`);
+        sp.skills.forEach((s: any) => {
+          lines.push(`  • ${s.skill} (${s.category}): ${s.level} (confidence: ${s.confidence})`);
+        });
+      }
+      if (sp.strengths.length > 0) {
+        lines.push(`- Điểm mạnh: ${sp.strengths.join(', ')}`);
+      }
+      if (sp.weaknesses.length > 0) {
+        lines.push(`- Cần cải thiện: ${sp.weaknesses.join(', ')}`);
+      }
     }
 
     return lines.join('\n');
@@ -567,6 +619,34 @@ export class LearningContextService {
     } catch (err: any) {
       logger.warn('Failed to fetch detailed paths:', err.message);
       return [];
+    }
+  }
+
+  /**
+   * Fetch skill profile from learning-service internal endpoint
+   * Phase 3A — non-blocking, returns null on failure
+   */
+  private static async fetchSkillProfile(userId: string): Promise<any> {
+    try {
+      const res = await this.learningApi.get(`/api/learning/internal/skill-profile/${userId}`);
+      return res.data?.data || null;
+    } catch (err: any) {
+      logger.debug(`No skill profile found for user ${userId}: ${err.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch LearnerCompetencyProfile from learning-service internal endpoint
+   * GĐ2 — used by CompetencyAnalysisService
+   */
+  static async fetchLearnerAnalysis(userId: string): Promise<any> {
+    try {
+      const res = await this.learningApi.get(`/api/learning/internal/learner-analysis/${userId}`);
+      return res.data?.data || null;
+    } catch (err: any) {
+      logger.warn(`Failed to fetch learner analysis for user ${userId}: ${err.message}`);
+      return null;
     }
   }
 }

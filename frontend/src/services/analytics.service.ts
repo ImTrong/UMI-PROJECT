@@ -1,4 +1,5 @@
 import { learningApi } from './api';
+import type { LearnerAnalyticsDashboardData } from '../components/learner-analytics/learner-analytics.types';
 
 // ==================== Interfaces ====================
 
@@ -104,9 +105,105 @@ export interface ContentRecommendation {
   metadata?: Record<string, any>;
 }
 
+// ==================== Response Mapping ====================
+
+/**
+ * Maps backend API response to frontend LearnerAnalyticsDashboardData.
+ */
+function mapBackendToFrontend(apiData: any): LearnerAnalyticsDashboardData {
+  // ── Overview ──
+  const overview = apiData.overview ?? null;
+
+  // ── Timeline ──
+  const timeline = apiData.timeline ?? null;
+
+  // ── Progress → TrendChartData ──
+  const progressTrend = apiData.progressTrend
+    ? {
+        status: apiData.progressTrend.status ?? 'INSUFFICIENT_DATA',
+        dataPoints: apiData.progressTrend.dataPoints ?? [],
+        trend: apiData.progressTrend.trend ?? 'STABLE',
+        trendLabel: apiData.progressTrend.trendLabel ?? 'Ổn định',
+        currentProgress: apiData.progressTrend.currentProgress,
+        confidence: apiData.progressTrend.confidence ?? 1,
+      }
+    : null;
+
+  // ── Performance → TrendChartData ──
+  const performanceTrend = apiData.performanceTrend
+    ? {
+        status: apiData.performanceTrend.status ?? 'INSUFFICIENT_DATA',
+        dataPoints: apiData.performanceTrend.dataPoints ?? [],
+        trend: apiData.performanceTrend.trend ?? 'STABLE',
+        trendLabel: apiData.performanceTrend.trendLabel ?? 'Ổn định',
+        currentScore: apiData.performanceTrend.currentScore,
+        confidence: apiData.performanceTrend.confidence ?? 1,
+      }
+    : null;
+
+  // ── Engagement ──
+  const engagement = apiData.engagement ?? null;
+
+  // ── Skills ──
+  const skills = apiData.skills ?? null;
+
+  // ── Knowledge Gaps ──
+  const knowledgeGaps = apiData.knowledgeGaps ?? null;
+
+  // ── Bottlenecks ──
+  const bottlenecks = apiData.bottlenecks ?? null;
+
+  // ── Recovery ──
+  const recovery = apiData.recovery ?? null;
+
+  // ── Learning State ──
+  const learningState = apiData.learningState ?? null;
+
+  // ── Effectiveness ──
+  const effectiveness = apiData.effectiveness ?? null;
+
+  // ── Recommendations ──
+  const recommendations = Array.isArray(apiData.recommendations)
+    ? apiData.recommendations
+    : [];
+
+  // ── AI Summary ──
+  const aiSummary = apiData.aiSummary ?? null;
+
+  // ── Data Quality ──
+  const dataQuality = apiData.dataQuality ?? null;
+
+  return {
+    overview,
+    timeline,
+    progressTrend,
+    performanceTrend,
+    engagement,
+    skills,
+    knowledgeGaps,
+    bottlenecks,
+    recovery,
+    learningState,
+    effectiveness,
+    recommendations,
+    aiSummary,
+    dataQuality,
+  };
+}
+
 // ==================== Service ====================
 
 export const analyticsService = {
+  /**
+   * Fetch the complete Learner Analytics Dashboard data.
+   * Calls GET /api/learning/analytics/dashboard and maps
+   * the backend response to frontend types.
+   */
+  async getLearnerDashboard(): Promise<LearnerAnalyticsDashboardData> {
+    const response = await learningApi.get('/api/learning/analytics/dashboard');
+    return mapBackendToFrontend(response.data.data);
+  },
+
   async getStudyPatterns(): Promise<StudyPatterns> {
     const response = await learningApi.get('/api/learning/analytics/study-patterns');
     return response.data.data;

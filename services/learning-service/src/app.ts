@@ -23,7 +23,7 @@ import {
   handleValidationErrors,
 } from './middleware/validation.middleware';
 import logger from './utils/logger';
-import { initializeVideosBucket, initializeCertificatesBucket } from './config/minio.config';
+import { initializeVideosBucket, initializeCertificatesBucket, initializeProjectsBucket } from './config/minio.config';
 import { videoUpload } from './config/multer.config';
 import { HLSQueueService } from './services/hls-queue.service';
 
@@ -117,6 +117,10 @@ app.get('/api/learning/analytics/my-schedule', authenticateToken, AnalyticsContr
 app.post('/api/learning/analytics/my-schedule', authenticateToken, AnalyticsController.saveMySchedule);
 app.get('/api/learning/analytics/content-recommendations', authenticateToken, AnalyticsController.getContentRecommendations);
 
+// ==================== Learner Analytics Dashboard Route ====================
+import { LearnerAnalyticsDashboardController } from './controllers/learner-analytics-dashboard.controller';
+app.get('/api/learning/analytics/dashboard', authenticateToken, LearnerAnalyticsDashboardController.getDashboard);
+
 // ==================== Recommendation & Learning Paths Routes ====================
 app.get('/api/learning/recommendations/home', authenticateOptional, RecommendationController.getHomeRecommendations);
 app.get('/api/learning/recommendations', authenticateToken, RecommendationController.getPersonalizedRecommendations);
@@ -178,6 +182,8 @@ app.post('/api/learning/exam/course/:courseId/retake', authenticateToken, Course
 
 // ==================== Final Project Routes ====================
 import { FinalProjectController } from './controllers/final-project.controller';
+import { zipUpload } from './config/zip-upload.config';
+
 app.post('/api/learning/final-project/:pathId', authenticateToken, FinalProjectController.createFinalProject);
 app.get('/api/learning/final-project/:pathId', authenticateToken, FinalProjectController.getFinalProject);
 app.put('/api/learning/final-project/:projectId', authenticateToken, FinalProjectController.updateFinalProject);
@@ -190,8 +196,30 @@ app.put('/api/learning/final-project/submission/:submissionId/grade', authentica
 app.post('/api/learning/final-project/:submissionId/evaluate', authenticateToken, FinalProjectController.evaluateSubmission);
 app.get('/api/learning/final-project/:pathId/unlock-status', authenticateToken, FinalProjectController.getUnlockStatus);
 
+// === Phase 1: Project Submission & Analysis Routes ===
+app.post('/api/learning/final-project/:projectId/submit-zip', authenticateToken, zipUpload.single('zipFile'), FinalProjectController.submitWithZip);
+app.post('/api/learning/final-project/:projectId/submit-github', authenticateToken, FinalProjectController.submitWithGithub);
+app.get('/api/learning/final-project/submission/:submissionId/status', authenticateToken, FinalProjectController.getProcessingStatus);
+app.get('/api/learning/final-project/submission/:submissionId/context', authenticateToken, FinalProjectController.getProjectContext);
+app.post('/api/learning/final-project/submission/:submissionId/retry-analysis', authenticateToken, FinalProjectController.retryAnalysis);
+
 // ==================== Path Certificate Route ====================
 app.post('/api/learning/certificates/path/:pathId/generate', authenticateToken, CertificateController.generatePathCertificate);
+
+// ==================== Phase 3A: Skill Profile Routes ====================
+app.get('/api/learning/skill-profile/me', authenticateToken, FinalProjectController.getMySkillProfile);
+app.get('/api/learning/skill-profile/me/summary', authenticateToken, FinalProjectController.getMySkillSummary);
+app.post('/api/learning/skill-profile/me/gap-analysis', authenticateToken, FinalProjectController.getSkillGapAnalysis);
+app.get('/api/learning/internal/skill-profile/:userId', FinalProjectController.getSkillProfileInternal); // Internal — no auth
+
+// ==================== Learner Analysis Routes ====================
+import { LearnerAnalysisController } from './controllers/learner-analysis.controller';
+app.get('/api/learning/learner-analysis/me', authenticateToken, LearnerAnalysisController.getMyProfile);
+app.get('/api/learning/learner-analysis/me/career-fit', authenticateToken, LearnerAnalysisController.getMyCareerFit);
+app.get('/api/learning/learner-analysis/me/skills', authenticateToken, LearnerAnalysisController.getMySkillsSummary);
+app.post('/api/learning/learner-analysis/me/refresh', authenticateToken, LearnerAnalysisController.refreshMyProfile);
+app.get('/api/learning/internal/learner-analysis/:userId', LearnerAnalysisController.getProfileInternal); // Internal — no auth
+app.post('/api/learning/internal/learner-analysis/:userId/invalidate', LearnerAnalysisController.invalidateCacheInternal); // Internal — no auth
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });
@@ -206,6 +234,22 @@ initializeVideosBucket().catch((err) => {
 initializeCertificatesBucket().catch((err) => {
   logger.error('Failed to initialize MinIO certificates bucket:', err);
 });
+
+// Initialize MinIO private project-submissions bucket on startup
+initializeProjectsBucket().catch((err) => {
+  logger.error('Failed to initialize MinIO project submissions bucket:', err);
+});
+
+// Ensure temp directories exist for ZIP uploads/extraction
+import * as fs from 'fs';
+const zipUploadDir = process.env.ZIP_UPLOAD_DIR || '/tmp/project-uploads';
+const zipExtractDir = process.env.ZIP_EXTRACT_DIR || '/tmp/project-analysis';
+try {
+  fs.mkdirSync(zipUploadDir, { recursive: true });
+  fs.mkdirSync(zipExtractDir, { recursive: true });
+} catch (e) {
+  logger.warn('Could not create temp directories for project analysis:', e);
+}
 
 // Resume any pending HLS processing jobs from last run
 HLSQueueService.resumePendingJobs().catch((err) => {

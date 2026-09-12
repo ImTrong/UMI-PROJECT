@@ -3,7 +3,9 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import { AIController } from './controllers/ai.controller';
-import { authenticateToken } from './middleware/auth.middleware';
+import { RAGController } from './modules/rag/rag.controller';
+import { RAGChatController } from './modules/rag/chat/rag-chat.controller';
+import { authenticateToken, requireAdmin } from './middleware/auth.middleware';
 import logger from './utils/logger';
 
 const app = express();
@@ -74,6 +76,26 @@ app.post('/api/ai/career-advisor/:sessionId/skip', insightLimiter, authenticateT
 
 // ==================== Evaluation Pipeline Route ====================
 app.post('/api/ai/evaluate-submission', insightLimiter, authenticateToken, AIController.evaluateSubmission); // Calls Gemini
+
+// === Phase 2: Per-Criterion Evaluation Routes ===
+app.post('/api/ai/evaluate-criterion', insightLimiter, authenticateToken, AIController.evaluateCriterionEndpoint); // Calls Gemini
+app.post('/api/ai/generate-evaluation-feedback', insightLimiter, authenticateToken, AIController.generateEvaluationFeedback); // Calls Gemini
+
+// ==================== GĐ2: Learner Competency Analysis ====================
+app.post('/api/ai/learner-analysis/generate', insightLimiter, authenticateToken, AIController.generateLearnerAnalysis); // Calls Gemini (3 calls), caches result
+app.get('/api/ai/learner-analysis', apiLimiter, authenticateToken, AIController.getCachedLearnerAnalysis); // Fast — reads from cache
+
+// ==================== RAG Foundation Routes ====================
+app.get('/api/ai/rag/health', RAGController.health);                                                                     // Public
+app.post('/api/ai/rag/search', apiLimiter, authenticateToken, RAGController.search);                                     // Authenticated
+app.post('/api/ai/rag/index/document', apiLimiter, authenticateToken, requireAdmin, RAGController.indexDocument);         // Admin
+app.post('/api/ai/rag/index/lesson', apiLimiter, authenticateToken, requireAdmin, RAGController.indexLesson);             // Admin
+app.delete('/api/ai/rag/index/document/:id', apiLimiter, authenticateToken, requireAdmin, RAGController.deleteDocument);  // Admin
+app.get('/api/ai/rag/documents', apiLimiter, authenticateToken, requireAdmin, RAGController.listDocuments);               // Admin
+
+// ==================== RAG Chat Routes (Tầng 2) ====================
+app.post('/api/ai/rag/chat', apiLimiter, chatLimiter, authenticateToken, RAGChatController.chat);             // Authenticated
+app.post('/api/ai/rag/chat/new', apiLimiter, chatLimiter, authenticateToken, RAGChatController.createAndChat); // Authenticated
 
 // ==================== Global Error Handler ====================
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {

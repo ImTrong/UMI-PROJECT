@@ -1,0 +1,1108 @@
+{
+  "config": {
+    "evaluationId": "eval-2026-09-10T11-26-20",
+    "datasetVersion": "v1",
+    "retrievalMode": "advanced",
+    "config": {
+      "llmModel": "gemini-3.6-flash",
+      "embeddingModel": "gemini-embedding-001",
+      "embeddingDimension": 768,
+      "retrievalTopK": 5,
+      "relevanceThreshold": 0.56,
+      "maxContextTokens": 4000,
+      "chunkSize": 600,
+      "chunkOverlap": 100,
+      "judgeTemperature": 0,
+      "judgePromptVersion": "v1",
+      "advancedDenseTopN": 10,
+      "advancedLexicalTopN": 10,
+      "rrfK": 60,
+      "rrfFusedTopM": 15,
+      "advancedFinalTopK": 5,
+      "rerankWeights": "d=0.5 l=0.3 r=0.2",
+      "advancedRerankThreshold": 0.75
+    },
+    "timestamp": "2026-09-10T11:26:20.610Z",
+    "totalSamples": 23
+  },
+  "overallMetrics": {
+    "faithfulness": {
+      "average": 0,
+      "min": 0,
+      "max": 0,
+      "count": 0
+    },
+    "answerRelevancy": {
+      "average": 0,
+      "min": 0,
+      "max": 0,
+      "count": 0
+    },
+    "contextPrecision": {
+      "average": 0,
+      "min": 0,
+      "max": 0,
+      "count": 0
+    },
+    "contextRecall": {
+      "average": 0,
+      "min": 0,
+      "max": 0,
+      "count": 0
+    }
+  },
+  "perCategory": [
+    {
+      "category": "direct_factual",
+      "sampleCount": 5,
+      "metrics": {
+        "faithfulness": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "answerRelevancy": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextPrecision": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextRecall": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        }
+      }
+    },
+    {
+      "category": "paraphrase",
+      "sampleCount": 3,
+      "metrics": {
+        "faithfulness": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "answerRelevancy": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextPrecision": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextRecall": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        }
+      }
+    },
+    {
+      "category": "multi_sentence",
+      "sampleCount": 2,
+      "metrics": {
+        "faithfulness": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "answerRelevancy": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextPrecision": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextRecall": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        }
+      }
+    },
+    {
+      "category": "conceptual",
+      "sampleCount": 3,
+      "metrics": {
+        "faithfulness": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "answerRelevancy": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextPrecision": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextRecall": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        }
+      }
+    },
+    {
+      "category": "out_of_knowledge",
+      "sampleCount": 4,
+      "metrics": {
+        "faithfulness": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "answerRelevancy": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextPrecision": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextRecall": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        }
+      }
+    },
+    {
+      "category": "similar_but_unrelated",
+      "sampleCount": 3,
+      "metrics": {
+        "faithfulness": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "answerRelevancy": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextPrecision": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextRecall": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        }
+      }
+    },
+    {
+      "category": "metadata_scoped",
+      "sampleCount": 3,
+      "metrics": {
+        "faithfulness": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "answerRelevancy": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextPrecision": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        },
+        "contextRecall": {
+          "average": 0,
+          "min": 0,
+          "max": 0,
+          "count": 0
+        }
+      }
+    }
+  ],
+  "retrievalAnalysis": {
+    "correct": 22,
+    "partial": 0,
+    "wrong": 1,
+    "noRetrieval": 0,
+    "ambiguous": 0
+  },
+  "gateAnalysis": {
+    "relevantSurvivedGate": 14,
+    "irrelevantRejectedByGate": 8,
+    "ambiguousRemaining": 1
+  },
+  "sampleResults": [
+    {
+      "sampleId": "eval-001",
+      "category": "direct_factual",
+      "question": "Middleware trong ExpressJS là gì?",
+      "ragResult": {
+        "sampleId": "eval-001",
+        "question": "Middleware trong ExpressJS là gì?",
+        "category": "direct_factual",
+        "groundTruth": "Middleware là các hàm trung gian trong Express.js, có quyền truy cập vào đối tượng request (req), response (res), và hàm next() trong chu trình xử lý request-response.",
+        "expectedSources": [
+          "eval-expressjs-middleware"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293ccd01a48bc1ec71d1e_chunk_0",
+            "chunkIndex": 0,
+            "documentId": "6aa293ccd01a48bc1ec71d1e",
+            "sourceId": "eval-expressjs-middleware",
+            "title": "Middleware trong ExpressJS",
+            "content": "# Middleware trong ExpressJS\n\n## ## Middleware là gì?\n\nMiddleware là các hàm trung gian trong Express.js, có quyền truy cập vào đối tượng request (req), response (res), và hàm next() trong chu trình xử lý request-response.\n\nMiddleware có thể:\n- Thực thi bất kỳ code nào\n- Thay đổi đối tượng request và response\n- Kết thúc chu trình request-response\n- Gọi middleware tiếp theo trong chuỗi",
+            "score": 1
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 1,
+        "retrievalTimeMs": 415,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-002",
+      "category": "direct_factual",
+      "question": "Error-handling middleware trong Express có mấy tham số?",
+      "ragResult": {
+        "sampleId": "eval-002",
+        "question": "Error-handling middleware trong Express có mấy tham số?",
+        "category": "direct_factual",
+        "groundTruth": "Error-handling middleware có 4 tham số thay vì 3: (err, req, res, next).",
+        "expectedSources": [
+          "eval-expressjs-middleware"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293ccd01a48bc1ec71d1e_chunk_2",
+            "chunkIndex": 2,
+            "documentId": "6aa293ccd01a48bc1ec71d1e",
+            "sourceId": "eval-expressjs-middleware",
+            "title": "Middleware trong ExpressJS",
+            "content": "ess.Router();\nrouter.use((req, res, next) => {\n  console.log('Time:', Date.now());\n  next();\n});\n``` ### 3. Error-handling middleware\nCó 4 tham số thay vì 3: (err, req, res, next):\n\n```javascript\napp.use((err, req, res, next) => {\n  console.error(err.stack);\n  res.status(500).send('Something broke!');\n});\n```\n\n### ### 4. Built-in middleware\nExpress cung cấp sẵn:\n- express.static: phục vụ file tĩnh\n- express.json: parse JSON body\n- express.urlencoded: parse URL-encoded body\n\n### ### 5. Third-party middleware\nCác middleware bên thứ ba phổ biến:\n- cors: xử lý Cross-Origin Resource Sharing\n- helmet: bảo mật HTTP headers\n- morgan: logging HTTP requests\n- cookie-parser: parse cookies",
+            "score": 1
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 1,
+        "retrievalTimeMs": 925,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-003",
+      "category": "direct_factual",
+      "question": "Dockerfile có những chỉ thị quan trọng nào?",
+      "ragResult": {
+        "sampleId": "eval-003",
+        "question": "Dockerfile có những chỉ thị quan trọng nào?",
+        "category": "direct_factual",
+        "groundTruth": "Các chỉ thị quan trọng của Dockerfile: FROM (chỉ định base image), WORKDIR (thiết lập thư mục làm việc), COPY (sao chép file từ host vào container), RUN (thực thi lệnh trong quá trình build), EXPOSE (khai báo port), CMD (lệnh mặc định khi container khởi động), ENV (thiết lập biến môi trường).",
+        "expectedSources": [
+          "eval-docker-basics"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293cdd01a48bc1ec71d23_chunk_1",
+            "chunkIndex": 1,
+            "documentId": "6aa293cdd01a48bc1ec71d23",
+            "sourceId": "eval-docker-basics",
+            "title": "Docker Containers Cơ Bản",
+            "content": "nhanh hơn (giây thay vì phút), tiêu tốn ít tài nguyên hơn, và có kích thước nhỏ hơn nhiều so với VM. ## Dockerfile\n\nDockerfile là file text chứa các chỉ thị để Docker build một image. Các chỉ thị quan trọng:\n\n- **FROM**: chỉ định base image (ví dụ: `FROM node:18-alpine`)\n- **WORKDIR**: thiết lập thư mục làm việc trong container\n- **COPY**: sao chép file từ host vào container\n- **RUN**: thực thi lệnh trong quá trình build\n- **EXPOSE**: khai báo port container lắng nghe\n- **CMD**: lệnh mặc định khi container khởi động\n- **ENV**: thiết lập biến môi trường\n\nVí dụ Dockerfile cho ứng dụng Node.js:",
+            "score": 1
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 1,
+        "retrievalTimeMs": 889,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-004",
+      "category": "direct_factual",
+      "question": "Git commit là gì và chứa những thông tin nào?",
+      "ragResult": {
+        "sampleId": "eval-004",
+        "question": "Git commit là gì và chứa những thông tin nào?",
+        "category": "direct_factual",
+        "groundTruth": "Commit là một snapshot của dự án tại một thời điểm. Mỗi commit có: Hash ID duy nhất, commit message mô tả thay đổi, author và timestamp, pointer đến commit trước đó (parent).",
+        "expectedSources": [
+          "eval-git-github"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293cfd01a48bc1ec71d2a_chunk_0",
+            "chunkIndex": 0,
+            "documentId": "6aa293cfd01a48bc1ec71d2a",
+            "sourceId": "eval-git-github",
+            "title": "Git và GitHub Cơ Bản",
+            "content": "# Git và GitHub Cơ Bản\n\n## ## Git là gì?\n\nGit là hệ thống quản lý phiên bản phân tán (Distributed Version Control System). Git theo dõi mọi thay đổi trong source code, cho phép nhiều developer cùng làm việc trên một dự án mà không gây xung đột.",
+            "score": 0.801
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 0.801,
+        "retrievalTimeMs": 905,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-005",
+      "category": "direct_factual",
+      "question": "Docker Volume có những loại nào?",
+      "ragResult": {
+        "sampleId": "eval-005",
+        "question": "Docker Volume có những loại nào?",
+        "category": "direct_factual",
+        "groundTruth": "Docker Volume có 3 loại: Named volumes (quản lý bởi Docker, dùng docker volume create), Bind mounts (ánh xạ trực tiếp thư mục host vào container), tmpfs mounts (lưu trong bộ nhớ RAM, mất khi container dừng).",
+        "expectedSources": [
+          "eval-docker-basics"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293cdd01a48bc1ec71d23_chunk_5",
+            "chunkIndex": 5,
+            "documentId": "6aa293cdd01a48bc1ec71d23",
+            "sourceId": "eval-docker-basics",
+            "title": "Docker Containers Cơ Bản",
+            "content": "rực tiếp thư mục host vào container\n- **tmpfs mounts**: lưu trong bộ nhớ RAM, mất khi container dừng ## Kết luận\n\nDocker giúp đơn giản hóa quy trình phát triển, kiểm thử và triển khai ứng dụng. Hiểu rõ Dockerfile, Docker Compose và Volume là nền tảng để làm việc hiệu quả với container.",
+            "score": 0.82
+          },
+          {
+            "chunkId": "6aa293cdd01a48bc1ec71d23_chunk_4",
+            "chunkIndex": 4,
+            "documentId": "6aa293cdd01a48bc1ec71d23",
+            "sourceId": "eval-docker-basics",
+            "title": "Docker Containers Cơ Bản",
+            "content": "- \"3000:3000\"\n  db:\n  image: mongo:7\n  volumes:\n  - mongo_data:/data/db\nvolumes:\n  mongo_data:\n``` ## Các lệnh Docker cơ bản\n\n- `docker build -t myapp .`: build image từ Dockerfile\n- `docker run -p 3000:3000 myapp`: chạy container\n- `docker ps`: liệt kê containers đang chạy\n- `docker images`: liệt kê images\n- `docker stop `: dừng container\n- `docker rm `: xóa container\n- `docker rmi `: xóa image\n\n## ## Docker Volume\n\nVolume là cơ chế lưu trữ dữ liệu bền vững cho container. Có 3 loại:\n- **Named volumes**: quản lý bởi Docker, dùng `docker volume create`\n- **Bind mounts**: ánh xạ trực tiếp thư mục host vào container\n- **tmpfs mounts**: lưu trong bộ nhớ RAM, mất khi container dừng",
+            "score": 0.815
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 2,
+        "topScore": 0.82,
+        "retrievalTimeMs": 394,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-006",
+      "category": "paraphrase",
+      "question": "Trong Express, các hàm trung gian dùng để làm gì?",
+      "ragResult": {
+        "sampleId": "eval-006",
+        "question": "Trong Express, các hàm trung gian dùng để làm gì?",
+        "category": "paraphrase",
+        "groundTruth": "Middleware có thể: thực thi bất kỳ code nào, thay đổi đối tượng request và response, kết thúc chu trình request-response, gọi middleware tiếp theo trong chuỗi.",
+        "expectedSources": [
+          "eval-expressjs-middleware"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293ccd01a48bc1ec71d1e_chunk_0",
+            "chunkIndex": 0,
+            "documentId": "6aa293ccd01a48bc1ec71d1e",
+            "sourceId": "eval-expressjs-middleware",
+            "title": "Middleware trong ExpressJS",
+            "content": "# Middleware trong ExpressJS\n\n## ## Middleware là gì?\n\nMiddleware là các hàm trung gian trong Express.js, có quyền truy cập vào đối tượng request (req), response (res), và hàm next() trong chu trình xử lý request-response.\n\nMiddleware có thể:\n- Thực thi bất kỳ code nào\n- Thay đổi đối tượng request và response\n- Kết thúc chu trình request-response\n- Gọi middleware tiếp theo trong chuỗi",
+            "score": 1
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 1,
+        "retrievalTimeMs": 357,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-007",
+      "category": "paraphrase",
+      "question": "Sự khác nhau chính giữa container Docker và máy ảo là gì?",
+      "ragResult": {
+        "sampleId": "eval-007",
+        "question": "Sự khác nhau chính giữa container Docker và máy ảo là gì?",
+        "category": "paraphrase",
+        "groundTruth": "Container chia sẻ kernel của hệ điều hành host, trong khi VM cần một hệ điều hành guest riêng. Do đó container khởi động nhanh hơn, tiêu tốn ít tài nguyên hơn, và có kích thước nhỏ hơn nhiều so với VM.",
+        "expectedSources": [
+          "eval-docker-basics"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293cdd01a48bc1ec71d23_chunk_0",
+            "chunkIndex": 0,
+            "documentId": "6aa293cdd01a48bc1ec71d23",
+            "sourceId": "eval-docker-basics",
+            "title": "Docker Containers Cơ Bản",
+            "content": "# Docker Containers Cơ Bản\n\n## ## Docker là gì?\n\nDocker là một nền tảng mã nguồn mở cho phép đóng gói, phân phối và chạy ứng dụng trong các container. Container là một đơn vị phần mềm nhẹ, độc lập, chứa mọi thứ cần thiết để chạy ứng dụng: code, runtime, thư viện và cấu hình hệ thống.\n\n## ## Sự khác biệt giữa Container và Virtual Machine\n\nContainer chia sẻ kernel của hệ điều hành host, trong khi VM cần một hệ điều hành guest riêng. Do đó container khởi động nhanh hơn (giây thay vì phút), tiêu tốn ít tài nguyên hơn, và có kích thước nhỏ hơn nhiều so với VM.",
+            "score": 1
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 1,
+        "retrievalTimeMs": 937,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-008",
+      "category": "paraphrase",
+      "question": "Quy trình làm Pull Request trên GitHub gồm những bước nào?",
+      "ragResult": {
+        "sampleId": "eval-008",
+        "question": "Quy trình làm Pull Request trên GitHub gồm những bước nào?",
+        "category": "paraphrase",
+        "groundTruth": "Quy trình Pull Request: 1. Fork hoặc tạo branch mới, 2. Thực hiện thay đổi và commit, 3. Push lên remote, 4. Tạo Pull Request trên GitHub, 5. Code review bởi team members, 6. Merge sau khi được approve.",
+        "expectedSources": [
+          "eval-git-github"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293cfd01a48bc1ec71d2a_chunk_5",
+            "chunkIndex": 5,
+            "documentId": "6aa293cfd01a48bc1ec71d2a",
+            "sourceId": "eval-git-github",
+            "title": "Git và GitHub Cơ Bản",
+            "content": "ush lên remote\ngit pull origin main  # Pull từ remote\ngit fetch  # Tải thay đổi nhưng chưa merge\n``` ## GitHub\n\nGitHub là nền tảng hosting cho Git repository. Tính năng chính:\n- **Pull Request (PR)**: yêu cầu review và merge code\n- **Issues**: theo dõi bugs và feature requests\n- **Actions**: CI/CD tự động\n- **Fork**: sao chép repo của người khác về tài khoản mình\n\n### Quy trình Pull Request\n1. Fork hoặc tạo branch mới\n2. Thực hiện thay đổi và commit\n3. Push lên remote\n4. Tạo Pull Request trên GitHub\n5. Code review bởi team members\n6. Merge sau khi được approve",
+            "score": 1
+          },
+          {
+            "chunkId": "6aa293cfd01a48bc1ec71d2a_chunk_6",
+            "chunkIndex": 6,
+            "documentId": "6aa293cfd01a48bc1ec71d2a",
+            "sourceId": "eval-git-github",
+            "title": "Git và GitHub Cơ Bản",
+            "content": "remote\n4. Tạo Pull Request trên GitHub\n5. Code review bởi team members\n6. Merge sau khi được approve ## Giải quyết Conflict\n\nConflict xảy ra khi hai branch sửa cùng một dòng code. Để giải quyết:\n1. Git đánh dấu vùng conflict bằng `>>>>>>`\n2. Developer chọn giữ phiên bản nào hoặc kết hợp cả hai\n3. Xóa markers và commit kết quả\n\n## ## Kết luận\n\nGit và GitHub là công cụ không thể thiếu trong phát triển phần mềm hiện đại. Thành thạo Git giúp bạn quản lý code hiệu quả và làm việc nhóm chuyên nghiệp.",
+            "score": 0.819
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 2,
+        "topScore": 1,
+        "retrievalTimeMs": 387,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-009",
+      "category": "multi_sentence",
+      "question": "Tôi đang xây dựng một ứng dụng Express và muốn thêm bảo mật. Các third-party middleware nào giúp bảo vệ HTTP headers và xử lý CORS?",
+      "ragResult": {
+        "sampleId": "eval-009",
+        "question": "Tôi đang xây dựng một ứng dụng Express và muốn thêm bảo mật. Các third-party middleware nào giúp bảo vệ HTTP headers và xử lý CORS?",
+        "category": "multi_sentence",
+        "groundTruth": "Các third-party middleware phổ biến cho bảo mật: cors (xử lý Cross-Origin Resource Sharing), helmet (bảo mật HTTP headers).",
+        "expectedSources": [
+          "eval-expressjs-middleware"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293ccd01a48bc1ec71d1e_chunk_3",
+            "chunkIndex": 3,
+            "documentId": "6aa293ccd01a48bc1ec71d1e",
+            "sourceId": "eval-expressjs-middleware",
+            "title": "Middleware trong ExpressJS",
+            "content": "haring\n- helmet: bảo mật HTTP headers\n- morgan: logging HTTP requests\n- cookie-parser: parse cookies ## Thứ tự Middleware\n\nThứ tự khai báo middleware RẤT QUAN TRỌNG. Middleware được thực thi theo thứ tự khai báo. Nếu một middleware không gọi next(), các middleware phía sau sẽ không được thực thi.\n\n## ## Kết luận\n\nMiddleware là nền tảng của kiến trúc Express.js. Hiểu rõ cách middleware hoạt động giúp bạn xây dựng ứng dụng web có tổ chức, bảo mật và dễ bảo trì.",
+            "score": 1
+          },
+          {
+            "chunkId": "6aa293ccd01a48bc1ec71d1e_chunk_2",
+            "chunkIndex": 2,
+            "documentId": "6aa293ccd01a48bc1ec71d1e",
+            "sourceId": "eval-expressjs-middleware",
+            "title": "Middleware trong ExpressJS",
+            "content": "ess.Router();\nrouter.use((req, res, next) => {\n  console.log('Time:', Date.now());\n  next();\n});\n``` ### 3. Error-handling middleware\nCó 4 tham số thay vì 3: (err, req, res, next):\n\n```javascript\napp.use((err, req, res, next) => {\n  console.error(err.stack);\n  res.status(500).send('Something broke!');\n});\n```\n\n### ### 4. Built-in middleware\nExpress cung cấp sẵn:\n- express.static: phục vụ file tĩnh\n- express.json: parse JSON body\n- express.urlencoded: parse URL-encoded body\n\n### ### 5. Third-party middleware\nCác middleware bên thứ ba phổ biến:\n- cors: xử lý Cross-Origin Resource Sharing\n- helmet: bảo mật HTTP headers\n- morgan: logging HTTP requests\n- cookie-parser: parse cookies",
+            "score": 0.8
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 2,
+        "topScore": 1,
+        "retrievalTimeMs": 363,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-010",
+      "category": "multi_sentence",
+      "question": "Tôi cần deploy ứng dụng Node.js bằng Docker. Hãy cho tôi biết cấu trúc Dockerfile cơ bản và các lệnh Docker Compose cần thiết.",
+      "ragResult": {
+        "sampleId": "eval-010",
+        "question": "Tôi cần deploy ứng dụng Node.js bằng Docker. Hãy cho tôi biết cấu trúc Dockerfile cơ bản và các lệnh Docker Compose cần thiết.",
+        "category": "multi_sentence",
+        "groundTruth": "Dockerfile cho Node.js: FROM node:18-alpine, WORKDIR /app, COPY package*.json, RUN npm install, COPY ., EXPOSE 3000, CMD node server.js. Docker Compose: docker compose up (khởi động), docker compose down (dừng), docker compose build (build lại), docker compose logs (xem logs).",
+        "expectedSources": [
+          "eval-docker-basics"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293cdd01a48bc1ec71d23_chunk_3",
+            "chunkIndex": 3,
+            "documentId": "6aa293cdd01a48bc1ec71d23",
+            "sourceId": "eval-docker-basics",
+            "title": "Docker Containers Cơ Bản",
+            "content": "ORKDIR /app\nCOPY package*.json ./\nRUN npm install\nCOPY . .\nEXPOSE 3000\nCMD [\"node\", \"server.js\"]\n``` ## Docker Compose\n\nDocker Compose cho phép định nghĩa và chạy nhiều container cùng lúc bằng file YAML. Lệnh chính:\n\n- `docker compose up`: khởi động tất cả services\n- `docker compose down`: dừng và xóa containers\n- `docker compose build`: build lại images\n- `docker compose logs`: xem logs\n\nVí dụ docker-compose.yml:\n\n```yaml\nversion: '3.8'\nservices:\n  web:\n  build: .\n  ports:\n  - \"3000:3000\"\n  db:\n  image: mongo:7\n  volumes:\n  - mongo_data:/data/db\nvolumes:\n  mongo_data:\n```",
+            "score": 0.848
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 0.848,
+        "retrievalTimeMs": 357,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-011",
+      "category": "conceptual",
+      "question": "Tại sao thứ tự khai báo middleware trong Express lại quan trọng?",
+      "ragResult": {
+        "sampleId": "eval-011",
+        "question": "Tại sao thứ tự khai báo middleware trong Express lại quan trọng?",
+        "category": "conceptual",
+        "groundTruth": "Thứ tự khai báo middleware RẤT QUAN TRỌNG. Middleware được thực thi theo thứ tự khai báo. Nếu một middleware không gọi next(), các middleware phía sau sẽ không được thực thi.",
+        "expectedSources": [
+          "eval-expressjs-middleware"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293ccd01a48bc1ec71d1e_chunk_3",
+            "chunkIndex": 3,
+            "documentId": "6aa293ccd01a48bc1ec71d1e",
+            "sourceId": "eval-expressjs-middleware",
+            "title": "Middleware trong ExpressJS",
+            "content": "haring\n- helmet: bảo mật HTTP headers\n- morgan: logging HTTP requests\n- cookie-parser: parse cookies ## Thứ tự Middleware\n\nThứ tự khai báo middleware RẤT QUAN TRỌNG. Middleware được thực thi theo thứ tự khai báo. Nếu một middleware không gọi next(), các middleware phía sau sẽ không được thực thi.\n\n## ## Kết luận\n\nMiddleware là nền tảng của kiến trúc Express.js. Hiểu rõ cách middleware hoạt động giúp bạn xây dựng ứng dụng web có tổ chức, bảo mật và dễ bảo trì.",
+            "score": 1
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 1,
+        "retrievalTimeMs": 406,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-012",
+      "category": "conceptual",
+      "question": "Giải thích khái niệm branch trong Git và tại sao nên sử dụng branch.",
+      "ragResult": {
+        "sampleId": "eval-012",
+        "question": "Giải thích khái niệm branch trong Git và tại sao nên sử dụng branch.",
+        "category": "conceptual",
+        "groundTruth": "Branch là nhánh phát triển độc lập. Branch mặc định là main (hoặc master). Tạo branch mới để phát triển tính năng mà không ảnh hưởng code chính.",
+        "expectedSources": [
+          "eval-git-github"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293cfd01a48bc1ec71d2a_chunk_1",
+            "chunkIndex": 1,
+            "documentId": "6aa293cfd01a48bc1ec71d2a",
+            "sourceId": "eval-git-github",
+            "title": "Git và GitHub Cơ Bản",
+            "content": "đổi trong source code, cho phép nhiều developer cùng làm việc trên một dự án mà không gây xung đột. ## Các khái niệm cơ bản\n\n### ### Repository (Repo)\nRepository là kho lưu trữ chứa toàn bộ lịch sử thay đổi của dự án. Có hai loại:\n- **Local repository**: trên máy tính cá nhân\n- **Remote repository**: trên server (GitHub, GitLab, Bitbucket)\n\n### ### Commit\nCommit là một snapshot của dự án tại một thời điểm. Mỗi commit có:\n- Hash ID duy nhất (ví dụ: `a1b2c3d`)\n- Commit message mô tả thay đổi\n- Author và timestamp\n- Pointer đến commit trước đó (parent)",
+            "score": 0.901
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 0.901,
+        "retrievalTimeMs": 369,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-013",
+      "category": "conceptual",
+      "question": "Conflict trong Git là gì và cách giải quyết?",
+      "ragResult": {
+        "sampleId": "eval-013",
+        "question": "Conflict trong Git là gì và cách giải quyết?",
+        "category": "conceptual",
+        "groundTruth": "Conflict xảy ra khi hai branch sửa cùng một dòng code. Để giải quyết: Git đánh dấu vùng conflict bằng markers (<<<<<<<, =======, >>>>>>>), developer chọn giữ phiên bản nào hoặc kết hợp cả hai, xóa markers và commit kết quả.",
+        "expectedSources": [
+          "eval-git-github"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293cfd01a48bc1ec71d2a_chunk_6",
+            "chunkIndex": 6,
+            "documentId": "6aa293cfd01a48bc1ec71d2a",
+            "sourceId": "eval-git-github",
+            "title": "Git và GitHub Cơ Bản",
+            "content": "remote\n4. Tạo Pull Request trên GitHub\n5. Code review bởi team members\n6. Merge sau khi được approve ## Giải quyết Conflict\n\nConflict xảy ra khi hai branch sửa cùng một dòng code. Để giải quyết:\n1. Git đánh dấu vùng conflict bằng `>>>>>>`\n2. Developer chọn giữ phiên bản nào hoặc kết hợp cả hai\n3. Xóa markers và commit kết quả\n\n## ## Kết luận\n\nGit và GitHub là công cụ không thể thiếu trong phát triển phần mềm hiện đại. Thành thạo Git giúp bạn quản lý code hiệu quả và làm việc nhóm chuyên nghiệp.",
+            "score": 1
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 1,
+        "retrievalTimeMs": 920,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-014",
+      "category": "out_of_knowledge",
+      "question": "Cách triển khai Kubernetes cluster trên AWS EKS",
+      "ragResult": {
+        "sampleId": "eval-014",
+        "question": "Cách triển khai Kubernetes cluster trên AWS EKS",
+        "category": "out_of_knowledge",
+        "groundTruth": null,
+        "expectedSources": [],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [],
+        "sources": [],
+        "totalChunksRetrieved": 0,
+        "topScore": 0,
+        "retrievalTimeMs": 339,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-015",
+      "category": "out_of_knowledge",
+      "question": "Hướng dẫn cấu hình Nginx làm reverse proxy cho microservices",
+      "ragResult": {
+        "sampleId": "eval-015",
+        "question": "Hướng dẫn cấu hình Nginx làm reverse proxy cho microservices",
+        "category": "out_of_knowledge",
+        "groundTruth": null,
+        "expectedSources": [],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [],
+        "sources": [],
+        "totalChunksRetrieved": 0,
+        "topScore": 0,
+        "retrievalTimeMs": 409,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-016",
+      "category": "out_of_knowledge",
+      "question": "Cách sử dụng React Query để quản lý server state",
+      "ragResult": {
+        "sampleId": "eval-016",
+        "question": "Cách sử dụng React Query để quản lý server state",
+        "category": "out_of_knowledge",
+        "groundTruth": null,
+        "expectedSources": [],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293cfd01a48bc1ec71d2a_chunk_1",
+            "chunkIndex": 1,
+            "documentId": "6aa293cfd01a48bc1ec71d2a",
+            "sourceId": "eval-git-github",
+            "title": "Git và GitHub Cơ Bản",
+            "content": "đổi trong source code, cho phép nhiều developer cùng làm việc trên một dự án mà không gây xung đột. ## Các khái niệm cơ bản\n\n### ### Repository (Repo)\nRepository là kho lưu trữ chứa toàn bộ lịch sử thay đổi của dự án. Có hai loại:\n- **Local repository**: trên máy tính cá nhân\n- **Remote repository**: trên server (GitHub, GitLab, Bitbucket)\n\n### ### Commit\nCommit là một snapshot của dự án tại một thời điểm. Mỗi commit có:\n- Hash ID duy nhất (ví dụ: `a1b2c3d`)\n- Commit message mô tả thay đổi\n- Author và timestamp\n- Pointer đến commit trước đó (parent)",
+            "score": 0.794
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 0.794,
+        "retrievalTimeMs": 864,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "wrong",
+      "retrievalCause": "false_positive"
+    },
+    {
+      "sampleId": "eval-017",
+      "category": "out_of_knowledge",
+      "question": "Cách cấu hình PostgreSQL replication trong môi trường production",
+      "ragResult": {
+        "sampleId": "eval-017",
+        "question": "Cách cấu hình PostgreSQL replication trong môi trường production",
+        "category": "out_of_knowledge",
+        "groundTruth": null,
+        "expectedSources": [],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [],
+        "sources": [],
+        "totalChunksRetrieved": 0,
+        "topScore": 0,
+        "retrievalTimeMs": 396,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-018",
+      "category": "similar_but_unrelated",
+      "question": "Cách cấu hình router Wi-Fi TP-Link để mở rộng mạng",
+      "ragResult": {
+        "sampleId": "eval-018",
+        "question": "Cách cấu hình router Wi-Fi TP-Link để mở rộng mạng",
+        "category": "similar_but_unrelated",
+        "groundTruth": null,
+        "expectedSources": [],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [],
+        "sources": [],
+        "totalChunksRetrieved": 0,
+        "topScore": 0,
+        "retrievalTimeMs": 921,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-019",
+      "category": "similar_but_unrelated",
+      "question": "Image processing trong Python với OpenCV là gì?",
+      "ragResult": {
+        "sampleId": "eval-019",
+        "question": "Image processing trong Python với OpenCV là gì?",
+        "category": "similar_but_unrelated",
+        "groundTruth": null,
+        "expectedSources": [],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [],
+        "sources": [],
+        "totalChunksRetrieved": 0,
+        "topScore": 0,
+        "retrievalTimeMs": 369,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-020",
+      "category": "similar_but_unrelated",
+      "question": "Branch manager trong ngân hàng có trách nhiệm gì?",
+      "ragResult": {
+        "sampleId": "eval-020",
+        "question": "Branch manager trong ngân hàng có trách nhiệm gì?",
+        "category": "similar_but_unrelated",
+        "groundTruth": null,
+        "expectedSources": [],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [],
+        "sources": [],
+        "totalChunksRetrieved": 0,
+        "topScore": 0,
+        "retrievalTimeMs": 379,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-021",
+      "category": "metadata_scoped",
+      "question": "Middleware trong ExpressJS là gì?",
+      "ragResult": {
+        "sampleId": "eval-021",
+        "question": "Middleware trong ExpressJS là gì?",
+        "category": "metadata_scoped",
+        "groundTruth": "Middleware là các hàm trung gian trong Express.js, có quyền truy cập vào đối tượng request (req), response (res), và hàm next() trong chu trình xử lý request-response.",
+        "expectedSources": [
+          "eval-expressjs-middleware"
+        ],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [
+          {
+            "chunkId": "6aa293ccd01a48bc1ec71d1e_chunk_0",
+            "chunkIndex": 0,
+            "documentId": "6aa293ccd01a48bc1ec71d1e",
+            "sourceId": "eval-expressjs-middleware",
+            "title": "Middleware trong ExpressJS",
+            "content": "# Middleware trong ExpressJS\n\n## ## Middleware là gì?\n\nMiddleware là các hàm trung gian trong Express.js, có quyền truy cập vào đối tượng request (req), response (res), và hàm next() trong chu trình xử lý request-response.\n\nMiddleware có thể:\n- Thực thi bất kỳ code nào\n- Thay đổi đối tượng request và response\n- Kết thúc chu trình request-response\n- Gọi middleware tiếp theo trong chuỗi",
+            "score": 1
+          }
+        ],
+        "sources": [],
+        "totalChunksRetrieved": 1,
+        "topScore": 1,
+        "retrievalTimeMs": 373,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-022",
+      "category": "metadata_scoped",
+      "question": "Docker là gì?",
+      "ragResult": {
+        "sampleId": "eval-022",
+        "question": "Docker là gì?",
+        "category": "metadata_scoped",
+        "groundTruth": null,
+        "expectedSources": [],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [],
+        "sources": [],
+        "totalChunksRetrieved": 0,
+        "topScore": 0,
+        "retrievalTimeMs": 379,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    },
+    {
+      "sampleId": "eval-023",
+      "category": "metadata_scoped",
+      "question": "Các lệnh Git cơ bản là gì?",
+      "ragResult": {
+        "sampleId": "eval-023",
+        "question": "Các lệnh Git cơ bản là gì?",
+        "category": "metadata_scoped",
+        "groundTruth": null,
+        "expectedSources": [],
+        "generatedAnswer": "(retrieval-only mode — generation skipped)",
+        "retrievedContexts": [],
+        "sources": [],
+        "totalChunksRetrieved": 0,
+        "topScore": 0,
+        "retrievalTimeMs": 385,
+        "generationTimeMs": 0
+      },
+      "metrics": {
+        "faithfulness": null,
+        "answerRelevancy": null,
+        "contextPrecision": null,
+        "contextRecall": null
+      },
+      "retrievalClassification": "correct",
+      "retrievalCause": null
+    }
+  ],
+  "totalGeminiCalls": 0,
+  "totalTimeMs": 12442
+}

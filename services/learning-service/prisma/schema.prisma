@@ -414,6 +414,11 @@ model FinalProjectSubmission {
   //   fileKey?: "final-projects/xxx/report.pdf",
   //   fileSize?: 1024000
   // }]
+  sourceZipUrl    String?          // MinIO URL for uploaded source ZIP
+  sourceZipKey    String?          // MinIO key for source ZIP
+  processingStatus String         @default("UPLOADED") // UPLOADED, ANALYZING, READY_FOR_EVALUATION, EVALUATING, COMPLETED, FAILED
+  processingError String?          // Error message if processing failed
+  projectContext  Json?            // Computed Project Context for AI evaluation (metadata + structure + artifacts + source index)
   status          SubmissionStatus @default(SUBMITTED)
   score           Float?
   totalScore      Float?           // Tổng điểm tính theo trọng số pipeline
@@ -429,6 +434,153 @@ model FinalProjectSubmission {
   @@unique([finalProjectId, userId, attemptNumber])
   @@index([userId])
   @@index([learningPathId])
+  @@index([processingStatus])
   @@map("final_project_submissions")
 }
 
+// ==================== Project Analysis (Phase 1: AI Project Review) ====================
+
+model ProjectAnalysis {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  submissionId      String   @unique @db.ObjectId
+  learningPathId    String   @db.ObjectId
+  userId            String   @db.ObjectId
+
+  // Project metadata
+  projectType       String?              // "web-app", "api", "mobile", "cli", "library", "fullstack"
+  primaryLanguage   String?              // "TypeScript", "JavaScript", "Python", etc.
+  languages         String[] @default([])
+  frameworks        String[] @default([])
+  libraries         String[] @default([])
+
+  // Structure analysis
+  directoryStructure Json?               // Nested directory tree {name, type, children}
+  totalFiles        Int      @default(0)
+  totalLines        Int      @default(0)
+  analyzedFiles     Int      @default(0)
+
+  // Collected artifacts
+  readmeContent     String?              // README.md content (truncated if too long)
+  packageInfo       Json?                // package.json / requirements.txt parsed data
+  configFiles       Json?                // [{path, type, content}] — key config files
+
+  // Source file index — NO AI summarization, direct analysis only
+  // [{path, language, lineCount, imports[], exports[], isEntryPoint, directory}]
+  sourceFileIndex   Json?
+
+  // Code chunks — retrievable segments for rubric-based evaluation in Phase 2
+  // [{filePath, chunkIndex, startLine, endLine, content, language}]
+  codeChunks        Json?
+
+  // Entry points detected
+  entryPoints       String[] @default([])
+
+  // GitHub-specific info (when submitted via GitHub URL)
+  githubInfo        Json?                // {repoUrl, stars, commits, branches, lastCommitDate, contributors}
+
+  // Processing metadata
+  processingStatus  String   @default("PENDING") // PENDING, ANALYZING, COMPLETED, FAILED
+  errorMessage      String?
+  analysisVersion   String   @default("1.0")
+  analyzedAt        DateTime?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@index([processingStatus])
+  @@map("project_analyses")
+}
+
+// ==================== Project Evaluation (Phase 2: AI Rubric Evaluation) ====================
+
+model ProjectEvaluation {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  submissionId    String   @db.ObjectId
+  learningPathId  String   @db.ObjectId
+  userId          String   @db.ObjectId
+
+  // Kết quả tổng
+  totalScore      Float                // Tổng điểm weighted (0-100)
+  passingScore    Float                // Ngưỡng đạt
+  passed          Boolean              // Backend tính: totalScore >= passingScore
+
+  // Kết quả từng criterion (structured JSON with snapshot)
+  // [{criterionId, title, maxScore, weight, passCriteria, score, weightedScore, passed,
+  //   evidenceUsed: [{chunkId, filePath, startLine, endLine}],
+  //   strengths[], weaknesses[], feedback, suggestions[]}]
+  criterionResults Json
+
+  // Tổng hợp
+  passedCriteria    String[] @default([])  // Tên các criterion đã đạt
+  failedCriteria    String[] @default([])  // Tên các criterion chưa đạt
+  overallStrengths  String[] @default([])  // Điểm mạnh tổng hợp
+  overallWeaknesses String[] @default([])  // Điểm cần cải thiện
+
+  // Feedback report
+  feedbackReport  String?                  // AI-generated comprehensive report
+
+  // Metadata
+  evaluationVersion String  @default("2.0")
+  evaluatedAt     DateTime  @default(now())
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([submissionId])
+  @@index([userId])
+  @@index([learningPathId])
+  @@map("project_evaluations")
+}
+
+// ==================== User Skill Profile (Phase 3: Skill-based Evaluation) ====================
+
+model UserSkillProfile {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @unique @db.ObjectId
+
+  // Skill data — array of canonical skill entries
+  // [{
+  //   canonicalName: "react", displayName: "React", category: "Frontend",
+  //   level: "INTERMEDIATE", confidence: 0.85,
+  //   evidences: [{source, sourceId, detail, scorePercentage, weight, date}],
+  //   lastUpdated: "2024-..."
+  // }]
+  skills        Json      @default("[]")
+
+  // Tổng hợp điểm mạnh/yếu từ evaluations
+  strengths     String[]  @default([])
+  weaknesses    String[]  @default([])
+
+  // Summary cho dashboard
+  overallLevel        String?   // "BEGINNER" | "INTERMEDIATE" | "ADVANCED"
+  profileCompleteness Int       @default(0)  // 0-100
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@map("user_skill_profiles")
+}
+
+// ==================== Learner Analysis (Competency Profile Cache) ====================
+
+model LearnerAnalysis {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @unique @db.ObjectId
+
+  // LearnerCompetencyProfile JSON — kết quả phân tích tổng hợp
+  profile         Json
+
+  // Cache management
+  dataVersion     Int      @default(1)           // Tăng khi schema thay đổi
+  analyzedAt      DateTime @default(now())       // Thời điểm phân tích
+  expiresAt       DateTime                       // TTL fallback (6 giờ)
+  invalidatedAt   DateTime?                      // Event-driven invalidation timestamp
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([expiresAt])
+  @@index([invalidatedAt])
+  @@map("learner_analyses")
+}

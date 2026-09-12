@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client';
-import { ERROR_MESSAGES } from '../utils/constants';
+import { ERROR_MESSAGES, PROJECT_ANALYSIS_ERRORS, PROJECT_ANALYSIS_SUCCESS } from '../utils/constants';
 import { ActivityService } from './activity.service';
-import { ActivityAction, FinalProjectData, EvaluationResult, SubmissionDataItem } from '../types';
+import { ProjectAnalyzerService } from './project-analyzer.service';
+import { EvaluationEngineService } from './evaluation-engine.service';
+import { ActivityAction, FinalProjectData, EvaluationResult, SubmissionDataItem, ProcessingStatus } from '../types';
 import logger from '../utils/logger';
 
 let fileStorage: any = null;
@@ -288,8 +290,300 @@ export class FinalProjectService {
     return submission;
   }
 
+  // ==================== Phase 1: ZIP & GitHub Submission ====================
+
+  /**
+   * Submit with ZIP file — upload to MinIO + trigger project analysis
+   */
+  static async submitWithZip(
+    userId: string,
+    projectId: string,
+    zipFile: Express.Multer.File,
+    data: {
+      learningPathId: string;
+      content?: string;
+      demoUrl?: string;
+    }
+  ) {
+    const project = await prisma.finalProject.findUnique({ where: { id: projectId } });
+    if (!project) throw new Error(ERROR_MESSAGES.FINAL_PROJECT_NOT_FOUND);
+
+    // Check unlock condition
+    const unlockStatus = await this.checkUnlockCondition(userId, project.learningPathId);
+    if (!unlockStatus.unlocked) {
+      throw new Error('Bạn chưa đủ điều kiện để làm bài kiểm tra cuối kỳ. ' + unlockStatus.reasons.join('. '));
+    }
+
+    // Check deadline
+    if (project.deadline && new Date() > project.deadline) {
+      throw new Error('Đã quá thời hạn nộp bài kiểm tra cuối kỳ');
+    }
+
+    // Count existing submissions
+    const existingCount = await prisma.finalProjectSubmission.count({
+      where: { finalProjectId: projectId, userId },
+    });
+
+    // Check max attempts
+    if (existingCount >= project.maxAttempts) {
+      throw new Error(`Bạn đã hết số lần nộp bài (${project.maxAttempts} lần)`);
+    }
+
+    const attemptNumber = existingCount + 1;
+
+    // Upload ZIP to MinIO
+    let sourceZipUrl = '';
+    let sourceZipKey = '';
+    if (fileStorage) {
+      const result = await fileStorage.uploadFile({
+        bucket: 'project-submissions',
+        filePath: zipFile.path,
+        fileName: `submissions/${userId}/${projectId}/attempt-${attemptNumber}/${zipFile.originalname}`,
+        mimeType: 'application/zip',
+      });
+      sourceZipUrl = result.fileUrl || '';
+      sourceZipKey = result.fileKey || '';
+    }
+
+    // Create submission with UPLOADED status
+    const submission = await prisma.finalProjectSubmission.create({
+      data: {
+        finalProjectId: projectId,
+        userId,
+        learningPathId: project.learningPathId,
+        attemptNumber,
+        content: data.content,
+        demoUrl: data.demoUrl,
+        fileName: zipFile.originalname,
+        sourceZipUrl,
+        sourceZipKey,
+        processingStatus: ProcessingStatus.UPLOADED,
+        status: 'SUBMITTED',
+      },
+    });
+
+    // Log activity
+    await ActivityService.logActivity({
+      userId,
+      action: ActivityAction.FINAL_PROJECT_SUBMITTED,
+      metadata: {
+        projectTitle: project.title,
+        learningPathId: project.learningPathId,
+        attemptNumber,
+        submissionType: 'ZIP',
+      },
+    });
+
+    // Trigger async analysis (fire and forget)
+    ProjectAnalyzerService.analyzeZipSubmission(submission.id, zipFile.path)
+      .catch(err => logger.error(`Async ZIP analysis failed for submission ${submission.id}:`, err));
+
+    logger.info(`ZIP submission created: ${submission.id} by user ${userId} (attempt ${attemptNumber})`);
+    return submission;
+  }
+
+  /**
+   * Submit with GitHub URL — validate URL + trigger project analysis
+   */
+  static async submitWithGithub(
+    userId: string,
+    projectId: string,
+    data: {
+      learningPathId: string;
+      githubUrl: string;
+      content?: string;
+      demoUrl?: string;
+    }
+  ) {
+    const project = await prisma.finalProject.findUnique({ where: { id: projectId } });
+    if (!project) throw new Error(ERROR_MESSAGES.FINAL_PROJECT_NOT_FOUND);
+
+    // Validate GitHub URL
+    const githubUrlPattern = /^https?:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/;
+    if (!githubUrlPattern.test(data.githubUrl)) {
+      throw new Error(PROJECT_ANALYSIS_ERRORS.INVALID_GITHUB_URL);
+    }
+
+    // Check unlock condition
+    const unlockStatus = await this.checkUnlockCondition(userId, project.learningPathId);
+    if (!unlockStatus.unlocked) {
+      throw new Error('Bạn chưa đủ điều kiện để làm bài kiểm tra cuối kỳ. ' + unlockStatus.reasons.join('. '));
+    }
+
+    // Check deadline
+    if (project.deadline && new Date() > project.deadline) {
+      throw new Error('Đã quá thời hạn nộp bài kiểm tra cuối kỳ');
+    }
+
+    // Count existing submissions
+    const existingCount = await prisma.finalProjectSubmission.count({
+      where: { finalProjectId: projectId, userId },
+    });
+
+    if (existingCount >= project.maxAttempts) {
+      throw new Error(`Bạn đã hết số lần nộp bài (${project.maxAttempts} lần)`);
+    }
+
+    const attemptNumber = existingCount + 1;
+
+    // Create submission
+    const submission = await prisma.finalProjectSubmission.create({
+      data: {
+        finalProjectId: projectId,
+        userId,
+        learningPathId: project.learningPathId,
+        attemptNumber,
+        content: data.content,
+        githubUrl: data.githubUrl,
+        demoUrl: data.demoUrl,
+        processingStatus: ProcessingStatus.UPLOADED,
+        status: 'SUBMITTED',
+      },
+    });
+
+    // Log activity
+    await ActivityService.logActivity({
+      userId,
+      action: ActivityAction.FINAL_PROJECT_SUBMITTED,
+      metadata: {
+        projectTitle: project.title,
+        learningPathId: project.learningPathId,
+        attemptNumber,
+        submissionType: 'GITHUB',
+      },
+    });
+
+    // Trigger async analysis
+    ProjectAnalyzerService.analyzeGithubSubmission(submission.id, data.githubUrl)
+      .catch(err => logger.error(`Async GitHub analysis failed for submission ${submission.id}:`, err));
+
+    logger.info(`GitHub submission created: ${submission.id} by user ${userId} (attempt ${attemptNumber})`);
+    return submission;
+  }
+
+  /**
+   * Get processing status for a submission
+   */
+  static async getSubmissionStatus(submissionId: string) {
+    const submission = await prisma.finalProjectSubmission.findUnique({
+      where: { id: submissionId },
+      select: {
+        id: true,
+        processingStatus: true,
+        processingError: true,
+        status: true,
+        fileName: true,
+        githubUrl: true,
+        sourceZipUrl: true,
+        submittedAt: true,
+        totalScore: true,
+        score: true,
+      },
+    });
+
+    if (!submission) throw new Error(ERROR_MESSAGES.SUBMISSION_NOT_FOUND);
+
+    // Get analysis info if available
+    const analysis = await prisma.projectAnalysis.findUnique({
+      where: { submissionId },
+      select: {
+        projectType: true,
+        primaryLanguage: true,
+        totalFiles: true,
+        totalLines: true,
+        frameworks: true,
+        processingStatus: true,
+        analyzedAt: true,
+      },
+    });
+
+    return {
+      ...submission,
+      analysis: analysis || null,
+    };
+  }
+
+  /**
+   * Get Project Context for a submission (for evaluation)
+   */
+  static async getProjectContext(submissionId: string) {
+    const submission = await prisma.finalProjectSubmission.findUnique({
+      where: { id: submissionId },
+      select: { projectContext: true, processingStatus: true },
+    });
+
+    if (!submission) throw new Error(ERROR_MESSAGES.SUBMISSION_NOT_FOUND);
+
+    if (!submission.projectContext) {
+      throw new Error(PROJECT_ANALYSIS_ERRORS.ANALYSIS_NOT_FOUND);
+    }
+
+    return {
+      processingStatus: submission.processingStatus,
+      projectContext: submission.projectContext,
+    };
+  }
+
+  /**
+   * Retry analysis for a failed submission
+   */
+  static async retryAnalysis(submissionId: string) {
+    const submission = await prisma.finalProjectSubmission.findUnique({
+      where: { id: submissionId },
+    });
+
+    if (!submission) throw new Error(ERROR_MESSAGES.SUBMISSION_NOT_FOUND);
+
+    // Only allow retry if status is ANALYSIS_FAILED or UPLOADED
+    if (!['ANALYSIS_FAILED', 'UPLOADED', 'FAILED'].includes(submission.processingStatus)) {
+      throw new Error(PROJECT_ANALYSIS_ERRORS.SUBMISSION_NOT_ANALYZABLE);
+    }
+
+    // Reset status
+    await prisma.finalProjectSubmission.update({
+      where: { id: submissionId },
+      data: { processingStatus: ProcessingStatus.UPLOADED, processingError: null },
+    });
+
+    // Re-trigger analysis
+    if (submission.githubUrl) {
+      ProjectAnalyzerService.analyzeGithubSubmission(submissionId, submission.githubUrl)
+        .catch(err => logger.error(`Retry GitHub analysis failed for submission ${submissionId}:`, err));
+    } else if (submission.sourceZipKey && fileStorage) {
+      // For ZIP, we need to re-download from MinIO
+      const tempPath = `/tmp/project-uploads/retry-${submissionId}-${Date.now()}.zip`;
+      try {
+        const fs = require('fs');
+        fs.mkdirSync('/tmp/project-uploads', { recursive: true });
+        await fileStorage.downloadFile({
+          bucket: 'project-submissions',
+          key: submission.sourceZipKey,
+          destinationPath: tempPath,
+        });
+        ProjectAnalyzerService.analyzeZipSubmission(submissionId, tempPath)
+          .catch(err => logger.error(`Retry ZIP analysis failed for submission ${submissionId}:`, err))
+          .finally(() => {
+            try { fs.unlinkSync(tempPath); } catch { /* ignore */ }
+          });
+      } catch (err: any) {
+        await prisma.finalProjectSubmission.update({
+          where: { id: submissionId },
+          data: { processingStatus: ProcessingStatus.ANALYSIS_FAILED, processingError: 'Could not download ZIP for re-analysis' },
+        });
+        throw new Error('Không thể tải lại file ZIP để phân tích. Vui lòng nộp lại bài.');
+      }
+    } else {
+      throw new Error(PROJECT_ANALYSIS_ERRORS.NO_SOURCE_PROVIDED);
+    }
+
+    return { message: PROJECT_ANALYSIS_SUCCESS.RETRY_STARTED };
+  }
+
+  // ==================== AI Evaluation (Updated for Project Context) ====================
+
   /**
    * Evaluate submission using AI pipeline
+   * Updated: checks processingStatus and sends projectContext instead of raw content
    */
   static async evaluateSubmission(submissionId: string, token?: string) {
     const submission = await prisma.finalProjectSubmission.findUnique({
@@ -299,10 +593,27 @@ export class FinalProjectService {
 
     if (!submission) throw new Error(ERROR_MESSAGES.SUBMISSION_NOT_FOUND);
 
-    // Mark as grading
+    // Check processingStatus — must be READY_FOR_EVALUATION or allow fallback for legacy submissions
+    const hasProjectContext = !!submission.projectContext;
+    if (submission.processingStatus &&
+      submission.processingStatus !== ProcessingStatus.READY_FOR_EVALUATION &&
+      submission.processingStatus !== ProcessingStatus.UPLOADED &&
+      submission.processingStatus !== 'UPLOADED') {
+      if (submission.processingStatus === ProcessingStatus.ANALYZING) {
+        throw new Error('Project đang được phân tích. Vui lòng chờ hoàn tất trước khi đánh giá.');
+      }
+      if (submission.processingStatus === ProcessingStatus.ANALYSIS_FAILED) {
+        throw new Error('Phân tích project thất bại. Vui lòng thử "Phân tích lại" trước khi đánh giá.');
+      }
+    }
+
+    // Mark as grading / evaluating
     await prisma.finalProjectSubmission.update({
       where: { id: submissionId },
-      data: { status: 'GRADING' },
+      data: {
+        status: 'GRADING',
+        processingStatus: ProcessingStatus.EVALUATING
+      },
     });
 
     const project = submission.finalProject;
@@ -312,43 +623,145 @@ export class FinalProjectService {
       throw new Error('Bài kiểm tra chưa được cấu hình Evaluation Pipeline');
     }
 
+    // === Phase 2: Per-Criterion Evaluation with Evidence Retrieval ===
+    // If projectContext exists, delegate to EvaluationEngineService
+    if (hasProjectContext) {
+      try {
+        const evaluationResult = await EvaluationEngineService.evaluateProject(submissionId, token);
+        const isPassed = evaluationResult.passed;
+
+        // If passed, auto-generate path certificate
+        if (isPassed) {
+          try {
+            const enrollment = await prisma.userPathEnrollment.findUnique({
+              where: { userId_learningPathId: { userId: submission.userId, learningPathId: submission.learningPathId } }
+            });
+            if (enrollment && enrollment.status !== 'COMPLETED') {
+              await prisma.userPathEnrollment.update({
+                where: { id: enrollment.id },
+                data: { status: 'COMPLETED', completedAt: new Date() }
+              });
+            }
+            const { CertificateService } = require('./certificate.service');
+            await CertificateService.generatePathCertificate(submission.userId, submission.learningPathId);
+            logger.info(`Auto-generated path certificate for user ${submission.userId} on path ${submission.learningPathId}`);
+          } catch (certErr: any) {
+            logger.warn(`Could not auto-generate path certificate: ${certErr.message}`);
+          }
+        }
+
+        // Log activity
+        await ActivityService.logActivity({
+          userId: submission.userId,
+          action: ActivityAction.FINAL_PROJECT_GRADED,
+          metadata: {
+            projectTitle: project.title,
+            score: evaluationResult.totalScore,
+            passed: isPassed,
+            attemptNumber: submission.attemptNumber,
+          },
+        });
+
+        // Send notification
+        try {
+          const notifAxios = require('axios');
+          const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+          await notifAxios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+            userId: submission.userId,
+            title: isPassed ? '🎉 Bài kiểm tra cuối kỳ ĐẠT!' : '📝 Bài kiểm tra cuối kỳ đã được chấm',
+            message: isPassed
+              ? `Chúc mừng! Bài kiểm tra "${project.title}" đạt ${Math.round(evaluationResult.totalScore)}%. Bạn đủ điều kiện nhận chứng chỉ lộ trình!`
+              : `Bài kiểm tra "${project.title}" đạt ${Math.round(evaluationResult.totalScore)}%. Xem feedback chi tiết và cải thiện bài nộp.`,
+            type: isPassed ? 'SUCCESS' : 'INFO',
+            link: `/final-project/${submission.learningPathId}`,
+          });
+        } catch (err) {
+          logger.error('Failed to send evaluation notification:', err);
+        }
+
+        logger.info(`[Phase2] Submission ${submissionId} evaluated: score=${evaluationResult.totalScore}, passed=${isPassed}`);
+        return prisma.finalProjectSubmission.findUnique({ where: { id: submissionId } });
+      } catch (error: any) {
+        await prisma.finalProjectSubmission.update({
+          where: { id: submissionId },
+          data: {
+            status: 'SUBMITTED',
+            processingStatus: ProcessingStatus.READY_FOR_EVALUATION,
+          },
+        });
+        logger.error('[Phase2] Evaluation failed:', error);
+        throw new Error('Không thể đánh giá bài nộp. Vui lòng thử lại sau.');
+      }
+    }
+
+    // === Legacy Flow (no projectContext): Send raw content to AI ===
     try {
       const axios = require('axios');
       const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:3007';
 
-      // Build submission content for AI — include both legacy fields and new submissionData
-      const contentParts: string[] = [];
+      // Build submission content for AI
+      // If projectContext is available (Phase 1 upgrade), use it
+      // Otherwise fallback to legacy content assembly
+      let submissionContent: string;
+      let projectContextData: any = null;
 
-      // Process new submissionData if available
-      const submissionDataArr = (submission.submissionData as any[]) || [];
-      if (submissionDataArr.length > 0) {
-        contentParts.push('=== BÀI NỘP CỦA HỌC VIÊN ===');
-        for (const item of submissionDataArr) {
-          const typeLabels: Record<string, string> = {
-            'FILE': '📎 Tệp tin',
-            'IMAGE': '🖼️ Hình ảnh',
-            'VIDEO': '🎬 Video',
-            'AUDIO': '🎵 Âm thanh',
-            'GITHUB_LINK': '💻 Link GitHub',
-            'DEMO_LINK': '🔗 Link Demo',
-            'FIGMA_LINK': '🎨 Link Figma',
-            'TEXT': '📝 Văn bản',
-            'CUSTOM': '📌 Khác',
-          };
-          const prefix = typeLabels[item.type] || '📌';
-          contentParts.push(`\n${prefix} — ${item.label}:`);
-          if (item.fileName) contentParts.push(`  Tên file: ${item.fileName}`);
-          contentParts.push(`  Nội dung/Link: ${item.value}`);
+      if (hasProjectContext) {
+        // Phase 1 upgraded: send structured projectContext
+        projectContextData = submission.projectContext;
+
+        // Build a text summary from projectContext for the AI
+        const ctx = submission.projectContext as any;
+        const contentParts: string[] = [
+          '=== PROJECT CONTEXT ===',
+          `Loại project: ${ctx.metadata?.projectType || 'Unknown'}`,
+          `Ngôn ngữ chính: ${ctx.metadata?.primaryLanguage || 'Unknown'}`,
+          `Frameworks: ${ctx.metadata?.techStack?.frameworks?.join(', ') || 'N/A'}`,
+          `Libraries: ${ctx.metadata?.techStack?.libraries?.slice(0, 20)?.join(', ') || 'N/A'}`,
+          `Tổng files: ${ctx.structure?.totalFiles || 0}`,
+          `Tổng dòng code: ${ctx.structure?.totalLines || 0}`,
+          `Entry points: ${ctx.structure?.entryPoints?.join(', ') || 'N/A'}`,
+        ];
+
+        if (ctx.artifacts?.readme) {
+          contentParts.push(`\n=== README ===\n${ctx.artifacts.readme}`);
         }
-      } else {
-        // Fallback to legacy fields
-        if (submission.content) contentParts.push(`Nội dung bài nộp:\n${submission.content}`);
-        if (submission.githubUrl) contentParts.push(`Link tài liệu / Bài làm: ${submission.githubUrl}`);
-        if (submission.demoUrl) contentParts.push(`Link Video / Demo: ${submission.demoUrl}`);
-        if (submission.fileName) contentParts.push(`File đính kèm: ${submission.fileName}`);
-      }
 
-      const submissionContent = contentParts.filter(Boolean).join('\n');
+        if (submission.githubUrl) contentParts.push(`\nGitHub: ${submission.githubUrl}`);
+        if (submission.demoUrl) contentParts.push(`Demo: ${submission.demoUrl}`);
+        if (submission.content) contentParts.push(`\nMô tả: ${submission.content}`);
+
+        submissionContent = contentParts.join('\n');
+      } else {
+        // Legacy fallback: build from submissionData or direct fields
+        const contentParts: string[] = [];
+        const submissionDataArr = (submission.submissionData as any[]) || [];
+        if (submissionDataArr.length > 0) {
+          contentParts.push('=== BÀI NỘP CỦA HỌC VIÊN ===');
+          for (const item of submissionDataArr) {
+            const typeLabels: Record<string, string> = {
+              'FILE': '📎 Tệp tin',
+              'IMAGE': '🖼️ Hình ảnh',
+              'VIDEO': '🎬 Video',
+              'AUDIO': '🎵 Âm thanh',
+              'GITHUB_LINK': '💻 Link GitHub',
+              'DEMO_LINK': '🔗 Link Demo',
+              'FIGMA_LINK': '🎨 Link Figma',
+              'TEXT': '📝 Văn bản',
+              'CUSTOM': '📌 Khác',
+            };
+            const prefix = typeLabels[item.type] || '📌';
+            contentParts.push(`\n${prefix} — ${item.label}:`);
+            if (item.fileName) contentParts.push(`  Tên file: ${item.fileName}`);
+            contentParts.push(`  Nội dung/Link: ${item.value}`);
+          }
+        } else {
+          if (submission.content) contentParts.push(`Nội dung bài nộp:\n${submission.content}`);
+          if (submission.githubUrl) contentParts.push(`Link tài liệu / Bài làm: ${submission.githubUrl}`);
+          if (submission.demoUrl) contentParts.push(`Link Video / Demo: ${submission.demoUrl}`);
+          if (submission.fileName) contentParts.push(`File đính kèm: ${submission.fileName}`);
+        }
+        submissionContent = contentParts.filter(Boolean).join('\n');
+      }
 
       const projectInfo = {
         title: project.title,
@@ -357,14 +770,15 @@ export class FinalProjectService {
         objectives: project.objectives || '',
       };
 
-      // Call AI service to evaluate
+      // Call AI service to evaluate — include projectContext if available
       const response = await axios.post(`${aiServiceUrl}/api/ai/evaluate-submission`, {
         submissionContent,
         projectInfo,
         evaluationPipeline: pipeline,
+        projectContext: projectContextData, // Send structured context for rubric-based retrieval
       }, {
         headers: token ? { Authorization: token } : undefined,
-        timeout: 120000, // 2 minutes timeout for AI evaluation
+        timeout: 180000, // 3 minutes timeout for AI evaluation with project context
       });
 
       const result: EvaluationResult = response.data?.data || response.data;
@@ -374,6 +788,7 @@ export class FinalProjectService {
         where: { id: submissionId },
         data: {
           status: 'GRADED',
+          processingStatus: ProcessingStatus.COMPLETED,
           stageResults: result.stageResults ? JSON.parse(JSON.stringify(result.stageResults)) : undefined,
           totalScore: result.totalScore,
           score: result.totalScore, // Also set legacy score field
@@ -392,10 +807,10 @@ export class FinalProjectService {
             where: { userId_learningPathId: { userId: submission.userId, learningPathId: submission.learningPathId } }
           });
           if (enrollment && enrollment.status !== 'COMPLETED') {
-             await prisma.userPathEnrollment.update({
-               where: { id: enrollment.id },
-               data: { status: 'COMPLETED', completedAt: new Date() }
-             });
+            await prisma.userPathEnrollment.update({
+              where: { id: enrollment.id },
+              data: { status: 'COMPLETED', completedAt: new Date() }
+            });
           }
 
           const { CertificateService } = require('./certificate.service');
@@ -441,7 +856,10 @@ export class FinalProjectService {
       // Revert status on failure
       await prisma.finalProjectSubmission.update({
         where: { id: submissionId },
-        data: { status: 'SUBMITTED' },
+        data: {
+          status: 'SUBMITTED',
+          processingStatus: hasProjectContext ? ProcessingStatus.READY_FOR_EVALUATION : ProcessingStatus.FAILED,
+        },
       });
       logger.error('AI evaluation failed:', error);
       throw new Error('Không thể đánh giá bài nộp. Vui lòng thử lại sau.');

@@ -1,14 +1,16 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useParams, useNavigate } from 'react-router-dom';
-import { learningService, FinalProject, FinalProjectSubmission, StageResult, SubmissionDataItem, SubmissionTypeConfig, SubmissionFieldType } from '../services/learning.service';
+import { learningService, FinalProject, FinalProjectSubmission, SubmissionDataItem, SubmissionTypeConfig, SubmissionFieldType } from '../services/learning.service';
+import { normalizeAllCriterionResults, CriterionResultViewModel, getProcessingPipelineSteps } from '../utils/criterion-adapter';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { 
   FiCheckCircle, FiXCircle, FiArrowLeft, FiAward, FiSend, 
   FiClock, FiTarget, FiStar, FiLink, FiBookOpen, 
   FiChevronDown, FiChevronUp, FiCpu, FiUpload, FiFile,
-  FiGithub, FiImage, FiVideo, FiMusic, FiEdit3, FiExternalLink
+  FiGithub, FiImage, FiVideo, FiMusic, FiEdit3, FiExternalLink,
+  FiAlertTriangle, FiRefreshCw, FiCode, FiZap, FiAlertCircle
 } from 'react-icons/fi';
 
 // Icon and label mappings for submission types
@@ -47,10 +49,12 @@ export default function FinalProjectPage() {
   const [submitting, setSubmitting] = useState(false);
   const [evaluating, setEvaluating] = useState(false);
   const [generatingCert, setGeneratingCert] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [uploadingFiles, setUploadingFiles] = useState<Record<string, boolean>>({});
   
   const [showHistory, setShowHistory] = useState(false);
   const [showRubric, setShowRubric] = useState(false);
+  const [expandedCriteria, setExpandedCriteria] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isAuthenticated || !pathId) return;
@@ -227,6 +231,44 @@ export default function FinalProjectPage() {
       setGeneratingCert(false);
     }
   };
+
+  const handleRetryAnalysis = async () => {
+    if (!submission) return;
+    setRetrying(true);
+    try {
+      await learningService.retryAnalysis(submission.id);
+      toast.success('Đang phân tích lại project...');
+      // Reload data to get updated status
+      await loadData();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.error || 'Không thể phân tích lại');
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  const toggleCriterion = (id: string) => {
+    setExpandedCriteria(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // Normalize criterion results for consistent rendering
+  const normalizedResults = useMemo(() => {
+    return normalizeAllCriterionResults(submission?.stageResults);
+  }, [submission?.stageResults]);
+
+  // Processing pipeline steps
+  const pipelineSteps = useMemo(() => {
+    if (!submission?.processingStatus) return [];
+    return getProcessingPipelineSteps(submission.processingStatus, submission.status);
+  }, [submission?.processingStatus, submission?.status]);
+
+  // Detect if submission has an error status
+  const hasProcessingError = submission?.processingStatus === 'ANALYSIS_FAILED' || submission?.processingStatus === 'FAILED';
 
   if (loading) {
     return (
@@ -460,6 +502,85 @@ export default function FinalProjectPage() {
         </div>
       )}
 
+      {/* Processing Error State (ANALYSIS_FAILED / FAILED) */}
+      {unlockStatus?.unlocked && hasProcessingError && submission && !evaluating && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 mb-8 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+              <FiAlertTriangle className="text-red-500" size={24} />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-red-800 mb-1">
+                {submission.processingStatus === 'ANALYSIS_FAILED' ? 'Phân tích project thất bại' : 'Đánh giá thất bại'}
+              </h3>
+              <p className="text-red-600 text-sm mb-3">
+                {submission.processingError || (submission.processingStatus === 'ANALYSIS_FAILED'
+                  ? 'Không thể phân tích cấu trúc project. Hãy kiểm tra file nộp và thử lại.'
+                  : 'Hệ thống gặp lỗi khi đánh giá. Vui lòng thử lại.')}
+              </p>
+              <button
+                onClick={handleRetryAnalysis}
+                disabled={retrying}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-all disabled:opacity-50 text-sm"
+              >
+                <FiRefreshCw className={retrying ? 'animate-spin' : ''} />
+                {retrying ? 'Đang thử lại...' : 'Thử phân tích lại'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Processing Pipeline (when submission is being processed) */}
+      {unlockStatus?.unlocked && pipelineSteps.length > 0 && !isGraded && !hasProcessingError && submission && (
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 mb-8 shadow-sm">
+          <h3 className="font-bold text-slate-800 mb-5 flex items-center gap-2">
+            <FiCpu className="text-indigo-500" /> Tiến trình xử lý
+          </h3>
+          <div className="flex items-center gap-0">
+            {pipelineSteps.map((step, idx) => (
+              <div key={step.key} className="flex items-center flex-1 last:flex-initial">
+                {/* Step indicator */}
+                <div className="flex flex-col items-center">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                    step.status === 'completed' ? 'bg-green-500 text-white' :
+                    step.status === 'active' ? 'bg-indigo-500 text-white animate-pulse' :
+                    step.status === 'error' ? 'bg-red-500 text-white' :
+                    'bg-slate-200 text-slate-500'
+                  }`}>
+                    {step.status === 'completed' ? <FiCheckCircle size={16} /> :
+                     step.status === 'error' ? <FiXCircle size={16} /> :
+                     step.status === 'active' ? <span className="w-2 h-2 bg-white rounded-full" /> :
+                     <span className="w-2 h-2 bg-slate-400 rounded-full" />}
+                  </div>
+                  <span className={`text-[10px] mt-1.5 font-medium text-center max-w-[80px] leading-tight ${
+                    step.status === 'completed' ? 'text-green-700' :
+                    step.status === 'active' ? 'text-indigo-700' :
+                    step.status === 'error' ? 'text-red-700' :
+                    'text-slate-400'
+                  }`}>
+                    {step.label}
+                  </span>
+                </div>
+                {/* Connector line */}
+                {idx < pipelineSteps.length - 1 && (
+                  <div className={`flex-1 h-0.5 mx-1 mt-[-16px] ${
+                    step.status === 'completed' ? 'bg-green-400' :
+                    step.status === 'active' ? 'bg-indigo-300 animate-pulse' :
+                    'bg-slate-200'
+                  }`} />
+                )}
+              </div>
+            ))}
+          </div>
+          {evaluating && (
+            <p className="text-sm text-indigo-600 mt-5 text-center">
+              Hệ thống đang đánh giá bài nộp dựa trên bộ tiêu chí đã được cấu hình. Quá trình này có thể mất 1-2 phút.
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Evaluation Results (If Graded) */}
       {unlockStatus?.unlocked && isGraded && submission && (
         <div className={`rounded-2xl border p-6 mb-8 shadow-sm ${isPassed ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
@@ -503,53 +624,149 @@ export default function FinalProjectPage() {
             </div>
           </div>
 
-          {/* Detailed Stage Results with Progress Bars */}
-          {submission.stageResults && submission.stageResults.length > 0 && (
+          {/* Detailed Criterion Results (Phase 2 + Legacy unified) */}
+          {normalizedResults.length > 0 && (
             <div className="mt-8">
               <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
                 <FiTarget className="text-indigo-500" /> Chi tiết từng tiêu chí đánh giá
               </h3>
               <div className="space-y-3">
-                {submission.stageResults.map((stage: StageResult) => (
-                  <div key={stage.stageNumber} className="bg-white rounded-xl border border-slate-200 p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${stage.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {stage.stageNumber}
-                        </span>
-                        <h4 className="font-semibold text-slate-800">{stage.title}</h4>
+                {normalizedResults.map((cr: CriterionResultViewModel) => {
+                  const isExpanded = expandedCriteria.has(cr.id);
+                  return (
+                    <div key={cr.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                      {/* Criterion Header — always visible */}
+                      <button
+                        onClick={() => toggleCriterion(cr.id)}
+                        className="w-full flex items-center justify-between p-4 hover:bg-slate-50/50 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${cr.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {cr.passed ? '✓' : '✗'}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-slate-800 text-sm">{cr.title}</h4>
+                            <div className="flex items-center gap-3 mt-1 text-xs text-slate-500">
+                              <span>Điểm: <strong className={cr.passed ? 'text-green-700' : 'text-red-600'}>{cr.score}/{cr.maxScore}</strong></span>
+                              {cr.weight !== undefined && <span>Trọng số: <strong>{Math.round(cr.weight * 100)}%</strong></span>}
+                              <span>Đóng góp: <strong className="text-indigo-600">{cr.weightedScore.toFixed(1)} đ</strong></span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 ml-3">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${cr.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                            {cr.passed ? 'ĐẠT' : 'CHƯA ĐẠT'}
+                          </span>
+                          {isExpanded ? <FiChevronUp className="text-slate-400" /> : <FiChevronDown className="text-slate-400" />}
+                        </div>
+                      </button>
+
+                      {/* Progress bar — always visible */}
+                      <div className="px-4 pb-3">
+                        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${cr.passed ? 'bg-green-500' : 'bg-red-400'}`}
+                            style={{ width: `${Math.min(100, cr.scorePercent)}%` }}
+                          />
+                        </div>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${stage.passed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                        {stage.passed ? '✅ ĐẠT' : '❌ CHƯA ĐẠT'}
-                      </span>
+
+                      {/* Expanded Detail */}
+                      {isExpanded && (
+                        <div className="px-4 pb-4 space-y-3 border-t border-slate-100 pt-3">
+                          {/* Criterion Snapshot (objective, criteria from evaluation time) */}
+                          {(cr.objective || cr.criteria) && (
+                            <div className="bg-slate-50 rounded-lg p-3 text-xs space-y-1">
+                              {cr.objective && <p className="text-slate-600"><strong className="text-slate-700">Mục tiêu:</strong> {cr.objective}</p>}
+                              {cr.criteria && <p className="text-slate-600"><strong className="text-slate-700">Tiêu chí:</strong> {cr.criteria}</p>}
+                              {cr.passCriteria && <p className="text-slate-600"><strong className="text-slate-700">Điều kiện đạt:</strong> {cr.passCriteria}</p>}
+                            </div>
+                          )}
+
+                          {/* Feedback */}
+                          {cr.feedback && (
+                            <p className="text-sm text-slate-700">{cr.feedback}</p>
+                          )}
+
+                          {/* Strengths */}
+                          {cr.strengths.length > 0 && (
+                            <div>
+                              <h5 className="text-xs font-bold text-green-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                <FiCheckCircle size={12} /> Điểm mạnh
+                              </h5>
+                              <ul className="space-y-1">
+                                {cr.strengths.map((s, idx) => (
+                                  <li key={idx} className="text-sm text-green-800 bg-green-50 rounded-lg px-3 py-1.5 flex items-start gap-2">
+                                    <span className="text-green-500 shrink-0 mt-0.5">✓</span> {s}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Weaknesses */}
+                          {cr.weaknesses.length > 0 && (
+                            <div>
+                              <h5 className="text-xs font-bold text-red-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                <FiAlertCircle size={12} /> Điểm cần cải thiện
+                              </h5>
+                              <ul className="space-y-1">
+                                {cr.weaknesses.map((w, idx) => (
+                                  <li key={idx} className="text-sm text-red-800 bg-red-50 rounded-lg px-3 py-1.5 flex items-start gap-2">
+                                    <span className="text-red-500 shrink-0 mt-0.5">✗</span> {w}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Suggestions */}
+                          {cr.suggestions.length > 0 && (
+                            <div>
+                              <h5 className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                <FiZap size={12} /> Gợi ý cải thiện
+                              </h5>
+                              <ul className="space-y-1">
+                                {cr.suggestions.map((s, idx) => (
+                                  <li key={idx} className="text-sm text-blue-800 bg-blue-50 rounded-lg px-3 py-1.5 flex items-start gap-2">
+                                    <span className="text-blue-500 shrink-0 mt-0.5">💡</span> {s}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+
+                          {/* Evidence References */}
+                          {cr.evidenceUsed.length > 0 && (
+                            <div>
+                              <h5 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-1.5 flex items-center gap-1">
+                                <FiCode size={12} /> Mã nguồn tham chiếu
+                              </h5>
+                              <div className="flex flex-wrap gap-1.5">
+                                {cr.evidenceUsed.map((ev, idx) => (
+                                  <span key={idx} className="inline-flex items-center gap-1 text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md font-mono">
+                                    <FiFile size={10} className="text-slate-400" />
+                                    {ev.filePath}
+                                    {ev.startLine > 0 && <span className="text-slate-400">:{ev.startLine}–{ev.endLine}</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Legacy Details (backward compatibility) */}
+                          {cr.legacyDetails && cr.legacyDetails.length > 0 && (
+                            <ul className="text-sm space-y-1 bg-slate-50 p-3 rounded-lg">
+                              {cr.legacyDetails.map((detail, idx) => (
+                                <li key={idx} className="text-slate-600">{detail}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    
-                    {/* Progress bar */}
-                    <div className="mb-3">
-                      <div className="flex justify-between text-xs text-slate-500 mb-1">
-                        <span>Điểm: {stage.score}/{stage.maxScore}</span>
-                        <span>Trọng số: {stage.weightedScore}%</span>
-                      </div>
-                      <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${stage.passed ? 'bg-green-500' : 'bg-red-400'}`}
-                          style={{ width: `${Math.min(100, (stage.score / stage.maxScore) * 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                    
-                    <p className="text-sm text-slate-600 mb-3">{stage.feedback}</p>
-                    {stage.details && stage.details.length > 0 && (
-                      <ul className="text-sm space-y-1 bg-slate-50 p-3 rounded-lg">
-                        {stage.details.map((detail, idx) => (
-                          <li key={idx} className={detail.startsWith('✅') ? 'text-green-700' : detail.startsWith('❌') ? 'text-red-700' : detail.startsWith('💡') ? 'text-blue-700' : 'text-slate-600'}>
-                            {detail}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
@@ -568,8 +785,8 @@ export default function FinalProjectPage() {
         </div>
       )}
 
-      {/* Evaluating State */}
-      {evaluating && (
+      {/* Evaluating State (legacy — no processingStatus) */}
+      {evaluating && !pipelineSteps.length && (
         <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-8 mb-8 text-center shadow-sm">
           <div className="inline-block p-4 bg-white rounded-full shadow-sm mb-4">
             <FiCpu className="w-10 h-10 text-indigo-500 animate-pulse" />

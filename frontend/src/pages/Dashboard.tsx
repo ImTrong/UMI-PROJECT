@@ -1,5 +1,5 @@
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import StudentDashboard from './StudentDashboard';
 import InstructorDashboard from './InstructorDashboard';
 
 export default function Dashboard() {
@@ -20,5 +20,5 @@ export default function Dashboard() {
     return <InstructorDashboard />;
   }
 
-  return <StudentDashboard />;
+  return <Navigate to="/learning-analytics" replace />;
 }

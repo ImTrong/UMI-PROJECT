@@ -12,7 +12,7 @@ export class CertificateController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { courseId } = req.params;
-      const certificate = await CertificateService.generateCertificate(req.user.userId, courseId);
+      const certificate = await CertificateService.generateCertificate(req.user.userId, courseId, req.user.fullName);
       res.status(HTTP_STATUS.CREATED).json({
         message: SUCCESS_MESSAGES.CERTIFICATE_GENERATED,
         data: certificate,
@@ -116,7 +116,7 @@ export class CertificateController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { pathId } = req.params;
-      const certificate = await CertificateService.generatePathCertificate(req.user.userId, pathId);
+      const certificate = await CertificateService.generatePathCertificate(req.user.userId, pathId, req.user.fullName);
       res.status(HTTP_STATUS.CREATED).json({
         message: 'Chứng chỉ lộ trình đã được tạo thành công',
         data: certificate,

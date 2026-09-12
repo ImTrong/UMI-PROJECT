@@ -983,6 +983,14 @@ async function main() {
           totalDurationMinutes: def.duration,
           prerequisiteRules: prerequisiteRules || undefined,
           completionRule: 'ALL_COURSES',
+          certificateConfig: {
+            title: def.certName,
+            subtitle: `Được cấp cho học viên hoàn thành xuất sắc lộ trình`,
+            signer: 'Giám đốc Đào tạo UMI Academy',
+            org: 'UMI Academy',
+            template: 'modern',
+            themeColor: '#10b981'
+          },
         },
       });
       pathCount++;

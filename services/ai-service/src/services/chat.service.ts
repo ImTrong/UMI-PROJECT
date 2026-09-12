@@ -10,6 +10,8 @@ import {
   SKILL_ASSESSMENT_PROMPT,
   EVALUATION_PIPELINE_PROMPT,
   FEEDBACK_REPORT_PROMPT,
+  RUBRIC_CRITERION_EVALUATION_PROMPT,
+  COMPREHENSIVE_EVALUATION_FEEDBACK_PROMPT,
 } from '../utils/system-prompt';
 import logger from '../utils/logger';
 
@@ -533,6 +535,19 @@ export class ChatService {
         throw new Error('Invalid response structure from AI');
       }
 
+      // Enrich with certificate details
+      if (result.matchedPath?.pathId) {
+        const matched = context.detailedPaths.find((p: any) => p.id === result.matchedPath.pathId || p._id === result.matchedPath.pathId);
+        if (matched) {
+          if (matched.certificateConfig) {
+            result.certificateConfig = matched.certificateConfig;
+            result.pathCertificate = matched.certificateConfig.title || result.pathCertificate || matched.certificateName;
+          } else if (matched.certificateName) {
+            result.pathCertificate = matched.certificateName;
+          }
+        }
+      }
+
       return result;
     } catch (parseError) {
       logger.error('Failed to parse career path JSON:', parseError);
@@ -677,5 +692,141 @@ export class ChatService {
 
     logger.info(`Evaluation complete: totalScore=${totalScore}%, passed=${passed}`);
     return result;
+  }
+
+  // ==================== Phase 2: Per-Criterion Evaluation ====================
+
+  /**
+   * Evaluate a SINGLE criterion based on evidence package.
+   * AI returns score + analysis but NOT passed/failed.
+   */
+  static async evaluateCriterion(
+    criterionConfig: {
+      criterionId: string;
+      title: string;
+      objective: string;
+      criteria: string;
+      maxScore: number;
+      passCriteria: string;
+      expectedOutput?: string;
+    },
+    evidence: string,
+    projectOverview: string,
+    projectInfo: { title: string; description: string; instructions: string; objectives: string }
+  ) {
+    logger.info(`Evaluating criterion: ${criterionConfig.title} (id: ${criterionConfig.criterionId})`);
+
+    const projectInfoStr = [
+      `Tên project: ${projectInfo.title}`,
+      `Mô tả: ${projectInfo.description}`,
+      projectInfo.instructions ? `Hướng dẫn: ${projectInfo.instructions}` : '',
+      projectInfo.objectives ? `Mục tiêu đầu ra: ${projectInfo.objectives}` : '',
+    ].filter(Boolean).join('\n');
+
+    const criterionConfigStr = [
+      `Tiêu chí: ${criterionConfig.title}`,
+      `Mục tiêu: ${criterionConfig.objective}`,
+      `Tiêu chí đánh giá chi tiết: ${criterionConfig.criteria}`,
+      `Điểm tối đa: ${criterionConfig.maxScore}`,
+      `Điều kiện đạt: ${criterionConfig.passCriteria}`,
+      criterionConfig.expectedOutput ? `Kết quả đầu ra mong muốn: ${criterionConfig.expectedOutput}` : '',
+    ].filter(Boolean).join('\n');
+
+    let prompt = RUBRIC_CRITERION_EVALUATION_PROMPT;
+    prompt = prompt.replace('{PROJECT_INFO}', projectInfoStr);
+    prompt = prompt.replace('{PROJECT_OVERVIEW}', projectOverview);
+    prompt = prompt.replace('{CRITERION_CONFIG}', criterionConfigStr);
+    prompt = prompt.replace('{EVIDENCE}', evidence);
+
+    try {
+      const response = await geminiService.generateResponse(
+        prompt,
+        [],
+        `Đánh giá tiêu chí: ${criterionConfig.title}`
+      );
+
+      // Parse JSON response
+      let jsonStr = response.trim();
+      if (jsonStr.startsWith('```json')) jsonStr = jsonStr.substring(7);
+      else if (jsonStr.startsWith('```')) jsonStr = jsonStr.substring(3);
+      if (jsonStr.endsWith('```')) jsonStr = jsonStr.substring(0, jsonStr.length - 3);
+      jsonStr = jsonStr.trim();
+
+      const aiResult = JSON.parse(jsonStr);
+
+      // Validate score range
+      aiResult.score = Math.max(0, Math.min(criterionConfig.maxScore, Number(aiResult.score) || 0));
+
+      // Ensure arrays
+      aiResult.evidenceUsed = Array.isArray(aiResult.evidenceUsed) ? aiResult.evidenceUsed : [];
+      aiResult.strengths = Array.isArray(aiResult.strengths) ? aiResult.strengths : [];
+      aiResult.weaknesses = Array.isArray(aiResult.weaknesses) ? aiResult.weaknesses : [];
+      aiResult.suggestions = Array.isArray(aiResult.suggestions) ? aiResult.suggestions : [];
+      aiResult.feedback = aiResult.feedback || '';
+
+      logger.info(`Criterion "${criterionConfig.title}" result: score=${aiResult.score}/${criterionConfig.maxScore}`);
+      return aiResult;
+    } catch (error: any) {
+      logger.error(`Failed to evaluate criterion "${criterionConfig.title}":`, error);
+
+      // Return a zero-score result on failure
+      return {
+        score: 0,
+        evidenceUsed: [],
+        strengths: [],
+        weaknesses: ['❌ Lỗi hệ thống khi đánh giá tiêu chí này. Vui lòng thử lại.'],
+        feedback: 'Không thể đánh giá tiêu chí này do lỗi hệ thống.',
+        suggestions: ['Vui lòng thử lại sau hoặc liên hệ hỗ trợ.'],
+      };
+    }
+  }
+
+  /**
+   * Generate a comprehensive feedback report from all criterion results.
+   */
+  static async generateComprehensiveFeedback(
+    criterionResults: {
+      title: string;
+      score: number;
+      maxScore: number;
+      passed: boolean;
+      feedback: string;
+      strengths: string[];
+      weaknesses: string[];
+    }[],
+    projectInfo: { title: string; description: string; instructions: string; objectives: string },
+    totalScore: number,
+    passingScore: number,
+    passed: boolean
+  ): Promise<string> {
+    const projectInfoStr = [
+      `Tên project: ${projectInfo.title}`,
+      `Mô tả: ${projectInfo.description}`,
+      projectInfo.instructions ? `Hướng dẫn: ${projectInfo.instructions}` : '',
+      projectInfo.objectives ? `Mục tiêu đầu ra: ${projectInfo.objectives}` : '',
+    ].filter(Boolean).join('\n');
+
+    const criterionResultsStr = criterionResults.map(r =>
+      `Tiêu chí: ${r.title}\n  Điểm: ${r.score}/${r.maxScore} — ${r.passed ? 'ĐẠT' : 'CHƯĂ ĐẠT'}\n  Nhận xét: ${r.feedback}\n  Điểm mạnh: ${r.strengths.join('; ')}\n  Điểm yếu: ${r.weaknesses.join('; ')}`
+    ).join('\n\n');
+
+    let feedbackPrompt = COMPREHENSIVE_EVALUATION_FEEDBACK_PROMPT;
+    feedbackPrompt = feedbackPrompt.replace('{PROJECT_INFO}', projectInfoStr);
+    feedbackPrompt = feedbackPrompt.replace('{CRITERION_RESULTS}', criterionResultsStr);
+    feedbackPrompt = feedbackPrompt.replace('{TOTAL_SCORE}', String(Math.round(totalScore * 100) / 100));
+    feedbackPrompt = feedbackPrompt.replace('{PASSING_SCORE}', String(passingScore));
+    feedbackPrompt = feedbackPrompt.replace('{PASS_STATUS}', passed ? 'ĐẠT' : 'CHƯĂ ĐẠT');
+
+    try {
+      const report = await geminiService.generateResponse(
+        feedbackPrompt,
+        [],
+        'Viết báo cáo phản hồi tổng hợp cho học viên.'
+      );
+      return report;
+    } catch (error) {
+      logger.error('Failed to generate comprehensive feedback:', error);
+      return `Tổng điểm: ${Math.round(totalScore)}%. ${passed ? 'Chúc mừng bạn đã đạt!' : 'Bạn cần cải thiện để đạt yêu cầu.'}`;
+    }
   }
 }

@@ -335,11 +335,24 @@ services:
       LEARNING_SERVICE_URL: "http://learning-service:3006"
       COURSE_SERVICE_URL: "http://course-service:3003"
       USER_SERVICE_URL: "http://user-service:3002"
+      # RAG Foundation
+      EMBEDDING_PROVIDER: "gemini"
+      EMBEDDING_MODEL: "gemini-embedding-001"
+      EMBEDDING_DIMENSION: "768"
+      QDRANT_URL: "http://qdrant:6333"
+      QDRANT_COLLECTION: "umi_knowledge"
+      CHUNK_SIZE: "600"
+      CHUNK_OVERLAP: "100"
+      RETRIEVAL_TOP_K: "5"
+      RETRIEVAL_SCORE_THRESHOLD: "0.0"
+      MAX_CONTEXT_TOKENS: "4000"
     depends_on:
       mongodb:
         condition: service_healthy
       auth-service:
         condition: service_started
+      qdrant:
+        condition: service_healthy
     networks:
       - elearning-network
     restart: unless-stopped
@@ -351,10 +364,31 @@ services:
       retries: 3
 
   # ============================================
+  # Qdrant Vector Database — RAG Foundation
+  # ============================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: elearning-qdrant
+    ports:
+      - "6333:6333"    # REST API + Dashboard
+      - "6334:6334"    # gRPC
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - elearning-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/6333'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================
   # MinIO File Storage Service
   # ============================================
   minio:
-    image: minio/minio:latest
+    image: quay.io/minio/minio:latest
     container_name: elearning-minio
     ports:
       - "9000:9000"   # S3 API port
@@ -380,7 +414,7 @@ services:
   # MinIO Client - Initialize buckets
   # ============================================
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:latest
     container_name: elearning-minio-init
     depends_on:
       - minio
@@ -412,4 +446,6 @@ volumes:
   mongo-data:
     driver: local
   minio-data:
+    driver: local
+  qdrant-data:
     driver: local

@@ -65,6 +65,14 @@ async function main() {
       courseIds: finalWebIds,
       category: 'Công nghệ thông tin',
       difficulty: 'ALL',
+      certificateConfig: {
+        title: 'Chứng chỉ Fullstack Web Developer',
+        subtitle: 'Được cấp cho học viên hoàn thành xuất sắc lộ trình',
+        signer: 'Giám đốc Đào tạo UMI Academy',
+        org: 'UMI Academy',
+        template: 'modern',
+        themeColor: '#10b981'
+      },
     },
     create: {
       title: 'Lập trình viên Web Chuyên nghiệp (Fullstack Developer)',
@@ -74,6 +82,14 @@ async function main() {
       difficulty: 'ALL',
       courseIds: finalWebIds,
       imageUrl: 'https://images.unsplash.com/photo-1517694712202-14dd9538aa97?q=80&w=600&auto=format&fit=crop',
+      certificateConfig: {
+        title: 'Chứng chỉ Fullstack Web Developer',
+        subtitle: 'Được cấp cho học viên hoàn thành xuất sắc lộ trình',
+        signer: 'Giám đốc Đào tạo UMI Academy',
+        org: 'UMI Academy',
+        template: 'modern',
+        themeColor: '#10b981'
+      },
     },
   });
 
@@ -84,6 +100,14 @@ async function main() {
       courseIds: finalDataIds,
       category: 'Công nghệ thông tin',
       difficulty: 'ALL',
+      certificateConfig: {
+        title: 'Chứng chỉ Chuyên gia Khoa học Dữ liệu',
+        subtitle: 'Được cấp cho học viên hoàn thành xuất sắc lộ trình',
+        signer: 'Giám đốc Đào tạo UMI Academy',
+        org: 'UMI Academy',
+        template: 'modern',
+        themeColor: '#10b981'
+      },
     },
     create: {
       title: 'Chuyên gia Khoa học Dữ liệu (Data Science Expert)',
@@ -93,6 +117,14 @@ async function main() {
       difficulty: 'ALL',
       courseIds: finalDataIds,
       imageUrl: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=600&auto=format&fit=crop',
+      certificateConfig: {
+        title: 'Chứng chỉ Chuyên gia Khoa học Dữ liệu',
+        subtitle: 'Được cấp cho học viên hoàn thành xuất sắc lộ trình',
+        signer: 'Giám đốc Đào tạo UMI Academy',
+        org: 'UMI Academy',
+        template: 'modern',
+        themeColor: '#10b981'
+      },
     },
   });
 

@@ -109,6 +109,13 @@ export interface CareerPathRecommendation {
   totalEstimatedHours: number;
   estimatedWeeks?: string;
   pathCertificate: string | null;
+  certificateConfig?: {
+    title?: string;
+    subtitle?: string;
+    signer?: string;
+    org?: string;
+    [key: string]: any;
+  };
   summary: string;
   alternativePaths: Array<{
     pathId: string;
@@ -297,4 +304,148 @@ export const aiService = {
     const response = await aiApi.post(`/api/ai/career-advisor/${sessionId}/skip`);
     return response.data.data;
   },
+
+  // ========== GĐ2: Learner Competency Analysis ==========
+
+  /**
+   * POST — Generate full AI analysis (competency + learning plan + alternative careers)
+   * Calls Gemini (3 calls) — results cached in DB
+   */
+  generateLearnerAnalysis: async (): Promise<AILearnerAnalysis> => {
+    const response = await aiApi.post('/api/ai/learner-analysis/generate');
+    return response.data.data;
+  },
+
+  /**
+   * GET — Read cached AI analysis result (no Gemini call — fast)
+   * Returns null if no cached analysis exists
+   */
+  getCachedLearnerAnalysis: async (): Promise<CachedLearnerAnalysisResponse> => {
+    const response = await aiApi.get('/api/ai/learner-analysis');
+    return response.data;
+  },
 };
+
+// ==================== GĐ2: Learner Competency Analysis Types ====================
+
+/**
+ * AI Analysis Evidence — bằng chứng AI sử dụng để giải thích
+ */
+export interface AIEvidence {
+  type: 'SKILL' | 'PROJECT' | 'QUIZ' | 'PROGRESS';
+  description: string;
+  impact: 'POSITIVE' | 'NEGATIVE' | 'NEUTRAL';
+}
+
+/**
+ * AI Competency Analysis — AI giải thích level hệ thống đã xác định
+ * 
+ * systemLevel là từ GĐ1 (deterministic)
+ * AI chỉ interpret, KHÔNG override
+ */
+export interface CompetencyAnalysisResult {
+  levelInterpretation: string;
+  reasoning: string;
+  evidences: AIEvidence[];
+  strengthsAnalysis: string;
+  weaknessesAnalysis: string;
+  developmentPotential: string;
+  oneLiner: string;
+  error?: boolean;
+}
+
+/**
+ * AI Learning Plan — đề xuất khóa học/path từ UMI
+ * 
+ * courseId/pathId đã được backend validate
+ */
+export interface LearningPlanRecommendation {
+  prioritySkills: {
+    skill: string;
+    currentLevel: string;
+    targetLevel: string;
+    reason: string;
+    estimatedEffort: string;
+  }[];
+  recommendedCourses: {
+    courseId: string;
+    courseTitle: string;
+    reason: string;
+    priority: 'HIGH' | 'MEDIUM' | 'LOW';
+    skillsCovered: string[];
+  }[];
+  recommendedPaths: {
+    pathId: string;
+    pathTitle: string;
+    reason: string;
+    fitScore: number;
+  }[];
+  nextActions: {
+    order: number;
+    action: string;
+    type: 'COURSE' | 'PRACTICE' | 'PROJECT' | 'REVIEW';
+    resourceId?: string | null;
+    resourceTitle?: string | null;
+  }[];
+  estimatedTimeline: string;
+  summary: string;
+  error?: boolean;
+}
+
+/**
+ * AI Alternative Career Suggestion
+ * 
+ * shouldSuggest = false nếu hướng hiện tại vẫn tốt nhất
+ * AI luôn giải thích cả "tại sao KHÔNG nên đổi"
+ */
+export interface AlternativeCareerSuggestion {
+  shouldSuggest: boolean;
+  currentCareerAssessment: {
+    careerGoal: string;
+    fitScore: number;
+    isAchievable: boolean;
+    assessment: string;
+    whyStay: string;
+  } | null;
+  alternativeCareers: {
+    career: string;
+    pathId?: string | null;
+    pathTitle?: string | null;
+    fitScore: number;
+    fitReason: string;
+    leveragedSkills: string[];
+    skillsToLearn: string[];
+    estimatedTransitionTime: string;
+  }[];
+  encouragement: string;
+  error?: boolean;
+}
+
+/**
+ * Full AI Learner Analysis Response
+ */
+export interface AILearnerAnalysis {
+  systemLevel: string;
+  levelConfidence: number;
+  competencyAnalysis: CompetencyAnalysisResult;
+  learningPlan: LearningPlanRecommendation;
+  alternativeCareers: AlternativeCareerSuggestion;
+  profile: {
+    acquiredSkills: any[];
+    strengths: any[];
+    weaknesses: any[];
+    careerFitAnalysis: any[];
+    learningProgress: any;
+    dataCompleteness: number;
+  };
+  generatedAt: string;
+}
+
+/**
+ * Cached Analysis Response wrapper
+ */
+export interface CachedLearnerAnalysisResponse {
+  message: string;
+  data: AILearnerAnalysis | null;
+  needsGeneration?: boolean;
+}

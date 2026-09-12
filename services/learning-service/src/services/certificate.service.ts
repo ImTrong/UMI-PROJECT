@@ -10,7 +10,7 @@ import { minioInternalClient, BUCKETS } from '../config/minio.config';
 const prisma = new PrismaClient();
 
 export class CertificateService {
-  static async generateCertificate(userId: string, courseId: string) {
+  static async generateCertificate(userId: string, courseId: string, fullNameFallback?: string) {
     const courseProgress = await prisma.courseProgress.findUnique({
       where: { userId_courseId: { userId, courseId } },
     });
@@ -37,13 +37,19 @@ export class CertificateService {
     try {
       const userRes: AxiosResponse<{ data: UserDetails[] }> = await axios.post(`${userServiceUrl}/api/users/batch`, { ids: [userId] });
       user = userRes.data.data?.[0];
-      if (!user) {
+      if (!user && fullNameFallback) {
+        user = { userId, fullName: fullNameFallback } as unknown as UserDetails;
+      } else if (!user) {
         logger.error(`User not found in batch lookup for userId: ${userId}`);
         throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
       }
     } catch (err: any) {
-      logger.error(`Failed to fetch user for certificate generation. userId: ${userId}, URL: ${userServiceUrl}, error:`, err.message);
-      throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+      if (fullNameFallback) {
+        user = { userId, fullName: fullNameFallback } as unknown as UserDetails;
+      } else {
+        logger.error(`Failed to fetch user for certificate generation. userId: ${userId}, URL: ${userServiceUrl}, error:`, err.message);
+        throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+      }
     }
 
     try {
@@ -119,7 +125,7 @@ export class CertificateService {
    * Generate a PATH_CERTIFICATE (chứng chỉ) for completing a learning path
    * Requires: path completed + final project score ≥ 80%
    */
-  static async generatePathCertificate(userId: string, pathId: string) {
+  static async generatePathCertificate(userId: string, pathId: string, fullNameFallback?: string) {
     const path = await prisma.learningPath.findUnique({ where: { id: pathId } });
     if (!path) throw new Error('Learning path not found');
 
@@ -168,13 +174,19 @@ export class CertificateService {
     try {
       const userRes: AxiosResponse<{ data: UserDetails[] }> = await axios.post(`${userServiceUrl}/api/users/batch`, { ids: [userId] });
       user = userRes.data.data?.[0];
-      if (!user) {
+      if (!user && fullNameFallback) {
+        user = { userId, fullName: fullNameFallback } as unknown as UserDetails;
+      } else if (!user) {
         logger.error(`User not found in batch lookup for path certificate. userId: ${userId}`);
         throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
       }
     } catch (err: any) {
-      logger.error(`Failed to fetch user for path certificate generation. userId: ${userId}, URL: ${userServiceUrl}, error:`, err.message);
-      throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+      if (fullNameFallback) {
+        user = { userId, fullName: fullNameFallback } as unknown as UserDetails;
+      } else {
+        logger.error(`Failed to fetch user for path certificate generation. userId: ${userId}, URL: ${userServiceUrl}, error:`, err.message);
+        throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+      }
     }
 
     const certificateNumber = this.generateCertificateNumber(userId, pathId);

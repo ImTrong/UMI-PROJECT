@@ -16,6 +16,13 @@ export interface LearningPath {
   totalDurationMinutes: number;
   enrollmentCount: number;
   recommended: boolean;
+  certificateConfig?: {
+    title?: string;
+    subtitle?: string;
+    signer?: string;
+    org?: string;
+    [key: string]: any;
+  };
   createdAt: string;
   updatedAt: string;
 }

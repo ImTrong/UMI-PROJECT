@@ -4,6 +4,8 @@ import { FiArrowRight, FiBell } from 'react-icons/fi';
 
 interface Props {
   reminders: StudyReminder[];
+  limit?: number;
+  compact?: boolean;
 }
 
 const urgencyStyles: Record<string, { border: string; bg: string; pulse: boolean }> = {
@@ -20,8 +22,11 @@ const urgencyBadge: Record<string, { label: string; color: string }> = {
   LOW: { label: 'Gợi ý', color: 'bg-slate-100 text-slate-600' },
 };
 
-export default function StudyReminders({ reminders }: Props) {
-  if (reminders.length === 0) {
+export default function StudyReminders({ reminders, limit, compact }: Props) {
+  const displayReminders = limit ? reminders.slice(0, limit) : reminders;
+
+  if (displayReminders.length === 0) {
+    if (compact) return null;
     return (
       <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
         <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 mb-4">
@@ -38,18 +43,20 @@ export default function StudyReminders({ reminders }: Props) {
     );
   }
 
-  const criticalCount = reminders.filter((r) => r.urgency === 'CRITICAL').length;
-  const highCount = reminders.filter((r) => r.urgency === 'HIGH').length;
+  const criticalCount = displayReminders.filter((r) => r.urgency === 'CRITICAL').length;
+  const highCount = displayReminders.filter((r) => r.urgency === 'HIGH').length;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 p-6 shadow-sm">
+    <div className={`bg-white rounded-2xl ${compact ? '' : 'border border-slate-100 p-6 shadow-sm'}`}>
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
           <FiBell className={`text-emerald-500 ${criticalCount > 0 ? 'animate-bounce' : ''}`} />
           Nhắc nhở học tập
-          <span className="text-[10px] bg-emerald-100 text-emerald-600 font-bold px-2 py-0.5 rounded-full">
-            {reminders.length}
-          </span>
+          {!compact && (
+            <span className="text-[10px] bg-emerald-100 text-emerald-600 font-bold px-2 py-0.5 rounded-full">
+              {displayReminders.length}
+            </span>
+          )}
         </h3>
 
         {(criticalCount > 0 || highCount > 0) && (
@@ -68,8 +75,8 @@ export default function StudyReminders({ reminders }: Props) {
         )}
       </div>
 
-      <div className="space-y-2.5 max-h-[400px] overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
-        {reminders.map((reminder) => {
+      <div className={`space-y-2.5 ${compact ? '' : 'max-h-[400px] overflow-y-auto'}`} style={{ scrollbarWidth: 'thin' }}>
+        {displayReminders.map((reminder) => {
           const style = urgencyStyles[reminder.urgency];
           const badge = urgencyBadge[reminder.urgency];
 

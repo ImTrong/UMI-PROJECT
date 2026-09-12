@@ -7,6 +7,7 @@ export interface AuthRequest extends Request {
   user?: {
     userId: string;
     email: string;
+    fullName?: string;
     role?: string;
   };
 }
@@ -42,6 +43,7 @@ export const authenticateToken = async (
     req.user = {
       userId: response.data.user.userId,
       email: response.data.user.email,
+      fullName: (response.data.user as any).fullName,
     };
 
     // Fetch role from user-service so controllers can check req.user.role
@@ -96,6 +98,7 @@ export const authenticateOptional = async (
       req.user = {
         userId: response.data.user.userId,
         email: response.data.user.email,
+        fullName: (response.data.user as any).fullName,
       };
 
       // Try to fetch role but don't block if it fails

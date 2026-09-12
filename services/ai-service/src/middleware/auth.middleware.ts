@@ -13,7 +13,7 @@ export interface AuthRequest extends Request {
 
 /**
  * Authenticate JWT token by verifying with auth-service
- * Pattern matches learning-service auth middleware
+ * Then fetch user role from user-service (same pattern as course-service)
  */
 export const authenticateToken = async (
   req: AuthRequest,
@@ -38,10 +38,30 @@ export const authenticateToken = async (
       return;
     }
 
-    req.user = {
-      userId: response.data.user.userId,
-      email: response.data.user.email,
-    };
+    // Get user role from user-service (same pattern as course-service)
+    try {
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
+      const userResponse = await axios.get(
+        `${userServiceUrl}/api/users/${response.data.user.userId}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+
+      req.user = {
+        userId: response.data.user.userId,
+        email: response.data.user.email,
+        role: userResponse.data.data.role,
+      };
+    } catch (error) {
+      // If user-service fails, default to STUDENT (non-privileged)
+      logger.warn(
+        `Failed to fetch user role from user-service for userId=${response.data.user.userId}. Defaulting to STUDENT.`,
+      );
+      req.user = {
+        userId: response.data.user.userId,
+        email: response.data.user.email,
+        role: 'STUDENT',
+      };
+    }
 
     next();
   } catch (error) {
@@ -49,3 +69,29 @@ export const authenticateToken = async (
     res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
   }
 };
+
+/**
+ * Require admin role. Must be used AFTER authenticateToken.
+ * Returns 403 Forbidden if user is not ADMIN or INSTRUCTOR.
+ */
+export const requireAdmin = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  if (!req.user) {
+    res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+    return;
+  }
+
+  const role = req.user.role || 'STUDENT';
+  if (role !== 'ADMIN' && role !== 'INSTRUCTOR') {
+    res.status(HTTP_STATUS.FORBIDDEN).json({
+      error: 'Forbidden: admin or instructor role required',
+    });
+    return;
+  }
+
+  next();
+};
+

@@ -429,7 +429,7 @@ async function main() {
     // Default mock description if none specified
     const mockDescription = `Đây là khóa học chuyên sâu về ${data.title}. Trong khóa học này, bạn sẽ được hướng dẫn từng bước một từ cơ bản đến nâng cao. Nội dung được thiết kế dễ hiểu, bám sát thực tế, giúp học viên có thể áp dụng ngay vào công việc sau khi hoàn thành.`;
 
-    await prisma.course.create({
+    const course = await prisma.course.create({
       data: {
         title: data.title,
         slug: createSlug(data.title) + '-' + Math.random().toString(36).substring(2, 7),
@@ -449,6 +449,37 @@ async function main() {
         totalReviews: Math.floor(Math.random() * 500) + 10, // Random 10 - 500
         enrolledCount: Math.floor(Math.random() * 2000) + 50, // Random 50 - 2000
       },
+    });
+
+    // Tạo 2 bài học mẫu cho khóa học
+    await prisma.lesson.create({
+      data: {
+        courseId: course.id,
+        title: 'Bài 1: Tổng quan và Cài đặt',
+        description: 'Hướng dẫn cài đặt môi trường và các công cụ cần thiết.',
+        videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', // Dùng placeholder video, kèm file PDF trong resources
+        duration: 300,
+        order: 1,
+        isPreview: true,
+        resources: [
+          { name: 'Tài liệu hướng dẫn Bài 1 (Docker)', url: 'd:/HK/HK8/Cong_nghe_moi/UMI-PROJECT/slot_08_01_Docker.pdf' }
+        ],
+      }
+    });
+
+    await prisma.lesson.create({
+      data: {
+        courseId: course.id,
+        title: 'Bài 2: Thực hành chuyên sâu',
+        description: 'Đi sâu vào kiến thức cốt lõi và thực hành.',
+        videoUrl: 'https://www.w3schools.com/html/mov_bbb.mp4', // Dùng placeholder video, kèm file PDF trong resources
+        duration: 600,
+        order: 2,
+        isPreview: false,
+        resources: [
+          { name: 'Tài liệu hướng dẫn Bài 2 (Docker)', url: 'd:/HK/HK8/Cong_nghe_moi/UMI-PROJECT/slot_08_02_Docker.pdf' }
+        ],
+      }
     });
   }
 

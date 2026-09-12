@@ -440,6 +440,14 @@ export class ProgressService {
       logger.error('Failed to update path progress:', err);
     }
 
+    // Invalidate LearnerAnalysis cache — course completion changes analysis
+    try {
+      const { LearnerAnalysisService } = require('./learner-analysis.service');
+      await LearnerAnalysisService.invalidateCache(userId, 'COURSE_COMPLETED');
+    } catch (err) {
+      logger.debug('Failed to invalidate learner analysis cache:', err);
+    }
+
     return { isComplete: true, newlyCompleted: true };
   }
 

@@ -52,3 +52,68 @@ model SkillAssessmentSession {
   @@index([userId])
   @@map("skill_assessment_sessions")
 }
+
+// ==================== AI Analysis Cache (GĐ2) ====================
+
+model AIAnalysisCache {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String   @unique @db.ObjectId
+
+  // Cached AI analysis results (structured JSON)
+  competencyAnalysis  Json?    // CompetencyAnalysisResult
+  learningPlan        Json?    // LearningPlanRecommendation
+  alternativeCareers  Json?    // AlternativeCareerSuggestion
+
+  // Cache management
+  dataVersion     Int      @default(1)
+  analyzedAt      DateTime @default(now())
+  invalidatedAt   DateTime?              // Event-driven invalidation
+
+  // Track which profile version was analyzed
+  profileAnalyzedAt   DateTime?          // analyzedAt from LearnerCompetencyProfile
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([invalidatedAt])
+  @@map("ai_analysis_cache")
+}
+
+// ==================== RAG Foundation ====================
+
+model KnowledgeDocument {
+  id            String    @id @default(auto()) @map("_id") @db.ObjectId
+  sourceType    String    // LESSON | COURSE | TRANSCRIPT | PDF | MARKDOWN | DOCUMENT | CODE
+  sourceId      String    // Reference to original entity (lessonId, courseId, etc.)
+  title         String
+  content       String    // Full text content
+  contentHash   String    // SHA-256 hash for idempotent re-indexing
+  metadata      Json      // { courseId, learningPathId, lessonId, skills[], language, ... }
+  version       Int       @default(1)
+  status        String    @default("ACTIVE") // ACTIVE | ARCHIVED | INDEXING | ERROR
+  chunkCount    Int       @default(0)
+  lastIndexedAt DateTime?
+  errorMessage  String?   // Error details if indexing failed
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([sourceType, sourceId, version])
+  @@index([sourceType])
+  @@index([sourceId])
+  @@index([status])
+  @@map("knowledge_documents")
+}
+
+model DocumentChunk {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  documentId  String   @db.ObjectId
+  chunkIndex  Int
+  content     String   // Chunk text content
+  metadata    Json     // Inherited from parent doc + section/position info
+  vectorId    String?  // Qdrant point UUID (for cleanup on re-index)
+  createdAt   DateTime @default(now())
+
+  @@unique([documentId, chunkIndex])
+  @@index([documentId])
+  @@map("document_chunks")
+}

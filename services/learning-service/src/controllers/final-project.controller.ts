@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { FinalProjectService } from '../services/final-project.service';
+import { SkillProfileService } from '../services/skill-profile.service';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 
@@ -230,6 +231,209 @@ export class FinalProjectController {
     } catch (error: any) {
       logger.error('Get unlock status error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to check unlock status' });
+    }
+  }
+
+  // ==================== Phase 1: ZIP & GitHub Submission ====================
+
+  /**
+   * POST /api/learning/final-project/:projectId/submit-zip
+   * Submit a final project with ZIP source code (Student)
+   */
+  static async submitWithZip(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { projectId } = req.params;
+      const zipFile = req.file;
+      if (!zipFile) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Vui lòng upload file ZIP' });
+      }
+
+      const { learningPathId, content, demoUrl } = req.body;
+      const submission = await FinalProjectService.submitWithZip(
+        req.user.userId,
+        projectId,
+        zipFile,
+        { learningPathId, content, demoUrl }
+      );
+
+      res.status(HTTP_STATUS.CREATED).json({
+        message: 'File ZIP đã được upload thành công. Đang phân tích project...',
+        data: submission,
+      });
+    } catch (error: any) {
+      logger.error('Submit ZIP error:', error);
+      res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message || 'Failed to submit ZIP' });
+    }
+  }
+
+  /**
+   * POST /api/learning/final-project/:projectId/submit-github
+   * Submit a final project with GitHub URL (Student)
+   */
+  static async submitWithGithub(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { projectId } = req.params;
+      const { learningPathId, githubUrl, content, demoUrl } = req.body;
+
+      if (!githubUrl) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Vui lòng cung cấp GitHub URL' });
+      }
+
+      const submission = await FinalProjectService.submitWithGithub(
+        req.user.userId,
+        projectId,
+        { learningPathId, githubUrl, content, demoUrl }
+      );
+
+      res.status(HTTP_STATUS.CREATED).json({
+        message: 'GitHub URL đã được gửi thành công. Đang phân tích project...',
+        data: submission,
+      });
+    } catch (error: any) {
+      logger.error('Submit GitHub error:', error);
+      res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message || 'Failed to submit GitHub URL' });
+    }
+  }
+
+  /**
+   * GET /api/learning/final-project/submission/:submissionId/status
+   * Get processing status for a submission
+   */
+  static async getProcessingStatus(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { submissionId } = req.params;
+      const result = await FinalProjectService.getSubmissionStatus(submissionId);
+      res.status(HTTP_STATUS.OK).json({ data: result });
+    } catch (error: any) {
+      logger.error('Get processing status error:', error);
+      if (error.message === ERROR_MESSAGES.SUBMISSION_NOT_FOUND) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get processing status' });
+    }
+  }
+
+  /**
+   * GET /api/learning/final-project/submission/:submissionId/context
+   * Get Project Context for a submission
+   */
+  static async getProjectContext(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { submissionId } = req.params;
+      const result = await FinalProjectService.getProjectContext(submissionId);
+      res.status(HTTP_STATUS.OK).json({ data: result });
+    } catch (error: any) {
+      logger.error('Get project context error:', error);
+      if (error.message === ERROR_MESSAGES.SUBMISSION_NOT_FOUND) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message || 'Failed to get project context' });
+    }
+  }
+
+  /**
+   * POST /api/learning/final-project/submission/:submissionId/retry-analysis
+   * Retry analysis for a failed submission
+   */
+  static async retryAnalysis(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { submissionId } = req.params;
+      const result = await FinalProjectService.retryAnalysis(submissionId);
+      res.status(HTTP_STATUS.OK).json({
+        message: 'Đang phân tích lại project...',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Retry analysis error:', error);
+      res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message || 'Failed to retry analysis' });
+    }
+  }
+
+  // ==================== Skill Profile Endpoints (Phase 3A) ====================
+
+  /**
+   * GET /api/learning/skill-profile/me
+   * Get current user's skill profile
+   */
+  static async getMySkillProfile(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const profile = await SkillProfileService.getOrCreateProfile(req.user.userId);
+      res.status(HTTP_STATUS.OK).json({ data: profile });
+    } catch (error: any) {
+      logger.error('Get skill profile error:', error);
+      res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message || 'Failed to get skill profile' });
+    }
+  }
+
+  /**
+   * GET /api/learning/skill-profile/me/summary
+   * Get skill summary for dashboard
+   */
+  static async getMySkillSummary(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const summary = await SkillProfileService.getSkillSummary(req.user.userId);
+      res.status(HTTP_STATUS.OK).json({ data: summary });
+    } catch (error: any) {
+      logger.error('Get skill summary error:', error);
+      res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message || 'Failed to get skill summary' });
+    }
+  }
+
+  /**
+   * POST /api/learning/skill-profile/me/gap-analysis
+   * Get skill gap analysis vs target skills
+   * Body: { targetSkills: [{ skill: "React", requiredLevel: "INTERMEDIATE" }] }
+   */
+  static async getSkillGapAnalysis(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { targetSkills } = req.body;
+      if (!targetSkills || !Array.isArray(targetSkills)) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'targetSkills array is required' });
+      }
+      const gaps = await SkillProfileService.getSkillGapAnalysis(req.user.userId, targetSkills);
+      res.status(HTTP_STATUS.OK).json({ data: gaps });
+    } catch (error: any) {
+      logger.error('Skill gap analysis error:', error);
+      res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message || 'Failed to analyze skill gaps' });
+    }
+  }
+
+  /**
+   * GET /api/learning/internal/skill-profile/:userId
+   * Internal endpoint — for ai-service to fetch skill profile
+   */
+  static async getSkillProfileInternal(req: AuthRequest, res: Response) {
+    try {
+      const { userId } = req.params;
+      const profile = await SkillProfileService.getProfile(userId);
+      res.status(HTTP_STATUS.OK).json({ data: profile });
+    } catch (error: any) {
+      logger.error('Internal skill profile error:', error);
+      res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message || 'Failed to get skill profile' });
     }
   }
 }

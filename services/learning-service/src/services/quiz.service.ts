@@ -266,6 +266,14 @@ export class QuizService {
     const courseTitle = courseResponse?.data?.data?.title || 'Khóa học';
     const completionResult = await ProgressService.checkAndCompleteCourse(userId, quiz.courseId, courseTitle);
 
+    // Invalidate LearnerAnalysis cache — quiz completion is supporting data
+    try {
+      const { LearnerAnalysisService } = require('./learner-analysis.service');
+      await LearnerAnalysisService.invalidateCache(userId, 'QUIZ_COMPLETED');
+    } catch (err) {
+      logger.debug('Failed to invalidate learner analysis cache after quiz:', err);
+    }
+
     return {
       attempt: updatedAttempt,
       courseCompleted: completionResult.isComplete && completionResult.newlyCompleted,

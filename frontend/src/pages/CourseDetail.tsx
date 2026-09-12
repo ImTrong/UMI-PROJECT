@@ -16,7 +16,7 @@ import { orderService } from '../services/order.service';
 import { learningService } from '../services/learning.service';
 
 export default function CourseDetail() {
-  const { slug } = useParams<{ slug: string }>();
+  const { slug, courseId } = useParams<{ slug?: string; courseId?: string }>();
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
   const { isAuthenticated, user } = useAuth();
@@ -80,10 +80,17 @@ export default function CourseDetail() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!slug) return;
+      if (!slug && !courseId) return;
       setLoading(true);
       try {
-        const courseData = await courseService.getCourseBySlug(slug);
+        let courseData;
+        if (slug) {
+          courseData = await courseService.getCourseBySlug(slug);
+        } else if (courseId) {
+          courseData = await courseService.getCourseById(courseId);
+        } else {
+          throw new Error('Course not found');
+        }
         setCourse(courseData);
         
         const lessonsData = await courseService.getCourseLessons(courseData.id);
@@ -120,7 +127,7 @@ export default function CourseDetail() {
       }
     };
     loadData();
-  }, [slug, isAuthenticated, navigate]);
+  }, [slug, courseId, isAuthenticated, navigate]);
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

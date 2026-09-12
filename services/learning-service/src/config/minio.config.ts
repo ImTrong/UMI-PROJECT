@@ -38,6 +38,8 @@ export const BUCKETS = {
   ASSIGNMENTS: 'assignments',
   QUIZ_ATTACHMENTS: 'quiz-attachments',
   CERTIFICATES: 'certificates',
+  /** Private bucket for project submissions (ZIP files) */
+  PROJECT_SUBMISSIONS: 'project-submissions',
 } as const;
 
 // ============================================
@@ -153,3 +155,24 @@ export async function initializeCertificatesBucket(): Promise<void> {
 // ============================================
 
 export { internalClient as minioInternalClient, publicClient as minioPublicClient };
+
+/**
+ * Ensure the project-submissions bucket exists (private).
+ * Used for storing student ZIP file submissions.
+ */
+export async function initializeProjectsBucket(): Promise<void> {
+  try {
+    const bucketName = BUCKETS.PROJECT_SUBMISSIONS;
+    const exists = await internalClient.bucketExists(bucketName);
+
+    if (!exists) {
+      await internalClient.makeBucket(bucketName);
+      logger.info(`✅ Created private bucket: ${bucketName}`);
+    }
+
+    logger.info(`✅ Private project submissions bucket "${bucketName}" is ready`);
+  } catch (error) {
+    logger.error('❌ Failed to initialize project submissions bucket:', error);
+    // Don't throw — this is non-critical for service startup
+  }
+}

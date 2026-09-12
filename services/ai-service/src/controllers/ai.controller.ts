@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { ChatService } from '../services/chat.service';
 import { CareerAdvisorService } from '../services/career-advisor.service';
+import { CompetencyAnalysisService } from '../services/competency-analysis.service';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 
@@ -554,6 +555,141 @@ export class AIController {
       logger.error('Career advisor skip error:', error);
       return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to skip assessment and generate roadmap',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
+
+  // ==================== Phase 2: Per-Criterion Evaluation ====================
+
+  /**
+   * POST /api/ai/evaluate-criterion
+   * Evaluate a single criterion with evidence package
+   */
+  static async evaluateCriterionEndpoint(req: AuthRequest, res: Response) {
+    try {
+      const { criterionConfig, evidence, projectOverview, projectInfo } = req.body;
+
+      if (!criterionConfig || !evidence || !projectInfo) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Missing required fields: criterionConfig, evidence, projectInfo',
+        });
+      }
+
+      const result = await ChatService.evaluateCriterion(
+        criterionConfig,
+        evidence,
+        projectOverview || '',
+        projectInfo
+      );
+
+      return res.status(HTTP_STATUS.OK).json({
+        message: 'Criterion evaluated successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Evaluate criterion error:', error);
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to evaluate criterion',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
+
+  /**
+   * POST /api/ai/generate-evaluation-feedback
+   * Generate comprehensive feedback from all criterion results
+   */
+  static async generateEvaluationFeedback(req: AuthRequest, res: Response) {
+    try {
+      const { criterionResults, projectInfo, totalScore, passingScore, passed } = req.body;
+
+      if (!criterionResults || !projectInfo || totalScore === undefined) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Missing required fields: criterionResults, projectInfo, totalScore',
+        });
+      }
+
+      const report = await ChatService.generateComprehensiveFeedback(
+        criterionResults,
+        projectInfo,
+        totalScore,
+        passingScore || 80,
+        passed ?? (totalScore >= (passingScore || 80))
+      );
+
+      return res.status(HTTP_STATUS.OK).json({
+        message: 'Feedback report generated successfully',
+        data: { feedbackReport: report },
+      });
+    } catch (error: any) {
+      logger.error('Generate evaluation feedback error:', error);
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to generate evaluation feedback',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
+
+  // ==================== GĐ2: Learner Competency Analysis ====================
+
+  /**
+   * POST /api/ai/learner-analysis/generate
+   * Generate full AI analysis (competency + learning plan + alternative careers)
+   * Calls Gemini — results cached in DB
+   */
+  static async generateLearnerAnalysis(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+
+      const token = extractToken(req);
+      const result = await CompetencyAnalysisService.generateFullAnalysis(userId, token);
+
+      return res.status(HTTP_STATUS.OK).json({
+        message: 'AI learner analysis generated successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Generate learner analysis error:', error);
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to generate AI learner analysis',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      });
+    }
+  }
+
+  /**
+   * GET /api/ai/learner-analysis
+   * Get cached AI analysis result (no Gemini call — fast)
+   */
+  static async getCachedLearnerAnalysis(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+
+      const cached = await CompetencyAnalysisService.getCachedAnalysis(userId);
+
+      if (!cached) {
+        return res.status(HTTP_STATUS.OK).json({
+          message: 'No AI analysis found. Generate one first.',
+          data: null,
+          needsGeneration: true,
+        });
+      }
+
+      return res.status(HTTP_STATUS.OK).json({
+        message: 'Cached AI learner analysis',
+        data: cached,
+      });
+    } catch (error: any) {
+      logger.error('Get cached learner analysis error:', error);
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to get cached AI learner analysis',
         details: process.env.NODE_ENV === 'development' ? error.message : undefined,
       });
     }

@@ -1,0 +1,208 @@
+{
+  "version": "v1",
+  "description": "UMI RAG Baseline Evaluation Dataset. 23 high-quality samples across 7 categories. Ground truth manually extracted from evaluation fixture content. This is a baseline dataset for comparison, NOT a production reliability claim.",
+  "createdAt": "2026-09-08",
+  "fixtureMapping": {
+    "eval-expressjs-middleware": {
+      "courseId": "6a8894d41878e03ad8299dfa",
+      "courseName": "API and Web services with ExpressJS",
+      "fixtureFile": "fixtures/expressjs-middleware.md"
+    },
+    "eval-docker-basics": {
+      "courseId": "6a7f448aa949aa290408270f",
+      "courseName": "Thành Thạo Docker Từ Cơ Bản Đến Nâng Cao",
+      "fixtureFile": "fixtures/docker-basics.md"
+    },
+    "eval-git-github": {
+      "courseId": "6a7f456da949aa2904082712",
+      "courseName": "Làm Chủ Git và GitHub Từ A đến Z",
+      "fixtureFile": "fixtures/git-github-basics.md"
+    }
+  },
+  "samples": [
+    {
+      "id": "eval-001",
+      "category": "direct_factual",
+      "question": "Middleware trong ExpressJS là gì?",
+      "groundTruth": "Middleware là các hàm trung gian trong Express.js, có quyền truy cập vào đối tượng request (req), response (res), và hàm next() trong chu trình xử lý request-response.",
+      "expectedSources": ["eval-expressjs-middleware"],
+      "metadata": { "courseId": "6a8894d41878e03ad8299dfa" }
+    },
+    {
+      "id": "eval-002",
+      "category": "direct_factual",
+      "question": "Error-handling middleware trong Express có mấy tham số?",
+      "groundTruth": "Error-handling middleware có 4 tham số thay vì 3: (err, req, res, next).",
+      "expectedSources": ["eval-expressjs-middleware"],
+      "metadata": { "courseId": "6a8894d41878e03ad8299dfa" }
+    },
+    {
+      "id": "eval-003",
+      "category": "direct_factual",
+      "question": "Dockerfile có những chỉ thị quan trọng nào?",
+      "groundTruth": "Các chỉ thị quan trọng của Dockerfile: FROM (chỉ định base image), WORKDIR (thiết lập thư mục làm việc), COPY (sao chép file từ host vào container), RUN (thực thi lệnh trong quá trình build), EXPOSE (khai báo port), CMD (lệnh mặc định khi container khởi động), ENV (thiết lập biến môi trường).",
+      "expectedSources": ["eval-docker-basics"],
+      "metadata": { "courseId": "6a7f448aa949aa290408270f" }
+    },
+    {
+      "id": "eval-004",
+      "category": "direct_factual",
+      "question": "Git commit là gì và chứa những thông tin nào?",
+      "groundTruth": "Commit là một snapshot của dự án tại một thời điểm. Mỗi commit có: Hash ID duy nhất, commit message mô tả thay đổi, author và timestamp, pointer đến commit trước đó (parent).",
+      "expectedSources": ["eval-git-github"],
+      "metadata": { "courseId": "6a7f456da949aa2904082712" }
+    },
+    {
+      "id": "eval-005",
+      "category": "direct_factual",
+      "question": "Docker Volume có những loại nào?",
+      "groundTruth": "Docker Volume có 3 loại: Named volumes (quản lý bởi Docker, dùng docker volume create), Bind mounts (ánh xạ trực tiếp thư mục host vào container), tmpfs mounts (lưu trong bộ nhớ RAM, mất khi container dừng).",
+      "expectedSources": ["eval-docker-basics"],
+      "metadata": { "courseId": "6a7f448aa949aa290408270f" }
+    },
+    {
+      "id": "eval-006",
+      "category": "paraphrase",
+      "question": "Trong Express, các hàm trung gian dùng để làm gì?",
+      "groundTruth": "Middleware có thể: thực thi bất kỳ code nào, thay đổi đối tượng request và response, kết thúc chu trình request-response, gọi middleware tiếp theo trong chuỗi.",
+      "expectedSources": ["eval-expressjs-middleware"],
+      "metadata": { "courseId": "6a8894d41878e03ad8299dfa" }
+    },
+    {
+      "id": "eval-007",
+      "category": "paraphrase",
+      "question": "Sự khác nhau chính giữa container Docker và máy ảo là gì?",
+      "groundTruth": "Container chia sẻ kernel của hệ điều hành host, trong khi VM cần một hệ điều hành guest riêng. Do đó container khởi động nhanh hơn, tiêu tốn ít tài nguyên hơn, và có kích thước nhỏ hơn nhiều so với VM.",
+      "expectedSources": ["eval-docker-basics"],
+      "metadata": { "courseId": "6a7f448aa949aa290408270f" }
+    },
+    {
+      "id": "eval-008",
+      "category": "paraphrase",
+      "question": "Quy trình làm Pull Request trên GitHub gồm những bước nào?",
+      "groundTruth": "Quy trình Pull Request: 1. Fork hoặc tạo branch mới, 2. Thực hiện thay đổi và commit, 3. Push lên remote, 4. Tạo Pull Request trên GitHub, 5. Code review bởi team members, 6. Merge sau khi được approve.",
+      "expectedSources": ["eval-git-github"],
+      "metadata": { "courseId": "6a7f456da949aa2904082712" }
+    },
+    {
+      "id": "eval-009",
+      "category": "multi_sentence",
+      "question": "Tôi đang xây dựng một ứng dụng Express và muốn thêm bảo mật. Các third-party middleware nào giúp bảo vệ HTTP headers và xử lý CORS?",
+      "groundTruth": "Các third-party middleware phổ biến cho bảo mật: cors (xử lý Cross-Origin Resource Sharing), helmet (bảo mật HTTP headers).",
+      "expectedSources": ["eval-expressjs-middleware"],
+      "metadata": { "courseId": "6a8894d41878e03ad8299dfa" }
+    },
+    {
+      "id": "eval-010",
+      "category": "multi_sentence",
+      "question": "Tôi cần deploy ứng dụng Node.js bằng Docker. Hãy cho tôi biết cấu trúc Dockerfile cơ bản và các lệnh Docker Compose cần thiết.",
+      "groundTruth": "Dockerfile cho Node.js: FROM node:18-alpine, WORKDIR /app, COPY package*.json, RUN npm install, COPY ., EXPOSE 3000, CMD node server.js. Docker Compose: docker compose up (khởi động), docker compose down (dừng), docker compose build (build lại), docker compose logs (xem logs).",
+      "expectedSources": ["eval-docker-basics"],
+      "metadata": { "courseId": "6a7f448aa949aa290408270f" }
+    },
+    {
+      "id": "eval-011",
+      "category": "conceptual",
+      "question": "Tại sao thứ tự khai báo middleware trong Express lại quan trọng?",
+      "groundTruth": "Thứ tự khai báo middleware RẤT QUAN TRỌNG. Middleware được thực thi theo thứ tự khai báo. Nếu một middleware không gọi next(), các middleware phía sau sẽ không được thực thi.",
+      "expectedSources": ["eval-expressjs-middleware"],
+      "metadata": { "courseId": "6a8894d41878e03ad8299dfa" }
+    },
+    {
+      "id": "eval-012",
+      "category": "conceptual",
+      "question": "Giải thích khái niệm branch trong Git và tại sao nên sử dụng branch.",
+      "groundTruth": "Branch là nhánh phát triển độc lập. Branch mặc định là main (hoặc master). Tạo branch mới để phát triển tính năng mà không ảnh hưởng code chính.",
+      "expectedSources": ["eval-git-github"],
+      "metadata": { "courseId": "6a7f456da949aa2904082712" }
+    },
+    {
+      "id": "eval-013",
+      "category": "conceptual",
+      "question": "Conflict trong Git là gì và cách giải quyết?",
+      "groundTruth": "Conflict xảy ra khi hai branch sửa cùng một dòng code. Để giải quyết: Git đánh dấu vùng conflict bằng markers (<<<<<<<, =======, >>>>>>>), developer chọn giữ phiên bản nào hoặc kết hợp cả hai, xóa markers và commit kết quả.",
+      "expectedSources": ["eval-git-github"],
+      "metadata": { "courseId": "6a7f456da949aa2904082712" }
+    },
+    {
+      "id": "eval-014",
+      "category": "out_of_knowledge",
+      "question": "Cách triển khai Kubernetes cluster trên AWS EKS",
+      "groundTruth": null,
+      "expectedSources": [],
+      "metadata": {}
+    },
+    {
+      "id": "eval-015",
+      "category": "out_of_knowledge",
+      "question": "Hướng dẫn cấu hình Nginx làm reverse proxy cho microservices",
+      "groundTruth": null,
+      "expectedSources": [],
+      "metadata": {}
+    },
+    {
+      "id": "eval-016",
+      "category": "out_of_knowledge",
+      "question": "Cách sử dụng React Query để quản lý server state",
+      "groundTruth": null,
+      "expectedSources": [],
+      "metadata": {}
+    },
+    {
+      "id": "eval-017",
+      "category": "out_of_knowledge",
+      "question": "Cách cấu hình PostgreSQL replication trong môi trường production",
+      "groundTruth": null,
+      "expectedSources": [],
+      "metadata": {}
+    },
+    {
+      "id": "eval-018",
+      "category": "similar_but_unrelated",
+      "question": "Cách cấu hình router Wi-Fi TP-Link để mở rộng mạng",
+      "groundTruth": null,
+      "expectedSources": [],
+      "metadata": {}
+    },
+    {
+      "id": "eval-019",
+      "category": "similar_but_unrelated",
+      "question": "Image processing trong Python với OpenCV là gì?",
+      "groundTruth": null,
+      "expectedSources": [],
+      "metadata": {}
+    },
+    {
+      "id": "eval-020",
+      "category": "similar_but_unrelated",
+      "question": "Branch manager trong ngân hàng có trách nhiệm gì?",
+      "groundTruth": null,
+      "expectedSources": [],
+      "metadata": {}
+    },
+    {
+      "id": "eval-021",
+      "category": "metadata_scoped",
+      "question": "Middleware trong ExpressJS là gì?",
+      "groundTruth": "Middleware là các hàm trung gian trong Express.js, có quyền truy cập vào đối tượng request (req), response (res), và hàm next() trong chu trình xử lý request-response.",
+      "expectedSources": ["eval-expressjs-middleware"],
+      "metadata": { "courseId": "6a8894d41878e03ad8299dfa" }
+    },
+    {
+      "id": "eval-022",
+      "category": "metadata_scoped",
+      "question": "Docker là gì?",
+      "groundTruth": null,
+      "expectedSources": [],
+      "metadata": { "courseId": "6a8894d41878e03ad8299dfa" }
+    },
+    {
+      "id": "eval-023",
+      "category": "metadata_scoped",
+      "question": "Các lệnh Git cơ bản là gì?",
+      "groundTruth": null,
+      "expectedSources": [],
+      "metadata": { "courseId": "6a7f448aa949aa290408270f" }
+    }
+  ]
+}

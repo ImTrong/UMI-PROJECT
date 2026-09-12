@@ -565,6 +565,35 @@ export const learningService = {
     const response = await learningApi.post(`/api/learning/certificates/path/${pathId}/generate`);
     return response.data.data;
   },
+
+  // ========== Phase 1: Project Submission Status & Retry ==========
+
+  async getSubmissionProcessingStatus(submissionId: string): Promise<{
+    id: string;
+    processingStatus: string;
+    processingError?: string;
+    status: string;
+    fileName?: string;
+    githubUrl?: string;
+    totalScore?: number;
+    analysis?: {
+      projectType: string;
+      primaryLanguage: string;
+      totalFiles: number;
+      totalLines: number;
+      frameworks: string[];
+      processingStatus: string;
+      analyzedAt: string;
+    } | null;
+  }> {
+    const response = await learningApi.get(`/api/learning/final-project/submission/${submissionId}/status`);
+    return response.data.data;
+  },
+
+  async retryAnalysis(submissionId: string): Promise<{ message: string }> {
+    const response = await learningApi.post(`/api/learning/final-project/submission/${submissionId}/retry-analysis`);
+    return response.data;
+  },
 };
 
 // ==================== Course Exam Types ====================
@@ -632,6 +661,55 @@ export interface EvaluationStage {
   expectedOutput?: string;
 }
 
+// ==================== Phase 2: Evidence & Criterion Types ====================
+
+/**
+ * Reference to a code evidence chunk from the project analysis.
+ * This is reference-only — frontend does NOT have the actual code content.
+ * To display code snippets, a dedicated API (e.g., GET /submission/:id/evidence/:chunkId) would be needed.
+ */
+export interface EvidenceChunkRef {
+  chunkId: string;
+  filePath: string;
+  startLine: number;
+  endLine: number;
+}
+
+/**
+ * Phase 2 CriterionResult — matches backend `CriterionResult` exactly.
+ * Includes criterion configuration snapshot + AI evaluation results.
+ * The snapshot fields (objective, criteria, passCriteria) reflect the rubric
+ * at evaluation time, so even if admin changes the rubric later, past results remain accurate.
+ */
+export interface CriterionResult {
+  // Criterion config snapshot (preserved from evaluation time)
+  criterionId: string;
+  title: string;
+  maxScore: number;
+  weight: number;
+  passCriteria: string;
+  objective: string;
+  criteria: string;
+
+  // Evaluation results (score from AI, passed from backend)
+  score: number;
+  weightedScore: number;
+  passed: boolean;
+
+  // Evidence references (chunkId-based, reference only)
+  evidenceUsed: EvidenceChunkRef[];
+
+  // AI analysis
+  strengths: string[];
+  weaknesses: string[];
+  feedback: string;
+  suggestions: string[];
+}
+
+/**
+ * Legacy StageResult — kept for backward compatibility with older submissions
+ * that were graded by the legacy AI pipeline (pre-Phase 2).
+ */
 export interface StageResult {
   stageNumber: number;
   title: string;
@@ -676,9 +754,12 @@ export interface FinalProjectSubmission {
   fileName?: string;
   submissionData?: SubmissionDataItem[];
   status: 'SUBMITTED' | 'GRADING' | 'GRADED' | 'RETURNED';
+  processingStatus?: 'UPLOADED' | 'ANALYZING' | 'ANALYSIS_FAILED' | 'READY_FOR_EVALUATION' | 'EVALUATING' | 'COMPLETED' | 'FAILED';
+  processingError?: string;
   score?: number;
   totalScore?: number;
-  stageResults?: StageResult[];
+  /** Phase 2 returns CriterionResult[], legacy returns StageResult[]. Use normalizeCriterionResult() to unify. */
+  stageResults?: (CriterionResult | StageResult)[];
   feedback?: string;
   aiFeedback?: string;
   gradedAt?: string;

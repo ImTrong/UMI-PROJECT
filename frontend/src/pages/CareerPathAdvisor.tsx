@@ -546,9 +546,24 @@ export default function CareerPathAdvisor() {
                   <div className="flex-1 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-yellow-500/10 dark:to-amber-500/10 border border-amber-200 dark:border-yellow-500/30 rounded-xl p-5 backdrop-blur-sm transition-transform group-hover:scale-[1.01]">
                     <div className="flex items-center gap-2 mb-2">
                       <FiAward className="text-amber-600 dark:text-yellow-400" size={20} />
-                      <h3 className="text-lg font-bold text-amber-700 dark:text-yellow-300 uppercase tracking-wide">🎓 Chứng chỉ hoàn thành</h3>
+                      <h3 className="text-lg font-bold text-amber-700 dark:text-yellow-300 uppercase tracking-wide">
+                        🎓 {recommendation.certificateConfig?.title || 'Chứng chỉ hoàn thành'}
+                      </h3>
                     </div>
-                    <p className="text-amber-800 dark:text-yellow-200/80 font-semibold">{recommendation.pathCertificate}</p>
+                    {recommendation.certificateConfig ? (
+                      <div className="space-y-1">
+                        <p className="text-amber-800 dark:text-yellow-200/80 font-semibold text-lg">{recommendation.pathCertificate}</p>
+                        {recommendation.certificateConfig.subtitle && <p className="text-amber-700/80 dark:text-yellow-300/80 text-sm">{recommendation.certificateConfig.subtitle}</p>}
+                        {(recommendation.certificateConfig.signer || recommendation.certificateConfig.org) && (
+                          <div className="flex gap-4 mt-2 text-xs font-medium text-amber-600/80 dark:text-yellow-400/70">
+                            {recommendation.certificateConfig.org && <span>Cấp bởi: {recommendation.certificateConfig.org}</span>}
+                            {recommendation.certificateConfig.signer && <span>Ký bởi: {recommendation.certificateConfig.signer}</span>}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-amber-800 dark:text-yellow-200/80 font-semibold">{recommendation.pathCertificate}</p>
+                    )}
                   </div>
                 </div>
               )}
