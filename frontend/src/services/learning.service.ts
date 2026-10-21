@@ -59,7 +59,36 @@ export interface Certificate {
   certificateUrl?: string;
   verificationUrl: string;
   isVerified: boolean;
-  metadata?: any;
+  metadata?: {
+    blockchain?: {
+      network?: string;
+      chainId?: number;
+      contractAddress?: string;
+      certificateIdHash?: string;
+      documentHash?: string;
+      transactionHash?: string;
+      status?: 'NOT_REGISTERED' | 'PENDING' | 'CONFIRMED' | 'FAILED' | 'REVOKED' | 'REVOKE_PENDING' | 'REVOKE_FAILED';
+      registeredAt?: string;
+      revokedAt?: string;
+      revokeTransactionHash?: string;
+    };
+    certificateConfig?: any;
+    [key: string]: any;
+  };
+}
+
+export interface BlockchainVerification {
+  verified: boolean;
+  network?: string;
+  chainId?: number;
+  contractAddress?: string;
+  transactionHash?: string;
+  documentHash?: string;
+  explorerUrl?: string;
+  status?: string;
+  message?: string;
+  error?: string;
+  revokeTransactionHash?: string;
 }
 
 export interface Badge {

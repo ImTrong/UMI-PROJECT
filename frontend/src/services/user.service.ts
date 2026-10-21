@@ -99,6 +99,32 @@ export interface UsersListResponse {
   };
 }
 
+export interface InstructorPublicProfile {
+  userId: string;
+  fullName: string;
+  avatar?: string;
+  bio?: string;
+  role: string;
+  createdAt: string;
+  education: {
+    id: string;
+    institution: string;
+    degree: string;
+    fieldOfStudy: string;
+    startDate: string;
+    endDate?: string;
+  }[];
+  work: {
+    id: string;
+    company: string;
+    position: string;
+    location?: string;
+    startDate: string;
+    endDate?: string;
+    current: boolean;
+  }[];
+}
+
 export const userService = {
   // === Profile ===
   async getProfile(): Promise<UserProfile> {
@@ -108,6 +134,11 @@ export const userService = {
 
   async getUserById(userId: string): Promise<UserProfile> {
     const response = await api.get(`/api/users/${userId}`);
+    return response.data.data;
+  },
+
+  async getPublicProfile(userId: string): Promise<InstructorPublicProfile> {
+    const response = await api.get(`/api/users/public/${userId}`);
     return response.data.data;
   },
 

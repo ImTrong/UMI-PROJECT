@@ -14,11 +14,14 @@ export class OrderController {
         });
       }
 
+      const { items, notes, paymentMethod, idempotencyKey } = req.body;
+
       const result = await OrderService.createOrder({
         userId: req.user.userId,
-        items: req.body.items,
-        notes: req.body.notes,
-        paymentMethodId: req.body.paymentMethodId,
+        items: items.map((item: any) => ({ courseId: item.courseId })),
+        notes,
+        paymentMethod: paymentMethod || 'stripe',
+        idempotencyKey: idempotencyKey || req.headers['x-idempotency-key'] as string,
       });
 
       res.status(HTTP_STATUS.CREATED).json({
@@ -34,6 +37,18 @@ export class OrderController {
         });
       }
 
+      if (error.message?.includes('already in a pending order')) {
+        return res.status(HTTP_STATUS.CONFLICT).json({
+          error: error.message,
+        });
+      }
+
+      if (error.message?.includes('not found') || error.message?.includes('not published') || error.message?.includes('not approved')) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: error.message,
+        });
+      }
+
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to create order',
       });
@@ -41,8 +56,7 @@ export class OrderController {
   }
 
   static async createOrderWithPayment(req: AuthRequest, res: Response) {
-    // This is essentially same as createOrder now that createOrder supports paymentMethodId
-    return this.createOrder(req, res);
+    return OrderController.createOrder(req, res);
   }
 
   static async processPayment(req: AuthRequest, res: Response) {
@@ -66,6 +80,36 @@ export class OrderController {
       logger.error('Process payment error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to process payment',
+      });
+    }
+  }
+
+  static async initiatePayosPayment(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+          error: ERROR_MESSAGES.UNAUTHORIZED,
+        });
+      }
+
+      const { orderId } = req.params;
+      const regenerate = req.query.regenerate === 'true' || req.body?.regenerate === true;
+      const result = await OrderService.initiatePayosPayment(orderId, req.user.userId, regenerate);
+
+      res.status(HTTP_STATUS.OK).json({
+        message: 'PayOS payment initiated successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Initiate PayOS payment error:', error);
+      if (error.message === ERROR_MESSAGES.ORDER_NOT_FOUND) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      if (error.message === ERROR_MESSAGES.FORBIDDEN) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: error.message || 'Failed to initiate PayOS payment',
       });
     }
   }
@@ -205,6 +249,7 @@ export class OrderController {
         userId: req.query.userId as string,
         fromDate: req.query.fromDate ? new Date(req.query.fromDate as string) : undefined,
         toDate: req.query.toDate ? new Date(req.query.toDate as string) : undefined,
+        reconciliationOnly: req.query.reconciliationOnly === 'true',
       };
 
       const result = await OrderService.getAllOrders(page, limit, filters);
@@ -334,7 +379,6 @@ export class OrderController {
     }
   }
 
-  // ==================== Analytics ====================
   static async getAnalytics(req: AuthRequest, res: Response) {
     try {
       if (!req.user || req.user.role !== 'ADMIN') {
@@ -359,7 +403,7 @@ export class OrderController {
 
   static async handlePaymentWebhook(req: Request, res: Response) {
     try {
-      const { orderId, status } = req.body;
+      const { orderId, status, providerRef } = req.body;
 
       if (!orderId || !status) {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({
@@ -367,7 +411,7 @@ export class OrderController {
         });
       }
 
-      const order = await OrderService.handlePaymentWebhook(orderId, status);
+      const order = await OrderService.handlePaymentWebhook(orderId, status, providerRef);
 
       res.status(HTTP_STATUS.OK).json({
         message: `Order updated to ${status}`,

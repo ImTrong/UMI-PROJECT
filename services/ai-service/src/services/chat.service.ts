@@ -173,11 +173,31 @@ export class ChatService {
     // 5. Build personalized system prompt with learning data
     const personalizedPrompt = await this.buildPersonalizedPrompt(userId, token);
 
-    // 6. Call Gemini AI with personalized prompt
+    // 6. Call Gemini AI with personalized prompt and tool handler
     const aiResponse = await geminiService.generateResponse(
       personalizedPrompt,
       chatHistory,
-      userMessage
+      userMessage,
+      async (functionName: string, args: any) => {
+        try {
+          switch (functionName) {
+            case 'search_course':
+              return await LearningContextService.searchCourse(args.query, token);
+            case 'get_course_review_stats':
+              return await LearningContextService.fetchCourseReviewContext(args.courseId);
+            case 'get_course_reviews':
+              return await LearningContextService.fetchCourseReviews(args.courseId, args.limit || 20);
+            case 'search_instructor':
+              return await LearningContextService.searchInstructor(args.query, token);
+            case 'get_instructor_review_stats':
+              return await LearningContextService.fetchInstructorReviewContext(args.instructorId);
+            default:
+              return { error: `Tool ${functionName} not supported` };
+          }
+        } catch (err: any) {
+          return { error: `Execution failed: ${err.message}` };
+        }
+      }
     );
 
     // 7. Save AI response

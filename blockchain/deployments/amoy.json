@@ -1,0 +1,9 @@
+{
+  "network": "polygon-amoy",
+  "chainId": 80002,
+  "contractAddress": "0x434f13D092C09E22905Fe82708CAAf99C71C2d79",
+  "deployer": "0xa809a2266ab00Ebba4F90B608faa60AfAfbB1AE0",
+  "transactionHash": "0x0cc93c855dafba81a7bd8a334cd0e0ca7318d9927737330c961489c6f69b67a1",
+  "deployedAt": "2026-09-27T03:09:01.950Z",
+  "explorerUrl": "https://amoy.polygonscan.com/address/0x434f13D092C09E22905Fe82708CAAf99C71C2d79"
+}

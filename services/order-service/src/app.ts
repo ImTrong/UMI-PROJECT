@@ -5,6 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { OrderController } from './controllers/order.controller';
 import { CartController } from './controllers/cart.controller';
 import { authenticateToken, requireRole } from './middleware/auth.middleware';
+import { verifyInternalService } from './middleware/internal-auth.middleware';
 import {
   validateAddToCart,
   validateCreateOrder,
@@ -101,9 +102,10 @@ app.get(
   OrderController.getUserOrders
 );
 
-// Internal webhook endpoint (service-to-service, no user auth)
+// Internal webhook endpoint (service-to-service, requires internal token)
 app.post(
   '/api/orders/webhook/payment',
+  verifyInternalService,
   OrderController.handlePaymentWebhook
 );
 
@@ -144,6 +146,14 @@ app.post(
   validateOrderId,
   handleValidationErrors,
   OrderController.processPayment
+);
+
+app.post(
+  '/api/orders/:orderId/payos-payment',
+  authenticateToken,
+  validateOrderId,
+  handleValidationErrors,
+  OrderController.initiatePayosPayment
 );
 
 app.get(

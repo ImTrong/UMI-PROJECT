@@ -2,11 +2,16 @@ import { paymentApi } from './api';
 
 export interface PaymentIntent {
   id: string;
-  stripePaymentIntentId: string;
-  clientSecret: string;
+  stripePaymentIntentId?: string;
+  clientSecret?: string;
   amount: number;
   currency: string;
-  status: 'PENDING' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED' | 'REFUNDED' | 'CANCELLED';
+  status: 'PENDING' | 'PROCESSING' | 'SUCCEEDED' | 'FAILED' | 'PARTIALLY_REFUNDED' | 'REFUNDED' | 'CANCELLED';
+  provider?: 'stripe' | 'payos';
+  payosOrderCode?: string | number;
+  payosCheckoutUrl?: string;
+  payosQrCode?: string;
+  isMock?: boolean;
 }
 
 export interface Payment {
@@ -124,6 +129,11 @@ export const paymentService = {
   async cancelPayment(paymentId: string): Promise<Payment> {
     const response = await paymentApi.post(`/api/payments/${paymentId}/cancel`);
     return response.data.data;
+  },
+
+  async simulateMockPayment(orderId: string): Promise<any> {
+    const response = await paymentApi.post('/api/payments/mock-complete', { orderId });
+    return response.data;
   },
 
   // Payment Methods

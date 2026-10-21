@@ -291,6 +291,35 @@ export const courseService = {
     return response.data.data;
   },
 
+  // Instructor Profile APIs
+  async getInstructorStats(instructorId: string): Promise<{
+    totalCourses: number;
+    totalStudents: number;
+    totalReviews: number;
+    averageRating: number;
+  }> {
+    const response = await courseApi.get(`/api/courses/instructor/${instructorId}/stats`);
+    return response.data.data;
+  },
+
+  async getInstructorPublicCourses(instructorId: string, page: number = 1, limit: number = 20): Promise<PaginatedCourses> {
+    const response = await courseApi.get(`/api/courses/instructor/${instructorId}/public-courses?page=${page}&limit=${limit}`);
+    return response.data;
+  },
+
+  async getInstructorReviews(instructorId: string, page: number = 1, limit: number = 10): Promise<{
+    reviews: (Review & { course?: { title: string; slug: string } })[];
+    pagination: any;
+  }> {
+    const response = await courseApi.get(`/api/courses/instructor/${instructorId}/reviews?page=${page}&limit=${limit}`);
+    return response.data;
+  },
+
+  async getInstructorRatingDistribution(instructorId: string): Promise<Record<number, number>> {
+    const response = await courseApi.get(`/api/courses/instructor/${instructorId}/rating-distribution`);
+    return response.data.data;
+  },
+
   // Categories
   async getCategories(includeCount: boolean = false): Promise<Category[]> {
     const response = await courseApi.get(`/api/categories?includeCount=${includeCount}`);

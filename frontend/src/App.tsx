@@ -52,6 +52,8 @@ import AIAssistant from './pages/AIAssistant'
 import CourseExamResult from './pages/CourseExamResult'
 import FinalProjectPage from './pages/FinalProjectPage'
 import CareerPathAdvisor from './pages/CareerPathAdvisor'
+import InstructorProfile from './pages/InstructorProfile'
+import Leaderboard from './pages/Leaderboard'
 
 function App() {
   const { isAuthenticated, loading } = useAuth()
@@ -110,6 +112,7 @@ function App() {
           
           {/* Course Routes */}
           <Route path="/courses" element={<SearchCourses />} />
+          <Route path="/instructors/:instructorId" element={<InstructorProfile />} />
           <Route path="/courses/:slug" element={<CourseDetail />} />
           <Route path="/courses/id/:courseId" element={<CourseDetail />} />
           <Route path="/courses/create" element={
@@ -178,6 +181,7 @@ function App() {
               <LearningPaths />
             </ProtectedRoute>
           } />
+          <Route path="/leaderboard" element={<Leaderboard />} />
           <Route path="/learning-analytics" element={
             <ProtectedRoute>
               <LearningAnalytics />

@@ -14,7 +14,8 @@ import { HLSController } from './controllers/hls.controller';
 import { RecommendationController } from './controllers/recommendation.controller';
 import { AdminPathController } from './controllers/admin-path.controller';
 import { AnalyticsController } from './controllers/analytics.controller';
-import { authenticateToken, authenticateOptional } from './middleware/auth.middleware';
+import { authenticateToken, authenticateOptional, requireRole } from './middleware/auth.middleware';
+import { verifyInternalService } from './middleware/internal-auth.middleware';
 import {
   validateLessonComplete,
   validateCourseId,
@@ -64,8 +65,8 @@ app.get('/api/learning/progress/course/:courseId/students/:userId', validateCour
 app.post('/api/learning/progress/:courseId/:lessonId/complete', authenticateToken, validateLessonComplete, handleValidationErrors, ProgressController.markLessonComplete);
 app.post('/api/learning/courses/:courseId/enroll', authenticateToken, validateCourseId, handleValidationErrors, ProgressController.enrollInCourse);
 
-// Internal routes (Service-to-service)
-app.post('/api/learning/internal/courses/:courseId/enroll', validateCourseId, handleValidationErrors, ProgressController.enrollInCourseInternal);
+// Internal routes (Service-to-service, requires internal token)
+app.post('/api/learning/internal/courses/:courseId/enroll', verifyInternalService, validateCourseId, handleValidationErrors, ProgressController.enrollInCourseInternal);
 
 // Certificate routes
 app.post('/api/learning/certificates/:courseId/generate', authenticateToken, validateCourseId, handleValidationErrors, CertificateController.generateCertificate);
@@ -73,6 +74,9 @@ app.get('/api/learning/certificates/me', authenticateToken, validatePagination, 
 app.get('/api/learning/certificates/verify/:certificateNumber', CertificateController.verifyCertificate);
 app.get('/api/learning/certificates/:certificateId/detail', authenticateToken, CertificateController.getCertificateDetail);
 app.get('/api/learning/certificates/:certificateId/download', authenticateToken, CertificateController.downloadCertificate);
+
+// Admin: revoke certificate (blockchain-first)
+app.patch('/api/learning/certificates/:certificateId/revoke', authenticateToken, requireRole(['ADMIN']), CertificateController.revokeCertificate);
 
 // Badge routes
 app.get('/api/learning/badges/me', authenticateToken, BadgeController.getUserBadges);
@@ -212,6 +216,42 @@ app.get('/api/learning/skill-profile/me/summary', authenticateToken, FinalProjec
 app.post('/api/learning/skill-profile/me/gap-analysis', authenticateToken, FinalProjectController.getSkillGapAnalysis);
 app.get('/api/learning/internal/skill-profile/:userId', FinalProjectController.getSkillProfileInternal); // Internal — no auth
 
+// ==================== Monthly Leaderboard & Reward Points Routes ====================
+import { LeaderboardController } from './controllers/leaderboard.controller';
+import { AdminLeaderboardController } from './controllers/admin-leaderboard.controller';
+
+// Learner endpoints
+app.get('/api/learning/leaderboard/current', authenticateOptional, LeaderboardController.getCurrentLeaderboard);
+app.get('/api/learning/leaderboard/history', authenticateOptional, LeaderboardController.getHistoryLeaderboard);
+app.get('/api/learning/leaderboard/me', authenticateToken, LeaderboardController.getMyRank);
+app.get('/api/learning/leaderboard/me/breakdown', authenticateToken, LeaderboardController.getMyBreakdown);
+app.get('/api/learning/leaderboard/months', authenticateOptional, LeaderboardController.getAvailableMonths);
+
+// Reward points & course redemption endpoints
+app.get('/api/learning/reward-points/me', authenticateToken, LeaderboardController.getMyRewardPoints);
+app.get('/api/learning/reward-points/transactions', authenticateToken, LeaderboardController.getRewardTransactions);
+app.post('/api/learning/reward-points/redeem', authenticateToken, LeaderboardController.redeemCourse);
+
+// Admin Leaderboard management endpoints (ADMIN only)
+app.get('/api/learning/admin/leaderboard/overview', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getOverview);
+app.post('/api/learning/admin/leaderboard/finalize', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.manualFinalize);
+app.post('/api/learning/admin/leaderboard/sync-completions', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.syncCompletions);
+app.get('/api/learning/admin/leaderboard/student-detail/:userId', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getStudentAudit);
+app.post('/api/learning/admin/leaderboard/flag-record', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.flagRecord);
+app.post('/api/learning/admin/leaderboard/adjust-points', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.adjustPoints);
+app.get('/api/learning/admin/leaderboard/audit-logs', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getAuditLogs);
+app.get('/api/learning/admin/leaderboard/reward-transactions', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getRewardTransactions);
+
+// Admin route aliases under /api/learning/leaderboard/admin/*
+app.get('/api/learning/leaderboard/admin/overview', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getOverview);
+app.post('/api/learning/leaderboard/admin/finalize', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.manualFinalize);
+app.post('/api/learning/leaderboard/admin/sync-completions', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.syncCompletions);
+app.get('/api/learning/leaderboard/admin/student-detail/:userId', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getStudentAudit);
+app.post('/api/learning/leaderboard/admin/flag-record', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.flagRecord);
+app.post('/api/learning/leaderboard/admin/adjust-points', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.adjustPoints);
+app.get('/api/learning/leaderboard/admin/audit-logs', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getAuditLogs);
+app.get('/api/learning/leaderboard/admin/reward-transactions', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getRewardTransactions);
+
 // ==================== Learner Analysis Routes ====================
 import { LearnerAnalysisController } from './controllers/learner-analysis.controller';
 app.get('/api/learning/learner-analysis/me', authenticateToken, LearnerAnalysisController.getMyProfile);
@@ -255,6 +295,12 @@ try {
 HLSQueueService.resumePendingJobs().catch((err) => {
   logger.error('Failed to resume HLS processing jobs:', err);
 });
+
+// Initialize blockchain certificate verification
+import { validateBlockchainConfig } from './config/blockchain.config';
+import { startBlockchainRetryJob } from './jobs/blockchain-retry.job';
+validateBlockchainConfig();
+startBlockchainRetryJob();
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   logger.error('Unhandled error:', err);

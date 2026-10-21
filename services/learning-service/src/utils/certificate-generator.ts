@@ -26,7 +26,7 @@ export interface CertificateData {
 }
 
 export class CertificateGenerator {
-  static async generate(data: CertificateData): Promise<string> {
+  static async generate(data: CertificateData): Promise<{ filename: string; pdfBuffer: Buffer }> {
     try {
       const filename = `${data.certificateNumber}.pdf`;
       const isPathCert = data.type === 'PATH_CERTIFICATE';
@@ -35,12 +35,15 @@ export class CertificateGenerator {
       const qrCodeDataUrl = await QRCode.toDataURL(data.verificationUrl);
       const doc = new PDFDocument({ size: 'A4', layout: 'landscape' });
       
+      let capturedPdfData: Buffer = Buffer.alloc(0);
+      
       const uploadPromise = new Promise<void>((resolve, reject) => {
         const buffers: Buffer[] = [];
         doc.on('data', buffers.push.bind(buffers));
         doc.on('end', async () => {
           try {
             const pdfData = Buffer.concat(buffers);
+            capturedPdfData = pdfData;
             await minioInternalClient.putObject(
               BUCKETS.CERTIFICATES, 
               filename, 
@@ -259,7 +262,7 @@ export class CertificateGenerator {
 
       await uploadPromise;
       logger.info(`Certificate generated and uploaded to MinIO: ${filename}`);
-      return filename;
+      return { filename, pdfBuffer: capturedPdfData };
     } catch (error) {
       logger.error('Certificate generation error:', error);
       throw new Error('Failed to generate certificate');

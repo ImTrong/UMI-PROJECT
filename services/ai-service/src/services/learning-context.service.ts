@@ -649,4 +649,233 @@ export class LearningContextService {
       return null;
     }
   }
+
+  // ==================== Page-Aware Review Context ====================
+
+  /**
+   * Fetch course review context for AI prompt injection
+   * Returns aggregate data only (no raw comments)
+   */
+  static async fetchCourseReviewContext(courseId: string): Promise<{
+    courseTitle: string;
+    courseLevel: string;
+    courseCategory: string;
+    rating: number;
+    totalReviews: number;
+    enrolledCount: number;
+    ratingDistribution: Record<number, number>;
+    instructorId: string;
+  } | null> {
+    try {
+      const courseUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3003';
+
+      // Fetch course info and rating distribution in parallel
+      const [courseRes, distRes] = await Promise.all([
+        axios.get(`${courseUrl}/api/courses/${courseId}`, { timeout: 5000 }),
+        axios.get(`${courseUrl}/api/courses/${courseId}/reviews/distribution`, { timeout: 5000 }),
+      ]);
+
+      const course = courseRes.data?.data || courseRes.data;
+      const distribution = distRes.data?.data || distRes.data || {};
+
+      if (!course) return null;
+
+      return {
+        courseTitle: course.title || '',
+        courseLevel: course.level || 'N/A',
+        courseCategory: course.category?.name || '',
+        rating: course.rating || 0,
+        totalReviews: course.totalReviews || 0,
+        enrolledCount: course.enrolledCount || 0,
+        ratingDistribution: distribution,
+        instructorId: course.instructorId || '',
+      };
+    } catch (err: any) {
+      logger.warn(`Failed to fetch course review context for ${courseId}: ${err.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch actual review contents for AI sentiment analysis
+   */
+  static async fetchCourseReviews(courseId: string, limit: number = 20): Promise<{
+    courseId: string;
+    reviews: Array<{ rating: number; content: string; createdAt: string }>;
+  } | null> {
+    try {
+      const courseUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3003';
+      
+      const res = await axios.get(`${courseUrl}/api/courses/${courseId}/reviews?limit=${limit}`, { timeout: 5000 });
+      const data = res.data?.data || res.data;
+      
+      if (!data || !data.reviews) return null;
+      
+      // Filter out PII, keep only useful data for AI
+      const filteredReviews = data.reviews
+        .filter((r: any) => r.comment && r.comment.trim() !== '') // only reviews with comments
+        .map((r: any) => ({
+          rating: r.rating,
+          content: r.comment,
+          createdAt: r.createdAt
+        }));
+
+      return {
+        courseId,
+        reviews: filteredReviews
+      };
+    } catch (err: any) {
+      logger.warn(`Failed to fetch course reviews for ${courseId}: ${err.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch instructor review context for AI prompt injection
+   * Aggregated from all courses of the instructor
+   */
+  static async fetchInstructorReviewContext(instructorId: string): Promise<{
+    instructorName: string;
+    totalCourses: number;
+    totalStudents: number;
+    totalReviews: number;
+    averageRating: number;
+    ratingDistribution: Record<number, number>;
+  } | null> {
+    try {
+      const courseUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3003';
+      const userUrl = process.env.USER_SERVICE_URL || 'http://user-service:3002';
+
+      // Fetch instructor stats, rating distribution, and profile in parallel
+      const [statsRes, distRes, profileRes] = await Promise.all([
+        axios.get(`${courseUrl}/api/courses/instructor/${instructorId}/stats`, { timeout: 5000 }),
+        axios.get(`${courseUrl}/api/courses/instructor/${instructorId}/rating-distribution`, { timeout: 5000 }),
+        axios.get(`${userUrl}/api/users/${instructorId}/public`, { timeout: 5000 }).catch(() => null),
+      ]);
+
+      const stats = statsRes.data?.data || statsRes.data;
+      const distribution = distRes.data?.data || distRes.data || {};
+      const profile = profileRes?.data?.data || profileRes?.data || null;
+
+      return {
+        instructorName: profile?.fullName || 'Giảng viên',
+        totalCourses: stats?.totalCourses || 0,
+        totalStudents: stats?.totalStudents || 0,
+        totalReviews: stats?.totalReviews || 0,
+        averageRating: stats?.averageRating || 0,
+        ratingDistribution: distribution,
+      };
+    } catch (err: any) {
+      logger.warn(`Failed to fetch instructor review context for ${instructorId}: ${err.message}`);
+      return null;
+    }
+  }
+
+  static async searchCourse(query: string, token: string): Promise<Array<{ id: string; title: string; instructorId: string }> | null> {
+    try {
+      const courseUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3003';
+      const res = await axios.get(`${courseUrl}/api/courses`, {
+        params: { search: query, limit: 5 },
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 5000,
+      });
+
+      const courses = res.data?.data?.courses || res.data?.courses || [];
+      return courses.map((c: any) => ({
+        id: c.id,
+        title: c.title,
+        instructorId: c.instructorId,
+      }));
+    } catch (err: any) {
+      logger.warn(`Failed to search courses for query "${query}": ${err.message}`);
+      return null;
+    }
+  }
+
+  static async searchInstructor(query: string, token: string): Promise<Array<{ id: string; fullName: string }> | null> {
+    try {
+      const userUrl = process.env.USER_SERVICE_URL || 'http://user-service:3002';
+      // using the generic users endpoint to search for instructors
+      const res = await axios.get(`${userUrl}/api/users`, {
+        params: { search: query, role: 'INSTRUCTOR', limit: 5 },
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 5000,
+      });
+
+      const users = res.data?.data?.users || res.data?.users || [];
+      return users.map((u: any) => ({
+        id: u.id,
+        fullName: u.fullName || u.email,
+      }));
+    } catch (err: any) {
+      logger.warn(`Failed to search instructors for query "${query}": ${err.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Build page context string for AI prompt injection
+   * Converts fetched review data into a Markdown text block
+   */
+  static buildPageContextString(pageContext: { type: string; id: string } | null, reviewData: any): string {
+    if (!pageContext || !reviewData) {
+      return '';
+    }
+
+    const lines: string[] = [];
+
+    if (pageContext.type === 'COURSE') {
+      const data = reviewData as {
+        courseTitle: string;
+        courseLevel: string;
+        courseCategory: string;
+        rating: number;
+        totalReviews: number;
+        enrolledCount: number;
+        ratingDistribution: Record<number, number>;
+      };
+
+      lines.push(`\n## Ngữ cảnh trang hiện tại — Khóa học`);
+      lines.push(`- Tên khóa học: "${data.courseTitle}"`);
+      lines.push(`- Danh mục: ${data.courseCategory || 'N/A'}`);
+      lines.push(`- Cấp độ: ${data.courseLevel}`);
+      lines.push(`- Số học viên: ${data.enrolledCount}`);
+      lines.push(`- Đánh giá trung bình: ${data.rating.toFixed(1)}/5`);
+      lines.push(`- Tổng lượt đánh giá: ${data.totalReviews}`);
+
+      if (data.ratingDistribution && Object.keys(data.ratingDistribution).length > 0) {
+        lines.push(`- Phân bố đánh giá:`);
+        for (let i = 5; i >= 1; i--) {
+          const count = data.ratingDistribution[i] || 0;
+          lines.push(`  + ${i} sao: ${count} lượt`);
+        }
+      }
+    } else if (pageContext.type === 'INSTRUCTOR') {
+      const data = reviewData as {
+        instructorName: string;
+        totalCourses: number;
+        totalStudents: number;
+        totalReviews: number;
+        averageRating: number;
+        ratingDistribution: Record<number, number>;
+      };
+
+      lines.push(`\n## Ngữ cảnh trang hiện tại — Giảng viên`);
+      lines.push(`- Tên giảng viên: "${data.instructorName}"`);
+      lines.push(`- Tổng khóa học: ${data.totalCourses}`);
+      lines.push(`- Tổng học viên: ${data.totalStudents}`);
+      lines.push(`- Đánh giá trung bình: ${data.averageRating.toFixed(1)}/5`);
+      lines.push(`- Tổng lượt đánh giá: ${data.totalReviews}`);
+
+      if (data.ratingDistribution && Object.keys(data.ratingDistribution).length > 0) {
+        lines.push(`- Phân bố đánh giá:`);
+        for (let i = 5; i >= 1; i--) {
+          const count = data.ratingDistribution[i] || 0;
+          lines.push(`  + ${i} sao: ${count} lượt`);
+        }
+      }
+    }
+
+    return lines.join('\n');
+  }
 }

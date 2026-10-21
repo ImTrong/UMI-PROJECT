@@ -13,13 +13,31 @@ model Payment {
   orderNumber           String?
   userId                String          @db.ObjectId
   amount                Float
-  currency              String          @default("usd")
+  currency              String          @default("vnd")
   status                PaymentStatus   @default(PENDING)
   type                  PaymentType     @default(COURSE_PURCHASE)
-  stripePaymentIntentId String?         @unique
+  provider              String          @default("stripe") // "stripe" | "payos"
+  stripePaymentIntentId String?
   stripeCustomerId      String?
   paymentMethodId       String?
   clientSecret          String?
+  // PayOS fields — stored as String to avoid BSON Int32 overflow; converted to Number at API boundary
+  payosOrderCode        String?
+  payosPaymentLinkId    String?
+  payosCheckoutUrl      String?
+  payosQrCode           String?
+  // Refund accounting — atomic reservation fields for concurrency-safe refund control
+  refundedTotal         Float           @default(0)  // Total successfully refunded
+  pendingRefundTotal    Float           @default(0)  // Total reserved by pending/processing refunds
+  refundVersion         Int             @default(0)  // Optimistic concurrency control for refund ops
+  // Outbox sync fields
+  orderSynced           Boolean?        @default(false)
+  orderSyncedAt         DateTime?
+  syncAttempts          Int             @default(0)
+  lastSyncAttemptAt     DateTime?
+  lastSyncError         String?
+  syncLockUntil         DateTime?
+  // Common fields
   errorMessage          String?
   metadata              Json            @default("{}")
   createdAt             DateTime        @default(now())
@@ -32,44 +50,60 @@ model Payment {
   @@index([userId])
   @@index([status])
   @@index([type])
+  @@index([orderSynced])
+  @@index([stripePaymentIntentId])
+  @@index([payosOrderCode])
   @@map("payments")
 }
 
 model Refund {
-  id          String       @id @default(auto()) @map("_id") @db.ObjectId
-  paymentId   String       @db.ObjectId
-  orderId     String?      @db.ObjectId
-  orderNumber String?
-  userId      String       @db.ObjectId
-  amount      Float
-  currency    String       @default("usd")
-  reason      String?
-  status      RefundStatus @default(PENDING)
-  stripeRefundId String?
-  errorMessage String?
-  createdAt   DateTime     @default(now())
-  completedAt DateTime?
+  id                String       @id @default(auto()) @map("_id") @db.ObjectId
+  paymentId         String       @db.ObjectId
+  orderId           String?      @db.ObjectId
+  orderNumber       String?
+  userId            String       @db.ObjectId
+  amount            Float
+  actualAmount      Float?
+  currency          String       @default("vnd")
+  reason            String?
+  status            RefundStatus @default(PENDING)
+  stripeRefundId    String?
+  idempotencyKey    String?      @unique // Stripe idempotency key for safe retries
+  transferReference String?      // Mã tham chiếu giao dịch chuyển khoản ngân hàng (FT... / mã GD)
+  confirmedBy       String?      // ID của admin đã xác nhận hoàn tiền thủ công
+  confirmedAt       DateTime?    // Thời điểm admin xác nhận
+  notes             String?      // Ghi chú đối soát hoàn tiền
+  errorMessage      String?
+  createdAt         DateTime     @default(now())
+  completedAt       DateTime?
   
-  payment     Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  payment           Payment      @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   
   @@index([paymentId])
   @@index([orderId])
   @@index([status])
+  @@index([stripeRefundId])
   @@map("refunds")
 }
 
 model StripeEvent {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  stripeEventId String   @unique
-  type          String
-  data          Json
-  processed     Boolean  @default(false)
-  processedAt   DateTime?
-  error         String?
-  createdAt     DateTime @default(now())
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  stripeEventId     String   @unique
+  type              String
+  data              Json
+  processed         Boolean  @default(false)
+  processedAt       DateTime?
+  processAttempts   Int      @default(0)
+  lastProcessedAt   DateTime?
+  processLockUntil  DateTime?  // Distributed lease lock for concurrent workers
+  exhausted         Boolean  @default(false) // True when max attempts reached
+  error             String?
+  createdAt         DateTime @default(now())
   
   @@index([type])
   @@index([processed])
+  @@index([processLockUntil])
+  @@index([exhausted])
   @@map("stripe_events")
 }
 
@@ -78,6 +112,7 @@ enum PaymentStatus {
   PROCESSING
   SUCCEEDED
   FAILED
+  PARTIALLY_REFUNDED
   REFUNDED
   CANCELLED
 }

@@ -19,42 +19,55 @@ model Cart {
 }
 
 model Order {
-  id            String      @id @default(auto()) @map("_id") @db.ObjectId
-  orderNumber   String      @unique
-  userId        String      @db.ObjectId
-  items         Json
-  subtotal      Float
-  discount      Float       @default(0)
-  totalPrice    Float
-  status        OrderStatus @default(PENDING)
-  paymentStatus PaymentStatus @default(UNPAID)
-  paymentId     String?     @db.ObjectId
-  notes         String?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  completedAt   DateTime?
-  cancelledAt   DateTime?
+  id              String        @id @default(auto()) @map("_id") @db.ObjectId
+  orderNumber     String        @unique
+  userId          String        @db.ObjectId
+  items           Json
+  subtotal        Float
+  discount        Float         @default(0)
+  totalPrice      Float
+  status          OrderStatus   @default(PENDING)
+  paymentStatus   PaymentStatus @default(UNPAID)
+  paymentId       String?       @db.ObjectId
+  paymentProvider String?       // "stripe" | "payos"
+  payosOrderCode  String?       // Mã số duy nhất cho payOS (String to avoid Int32 overflow)
+  idempotencyKey  String?       // Chống request trùng
+  paymentMethod   String?       // Phương thức thanh toán đã chọn
+  notes           String?
+  refundableAmount Float?        @default(0) // Số tiền CẦN hoàn
+  refundedAmount   Float?        @default(0) // Số tiền ĐÃ hoàn
+  reconciliationStatus String?   @default("NONE") // "NONE" | "RECONCILIATION_REQUIRED" | "PARTIAL_DUPLICATE_PAYMENT" | "FULL_DUPLICATE_PAYMENT" | "RECONCILED"
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  completedAt     DateTime?
+  cancelledAt     DateTime?
   cancelledReason String?
   
-  orderItems    OrderItem[]
+  orderItems      OrderItem[]
   
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([idempotencyKey])
+  @@index([payosOrderCode])
   @@map("orders")
 }
 
 model OrderItem {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  orderId   String   @db.ObjectId
-  courseId  String   @db.ObjectId
-  courseTitle String
-  price     Float
-  discount  Float    @default(0)
-  finalPrice Float
-  createdAt DateTime @default(now())
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  orderId      String   @db.ObjectId
+  courseId      String   @db.ObjectId
+  courseTitle   String
+  instructorId String?  @db.ObjectId // Snapshot giảng viên tại thời điểm mua
+  price        Float
+  discount     Float    @default(0)
+  finalPrice   Float
+  status       String?  @default("PENDING") // "FULFILLED" | "ALREADY_OWNED_DUPLICATE" | "REFUNDED"
+  refundableAmount Float? @default(0)
+  refundedAmount   Float? @default(0)
+  createdAt    DateTime @default(now())
   
-  order     Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order        Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
   
   @@index([orderId])
   @@index([courseId])

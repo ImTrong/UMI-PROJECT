@@ -130,6 +130,39 @@ export class CertificateController {
     }
   }
 
+  /**
+   * PATCH /api/learning/certificates/:certificateId/revoke
+   * Admin only — revokes a certificate (blockchain-first if applicable)
+   */
+  static async revokeCertificate(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const { certificateId } = req.params;
+      const result = await CertificateService.revokeCertificate(certificateId, req.user.userId);
+      res.status(HTTP_STATUS.OK).json({
+        message: 'Certificate revoked successfully',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Revoke certificate error:', error);
+      if (error.message === 'Certificate not found') {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      if (error.message === 'Certificate is already revoked') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
+      }
+      if (error.message.includes('Blockchain revocation failed')) {
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+          error: error.message,
+          retryable: true,
+        });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to revoke certificate' });
+    }
+  }
+
   static async healthCheck(req: AuthRequest, res: Response) {
     const health = await CertificateService.healthCheck();
     const statusCode = health.database === 'connected' ? HTTP_STATUS.OK : HTTP_STATUS.INTERNAL_SERVER_ERROR;

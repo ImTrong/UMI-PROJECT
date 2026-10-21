@@ -18,10 +18,13 @@ export const validateCreateOrder = [
     .withMessage('Order must have at least one item'),
   body('items.*.courseId')
     .notEmpty()
-    .withMessage('Course ID is required'),
-  body('items.*.price')
-    .isFloat({ min: 0 })
-    .withMessage('Price must be a positive number'),
+    .withMessage('Course ID is required')
+    .matches(/^[0-9a-fA-F]{24}$/)
+    .withMessage('Invalid course ID format'),
+  body('paymentMethod')
+    .optional()
+    .isIn(['stripe', 'payos'])
+    .withMessage('Payment method must be "stripe" or "payos"'),
   body('notes')
     .optional()
     .isString()

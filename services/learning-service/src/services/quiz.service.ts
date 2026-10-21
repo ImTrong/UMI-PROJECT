@@ -1,6 +1,7 @@
 import { PrismaClient, QuizAttemptStatus } from '@prisma/client';
 import { ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+import { CourseAccessService } from './course-access.service';
 
 let fileStorage: any = null;
 try {
@@ -51,11 +52,34 @@ export interface CreateQuizData {
   createdBy: string;
 }
 
+export interface QuizRequester {
+  userId: string;
+  role?: string;
+}
+
+const QUIZ_NOT_FOUND = 'Quiz not found';
+const ATTEMPT_NOT_FOUND = 'Quiz attempt not found';
+
 export class QuizService {
+  /**
+   * Only an admin or the quiz author may see answer keys / all learners' attempts.
+   * Holding the INSTRUCTOR role alone is not enough.
+   */
+  private static canManageQuiz(quiz: { createdBy: string }, requester: QuizRequester): boolean {
+    return requester.role === 'ADMIN' || quiz.createdBy === requester.userId;
+  }
+
   /**
    * Create a quiz for a lesson (Instructor only)
    */
   static async createQuiz(data: CreateQuizData) {
+    // The lesson must really belong to the course the quiz is attached to; the
+    // course access check on every learner endpoint relies on quiz.courseId.
+    const courseLessons = await CourseAccessService.fetchCourseLessons(data.courseId);
+    if (!courseLessons.some((l) => l.id === data.lessonId)) {
+      throw new Error('Lesson does not belong to the specified course');
+    }
+
     // Check if quiz already exists for this lesson
     const existing = await prisma.quiz.findUnique({
       where: { lessonId: data.lessonId },
@@ -111,14 +135,17 @@ export class QuizService {
   /**
    * Get quiz by lesson ID (hides answers for students)
    */
-  static async getQuizByLessonId(lessonId: string, isInstructor: boolean = false) {
+  static async getQuizByLessonId(lessonId: string, requester: QuizRequester) {
     const quiz = await prisma.quiz.findUnique({
       where: { lessonId },
     });
 
-    if (!quiz) throw new Error('Quiz not found');
+    if (!quiz) throw new Error(QUIZ_NOT_FOUND);
 
-    if (!isInstructor) {
+    if (!this.canManageQuiz(quiz, requester)) {
+      // Learners (and non-author instructors) need enrollment in the quiz's course.
+      await CourseAccessService.requireEnrollment(requester.userId, quiz.courseId);
+
       // Strip correct answers and explanations for students
       const questions = (quiz.questions as unknown as QuizQuestion[]).map((q) => ({
         id: q.id,
@@ -139,7 +166,10 @@ export class QuizService {
    */
   static async startQuizAttempt(quizId: string, userId: string) {
     const quiz = await prisma.quiz.findUnique({ where: { id: quizId } });
-    if (!quiz) throw new Error('Quiz not found');
+    if (!quiz) throw new Error(QUIZ_NOT_FOUND);
+
+    // Authorize before reading attempts or creating anything.
+    await CourseAccessService.requireEnrollment(userId, quiz.courseId);
 
     // Check max attempts
     const attemptCount = await prisma.quizAttempt.count({
@@ -188,6 +218,19 @@ export class QuizService {
       },
     });
 
+    // Concurrent starts: the schema has no unique key for an in-progress attempt, so converge
+    // on the earliest one and drop our duplicate (best effort, not a transactional guarantee).
+    const active = await prisma.quizAttempt.findMany({
+      where: { quizId, userId, status: QuizAttemptStatus.IN_PROGRESS },
+      orderBy: [{ startedAt: 'asc' }, { id: 'asc' }],
+    });
+    if (active.length > 1 && active[0].id !== attempt.id) {
+      await prisma.quizAttempt.deleteMany({
+        where: { id: attempt.id, status: QuizAttemptStatus.IN_PROGRESS },
+      });
+      return active[0];
+    }
+
     return attempt;
   }
 
@@ -200,13 +243,34 @@ export class QuizService {
       include: { quiz: true },
     });
 
-    if (!attempt) throw new Error('Quiz attempt not found');
-    if (attempt.userId !== userId) throw new Error(ERROR_MESSAGES.FORBIDDEN);
+    // Someone else's attempt is indistinguishable from a missing one (no ID probing).
+    if (!attempt || attempt.userId !== userId) throw new Error(ATTEMPT_NOT_FOUND);
+
+    const quiz = attempt.quiz;
+
+    // Authorize on the server for every submit, independent of how the attempt was created.
+    await CourseAccessService.requireEnrollment(userId, quiz.courseId);
+
     if (attempt.status !== QuizAttemptStatus.IN_PROGRESS) {
       throw new Error('This quiz attempt has already been submitted');
     }
 
-    const quiz = attempt.quiz;
+    if (!Array.isArray(answers) || answers.some((a) => !a || !Array.isArray(a.selectedOptionIds))) {
+      throw new Error('Invalid answers payload');
+    }
+
+    // Enforce the existing attempt limit at submit time too (guards duplicate in-progress attempts).
+    const otherFinished = await prisma.quizAttempt.count({
+      where: {
+        quizId: quiz.id,
+        userId,
+        id: { not: attemptId },
+        status: { in: [QuizAttemptStatus.SUBMITTED, QuizAttemptStatus.TIMED_OUT] },
+      },
+    });
+    if (otherFinished >= quiz.maxAttempts) {
+      throw new Error(`Maximum attempts (${quiz.maxAttempts}) reached`);
+    }
 
     // Check time limit
     if (quiz.timeLimitMinutes) {
@@ -244,8 +308,9 @@ export class QuizService {
     const passed = score >= quiz.passingScore;
     const timeTaken = Math.floor((Date.now() - attempt.startedAt.getTime()) / 1000);
 
-    const updatedAttempt = await prisma.quizAttempt.update({
-      where: { id: attemptId },
+    // Atomic claim: only one concurrent submit can move IN_PROGRESS -> SUBMITTED.
+    const claimed = await prisma.quizAttempt.updateMany({
+      where: { id: attemptId, userId, status: QuizAttemptStatus.IN_PROGRESS },
       data: {
         answers: answers as any,
         score,
@@ -256,6 +321,10 @@ export class QuizService {
         timeTakenSeconds: timeTaken,
       },
     });
+    if (claimed.count !== 1) {
+      throw new Error('This quiz attempt has already been submitted');
+    }
+    const updatedAttempt = await prisma.quizAttempt.findUniqueOrThrow({ where: { id: attemptId } });
 
     logger.info(`Quiz submitted: attempt ${attemptId}, score ${score.toFixed(1)}%, passed: ${passed}`);
 
@@ -310,6 +379,10 @@ export class QuizService {
    * Get quiz attempts for a user
    */
   static async getUserAttempts(quizId: string, userId: string) {
+    const quiz = await prisma.quiz.findUnique({ where: { id: quizId }, select: { courseId: true } });
+    if (!quiz) throw new Error(QUIZ_NOT_FOUND);
+    await CourseAccessService.requireEnrollment(userId, quiz.courseId);
+
     return prisma.quizAttempt.findMany({
       where: { quizId, userId },
       orderBy: { startedAt: 'desc' },
@@ -319,7 +392,11 @@ export class QuizService {
   /**
    * Get all attempts for a quiz (Instructor)
    */
-  static async getAllAttempts(quizId: string, page: number = 1, limit: number = 20) {
+  static async getAllAttempts(quizId: string, requester: QuizRequester, page: number = 1, limit: number = 20) {
+    const quiz = await prisma.quiz.findUnique({ where: { id: quizId } });
+    if (!quiz) throw new Error(QUIZ_NOT_FOUND);
+    if (!this.canManageQuiz(quiz, requester)) throw new Error(ERROR_MESSAGES.FORBIDDEN);
+
     const skip = (page - 1) * limit;
 
     const [attempts, total] = await Promise.all([

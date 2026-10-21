@@ -187,4 +187,55 @@ export class ReviewController {
       });
     }
   }
+
+  // ==================== Instructor Rating tổng hợp ====================
+
+  static async getInstructorStats(req: AuthRequest, res: Response) {
+    try {
+      const { instructorId } = req.params;
+      const stats = await ReviewService.getInstructorStats(instructorId);
+
+      res.status(HTTP_STATUS.OK).json({
+        data: stats,
+      });
+    } catch (error: any) {
+      logger.error('Get instructor stats error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to get instructor stats',
+      });
+    }
+  }
+
+  static async getInstructorReviews(req: AuthRequest, res: Response) {
+    try {
+      const { instructorId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 10;
+
+      const result = await ReviewService.getInstructorReviews(instructorId, page, limit);
+
+      res.status(HTTP_STATUS.OK).json(result);
+    } catch (error: any) {
+      logger.error('Get instructor reviews error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to get instructor reviews',
+      });
+    }
+  }
+
+  static async getInstructorRatingDistribution(req: AuthRequest, res: Response) {
+    try {
+      const { instructorId } = req.params;
+      const distribution = await ReviewService.getInstructorRatingDistribution(instructorId);
+
+      res.status(HTTP_STATUS.OK).json({
+        data: distribution,
+      });
+    } catch (error: any) {
+      logger.error('Get instructor rating distribution error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to get instructor rating distribution',
+      });
+    }
+  }
 }

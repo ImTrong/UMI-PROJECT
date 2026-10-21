@@ -60,14 +60,14 @@ export class CourseExamService {
     const totalQuizzes = quizzes.length;
     const completedQuizzes = quizResults.filter((q) => q.attempts > 0).length;
 
-    // Average of best scores across all quizzes
+    // Average of best scores across all quizzes (null if course has no quizzes)
     const averageQuizScore =
-      completedQuizzes > 0
+      totalQuizzes > 0 && completedQuizzes > 0
         ? quizResults.reduce((sum, q) => sum + q.bestScore, 0) / totalQuizzes
-        : 0;
+        : (totalQuizzes === 0 ? null : 0);
 
     const passingScore = courseProgress.passingScore ?? 80;
-    const passed = courseProgress.progressPercentage >= 100 && averageQuizScore >= passingScore;
+    const passed = courseProgress.progressPercentage >= 100 && (totalQuizzes === 0 || (averageQuizScore != null && averageQuizScore >= passingScore));
 
     // Update course progress with exam result
     if (courseProgress.progressPercentage >= 100 && courseProgress.passed === null) {
@@ -84,7 +84,7 @@ export class CourseExamService {
     return {
       courseId,
       courseTitle: courseProgress.courseTitle,
-      averageQuizScore: Math.round(averageQuizScore * 100) / 100,
+      averageQuizScore: averageQuizScore != null ? Math.round(averageQuizScore * 100) / 100 : null,
       passingScore,
       passed,
       totalQuizzes,

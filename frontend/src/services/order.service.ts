@@ -35,6 +35,9 @@ export interface Order {
   status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
   paymentStatus: 'UNPAID' | 'PAID' | 'REFUNDED' | 'FAILED';
   paymentId?: string;
+  paymentMethod?: string;
+  paymentProvider?: string;
+  payosOrderCode?: string | number;
   notes?: string;
   createdAt: string;
   updatedAt: string;
@@ -51,6 +54,8 @@ export interface CreateOrderData {
     discount?: number;
   }[];
   notes?: string;
+  paymentMethod?: 'stripe' | 'payos';
+  idempotencyKey?: string;
 }
 
 export interface OrderFilters {
@@ -83,6 +88,9 @@ export interface CreateOrderResponse {
     currency: string;
     status: string;
   } | null;
+  payosPaymentUrl?: string;
+  payosQrCode?: string;
+  payosOrderCode?: string | number;
 }
 
 export const orderService = {
@@ -112,9 +120,20 @@ export const orderService = {
     return response.data.data;
   },
 
-  // Orders
   async createOrder(data: CreateOrderData): Promise<CreateOrderResponse> {
     const response = await orderApi.post('/api/orders', data);
+    return response.data.data;
+  },
+
+  async initiatePayosPayment(orderId: string, regenerate: boolean = false): Promise<{
+    orderId: string;
+    orderNumber: string;
+    orderCode: number;
+    amount: number;
+    checkoutUrl: string;
+    qrCode: string;
+  }> {
+    const response = await orderApi.post(`/api/orders/${orderId}/payos-payment`, { regenerate });
     return response.data.data;
   },
 

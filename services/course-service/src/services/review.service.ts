@@ -83,8 +83,11 @@ export class ReviewService {
       prisma.review.count({ where: { courseId } }),
     ]);
 
+    // Enrich reviews with user info from user-service
+    const enrichedReviews = await this.enrichReviewsWithUserInfo(reviews);
+
     return {
-      reviews,
+      reviews: enrichedReviews,
       pagination: {
         page,
         limit,
@@ -220,5 +223,134 @@ export class ReviewService {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  // ==================== Instructor Rating (Tổng hợp từ CourseReview) ====================
+
+  // Helper: Enrich reviews with user info from user-service
+  private static async enrichReviewsWithUserInfo(reviews: any[]) {
+    if (reviews.length === 0) return reviews;
+
+    const userIds = [...new Set(reviews.map(r => r.userId))];
+    let userMap: Record<string, { fullName: string; avatar?: string }> = {};
+
+    try {
+      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3001';
+      const userRes = await axios.post(`${userServiceUrl}/api/users/batch`, { ids: userIds });
+      const users = userRes.data.data || [];
+      userMap = users.reduce((acc: any, u: any) => ({
+        ...acc,
+        [u.userId]: { fullName: u.fullName, avatar: u.avatar },
+      }), {});
+    } catch (error) {
+      logger.error('Failed to fetch user info for reviews:', error);
+    }
+
+    return reviews.map(review => ({
+      ...review,
+      user: userMap[review.userId] || { fullName: 'Ẩn danh', avatar: null },
+    }));
+  }
+
+  // Instructor Stats: rating trung bình, tổng review, tổng học viên, tổng khóa
+  static async getInstructorStats(instructorId: string) {
+    const courses = await prisma.course.findMany({
+      where: { instructorId, published: true },
+      select: {
+        id: true,
+        enrolledCount: true,
+        rating: true,
+        totalReviews: true,
+      },
+    });
+
+    const totalCourses = courses.length;
+    const totalStudents = courses.reduce((sum, c) => sum + c.enrolledCount, 0);
+    const totalReviews = courses.reduce((sum, c) => sum + c.totalReviews, 0);
+
+    // Weighted average rating
+    const averageRating = totalReviews > 0
+      ? courses.reduce((sum, c) => sum + c.rating * c.totalReviews, 0) / totalReviews
+      : 0;
+
+    return {
+      totalCourses,
+      totalStudents,
+      totalReviews,
+      averageRating: Math.round(averageRating * 100) / 100,
+    };
+  }
+
+  // Instructor Reviews: tất cả course reviews từ các khóa của instructor
+  static async getInstructorReviews(instructorId: string, page: number = 1, limit: number = 10) {
+    const skip = (page - 1) * limit;
+
+    // Lấy tất cả courseIds của instructor
+    const courses = await prisma.course.findMany({
+      where: { instructorId, published: true },
+      select: { id: true, title: true, slug: true },
+    });
+
+    const courseIds = courses.map(c => c.id);
+    const courseMap = courses.reduce((acc: any, c) => ({ ...acc, [c.id]: { title: c.title, slug: c.slug } }), {});
+
+    if (courseIds.length === 0) {
+      return { reviews: [], pagination: { page, limit, total: 0, totalPages: 0 } };
+    }
+
+    const [reviews, total] = await Promise.all([
+      prisma.review.findMany({
+        where: { courseId: { in: courseIds } },
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.review.count({ where: { courseId: { in: courseIds } } }),
+    ]);
+
+    // Enrich with user info and course info
+    const enrichedReviews = await this.enrichReviewsWithUserInfo(reviews);
+    const finalReviews = enrichedReviews.map(r => ({
+      ...r,
+      course: courseMap[r.courseId] || null,
+    }));
+
+    return {
+      reviews: finalReviews,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  // Instructor Rating Distribution: phân bố tổng hợp từ tất cả courses
+  static async getInstructorRatingDistribution(instructorId: string) {
+    const courses = await prisma.course.findMany({
+      where: { instructorId, published: true },
+      select: { id: true },
+    });
+
+    const courseIds = courses.map(c => c.id);
+
+    if (courseIds.length === 0) {
+      return { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    }
+
+    const distribution = await prisma.review.groupBy({
+      by: ['rating'],
+      where: { courseId: { in: courseIds } },
+      _count: true,
+    });
+
+    const result: { [key: number]: number } = {};
+    for (let i = 1; i <= 5; i++) {
+      const found = distribution.find(d => d.rating === i);
+      result[i] = found ? found._count : 0;
+    }
+
+    return result;
   }
 }

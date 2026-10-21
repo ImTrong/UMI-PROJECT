@@ -6,6 +6,7 @@ import { CourseController } from './controllers/course.controller';
 import { LessonController } from './controllers/lesson.controller';
 import { ReviewController } from './controllers/review.controller';
 import { CategoryController } from './controllers/category.controller';
+import { CourseService } from './services/course.service';
 import { authenticateToken, requireRole, requireInstructorOrAdmin, authenticateOptional } from './middleware/auth.middleware';
 import {
   validateCreateCourse,
@@ -117,6 +118,23 @@ app.post('/api/courses/:courseId/reject', authenticateToken, requireRole(['ADMIN
 app.get('/api/courses/instructor/dashboard', authenticateToken, requireInstructorOrAdmin, CourseController.getInstructorDashboard);
 app.get('/api/courses/instructor/:courseId/students', authenticateToken, requireInstructorOrAdmin, validateCourseId, handleValidationErrors, CourseController.getCourseStudents);
 app.get('/api/courses/instructor/:courseId/students/:studentId', authenticateToken, requireInstructorOrAdmin, validateCourseId, handleValidationErrors, CourseController.getCourseStudentDetail);
+
+// Instructor Public Profile routes (no auth required - marketplace style)
+app.get('/api/courses/instructor/:instructorId/stats', ReviewController.getInstructorStats);
+app.get('/api/courses/instructor/:instructorId/reviews', ReviewController.getInstructorReviews);
+app.get('/api/courses/instructor/:instructorId/rating-distribution', ReviewController.getInstructorRatingDistribution);
+app.get('/api/courses/instructor/:instructorId/public-courses', async (req, res) => {
+  try {
+    const { instructorId } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+
+    const result = await CourseService.getAllCourses(page, limit, { instructorId });
+    res.status(200).json(result);
+  } catch (error: any) {
+    res.status(500).json({ error: 'Failed to get instructor courses' });
+  }
+});
 
 app.get('/api/courses/slug/:slug', authenticateOptional, CourseController.getCourseBySlug);
 

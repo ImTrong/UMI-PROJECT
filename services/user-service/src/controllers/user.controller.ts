@@ -62,6 +62,30 @@ export class UserController {
     }
   }
 
+  static async getPublicProfile(req: AuthRequest, res: Response) {
+    try {
+      const { userId } = req.params;
+
+      const publicProfile = await UserService.getPublicProfile(userId);
+
+      res.status(HTTP_STATUS.OK).json({
+        data: publicProfile,
+      });
+    } catch (error: any) {
+      logger.error('Get public profile error:', error);
+
+      if (error.message === ERROR_MESSAGES.USER_NOT_FOUND) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({
+          error: error.message,
+        });
+      }
+
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to get public profile',
+      });
+    }
+  }
+
   static async getBatchUsers(req: AuthRequest, res: Response) {
     try {
       const { ids } = req.body;

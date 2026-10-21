@@ -4,10 +4,32 @@ import logger from '../utils/logger';
 const ZERO_DECIMAL_CURRENCIES = ['bif', 'clp', 'djf', 'gnf', 'jpy', 'kmf', 'krw', 'mga', 'pyg', 'rwf', 'ugx', 'vnd', 'vuv', 'xaf', 'xof', 'xpf'];
 const isZeroDecimal = (currency: string) => ZERO_DECIMAL_CURRENCIES.includes(currency.toLowerCase());
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2023-10-16',
-  maxNetworkRetries: 3,
-});
+function isPlaceholder(value?: string): boolean {
+  if (!value) return true;
+  const v = value.trim().toLowerCase();
+  return (
+    v.startsWith('your_') ||
+    v.includes('placeholder') ||
+    v === 'xxx' ||
+    v === 'changeme'
+  );
+}
+
+let stripeInstance: Stripe | null = null;
+
+function getStripe(): Stripe {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key || isPlaceholder(key)) {
+    throw new Error('Stripe secret key is not configured or using placeholder value. Set real STRIPE_SECRET_KEY.');
+  }
+  if (!stripeInstance) {
+    stripeInstance = new Stripe(key, {
+      apiVersion: '2023-10-16',
+      maxNetworkRetries: 3,
+    });
+  }
+  return stripeInstance;
+}
 
 export interface CreatePaymentIntentData {
   amount: number;
@@ -27,8 +49,14 @@ export interface PaymentIntentResult {
 }
 
 export class StripeService {
+  static isConfigured(): boolean {
+    const key = process.env.STRIPE_SECRET_KEY;
+    return !!key && !isPlaceholder(key);
+  }
+
   static async createPaymentIntent(data: CreatePaymentIntentData): Promise<PaymentIntentResult> {
     try {
+      const stripe = getStripe();
       const paymentIntent = await stripe.paymentIntents.create({
         amount: isZeroDecimal(data.currency) ? Math.round(data.amount) : Math.round(data.amount * 100),
         currency: data.currency.toLowerCase(),
@@ -58,7 +86,7 @@ export class StripeService {
 
   static async confirmPayment(paymentIntentId: string, paymentMethodId: string) {
     try {
-      const paymentIntent = await stripe.paymentIntents.confirm(paymentIntentId, {
+      const paymentIntent = await getStripe().paymentIntents.confirm(paymentIntentId, {
         payment_method: paymentMethodId,
       });
 
@@ -79,7 +107,7 @@ export class StripeService {
 
   static async getPaymentIntent(paymentIntentId: string) {
     try {
-      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      const paymentIntent = await getStripe().paymentIntents.retrieve(paymentIntentId);
 
       return {
         id: paymentIntent.id,
@@ -95,22 +123,32 @@ export class StripeService {
     }
   }
 
-  static async refundPayment(paymentIntentId: string, amount?: number, reason?: string, currency?: string) {
+  static async refundPayment(paymentIntentId: string, amount?: number, reason?: string, currency?: string, idempotencyKey?: string) {
     try {
       let refundAmount: number | undefined;
-      if (amount && currency) {
-        refundAmount = isZeroDecimal(currency) ? Math.round(amount) : Math.round(amount * 100);
-      } else if (amount) {
-        refundAmount = Math.round(amount * 100);
+      if (amount) {
+        // Luôn sử dụng currency để xác định cách chuyển đổi.
+        // VND là zero-decimal: Stripe nhận amount = giá trị thực (VD: 100000 cho 100.000₫).
+        // USD cần nhân 100: Stripe nhận amount in cents.
+        const effectiveCurrency = currency || 'vnd'; // Mặc định VND
+        refundAmount = isZeroDecimal(effectiveCurrency) ? Math.round(amount) : Math.round(amount * 100);
       }
 
-      const refund = await stripe.refunds.create({
+      const createParams: Stripe.RefundCreateParams = {
         payment_intent: paymentIntentId,
         amount: refundAmount,
         reason: reason as Stripe.RefundCreateParams.Reason,
-      });
+      };
 
-      logger.info(`Refund created: ${refund.id} for payment: ${paymentIntentId}`);
+      // A.4: Pass idempotency key for safe retries
+      const requestOptions: Stripe.RequestOptions = {};
+      if (idempotencyKey) {
+        requestOptions.idempotencyKey = idempotencyKey;
+      }
+
+      const refund = await getStripe().refunds.create(createParams, requestOptions);
+
+      logger.info(`Refund created: ${refund.id} for payment: ${paymentIntentId}${idempotencyKey ? ` (idem: ${idempotencyKey})` : ''}`);
 
       return {
         id: refund.id,
@@ -126,7 +164,7 @@ export class StripeService {
 
   static async cancelPaymentIntent(paymentIntentId: string) {
     try {
-      const paymentIntent = await stripe.paymentIntents.cancel(paymentIntentId);
+      const paymentIntent = await getStripe().paymentIntents.cancel(paymentIntentId);
 
       logger.info(`Payment intent cancelled: ${paymentIntentId}`);
 
@@ -142,7 +180,7 @@ export class StripeService {
 
   static async createCustomer(email: string, name?: string, metadata?: Record<string, string>) {
     try {
-      const customer = await stripe.customers.create({
+      const customer = await getStripe().customers.create({
         email,
         name,
         metadata,

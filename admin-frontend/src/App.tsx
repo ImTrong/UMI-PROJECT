@@ -12,6 +12,7 @@ import AdminCategories from './pages/AdminCategories';
 import AdminCourses from './pages/AdminCourses';
 import AdminLearningPaths from './pages/admin/AdminLearningPaths';
 import AdminLearningPathForm from './pages/admin/AdminLearningPathForm';
+import AdminLeaderboard from './pages/admin/AdminLeaderboard';
 
 function App() {
   const { isAuthenticated, loading, user } = useAuth();
@@ -94,6 +95,12 @@ function App() {
         <Route path="/admin/learning-paths/:id/edit" element={
           <ProtectedRoute requiredRole="ADMIN">
             <AdminLearningPathForm />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/admin/leaderboard" element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminLeaderboard />
           </ProtectedRoute>
         } />
       </Route>

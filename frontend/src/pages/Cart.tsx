@@ -67,7 +67,7 @@ export default function Cart() {
     }
   };
 
-  const handleCheckout = async (notes: string) => {
+  const handleCheckout = async (notes: string, paymentMethod: 'stripe' | 'payos' = 'payos') => {
     const itemsToCheckout = items.filter(item => selectedItems.has(item.courseId));
     
     if (itemsToCheckout.length === 0) {
@@ -84,6 +84,7 @@ export default function Cart() {
           price: item.price,
         })),
         notes,
+        paymentMethod,
       });
       toast.success('Tạo đơn hàng thành công! Đang chuyển đến thanh toán...');
       navigate(`/checkout/${result.order.id}`);

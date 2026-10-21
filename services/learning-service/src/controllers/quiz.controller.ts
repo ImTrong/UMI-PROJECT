@@ -1,8 +1,19 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { QuizService } from '../services/quiz.service';
+import { CourseAccessError } from '../services/course-access.service';
 import { HTTP_STATUS, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+
+const NOT_FOUND_MESSAGES = ['Quiz not found', 'Quiz attempt not found'];
+
+/** Map access/ownership failures to proper HTTP statuses; null if the error is not one of them. */
+const accessErrorStatus = (error: any): number | null => {
+  if (error instanceof CourseAccessError) return error.statusCode;
+  if (error?.message === ERROR_MESSAGES.FORBIDDEN) return HTTP_STATUS.FORBIDDEN;
+  if (NOT_FOUND_MESSAGES.includes(error?.message)) return HTTP_STATUS.NOT_FOUND;
+  return null;
+};
 
 export class QuizController {
   static async createQuiz(req: AuthRequest, res: Response) {
@@ -31,6 +42,7 @@ export class QuizController {
       res.status(HTTP_STATUS.CREATED).json({ message: 'Quiz created successfully', data: quiz });
     } catch (error: any) {
       logger.error('Create quiz error:', error);
+      if (error instanceof CourseAccessError) return res.status(error.statusCode).json({ error: error.message });
       res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
     }
   }
@@ -43,21 +55,22 @@ export class QuizController {
       res.status(HTTP_STATUS.OK).json({ message: 'Quiz updated', data: quiz });
     } catch (error: any) {
       logger.error('Update quiz error:', error);
+      const status = accessErrorStatus(error);
+      if (status) return res.status(status).json({ error: error.message });
       res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
     }
   }
 
   static async getQuizByLesson(req: AuthRequest, res: Response) {
     try {
+      if (!req.user) return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       const { lessonId } = req.params;
-      const isInstructor = req.user?.role === 'INSTRUCTOR' || req.user?.role === 'ADMIN';
-      const quiz = await QuizService.getQuizByLessonId(lessonId, isInstructor);
+      const quiz = await QuizService.getQuizByLessonId(lessonId, { userId: req.user.userId, role: req.user.role });
       res.status(HTTP_STATUS.OK).json({ data: quiz });
     } catch (error: any) {
       logger.error('Get quiz error:', error);
-      if (error.message === 'Quiz not found') {
-        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
-      }
+      const status = accessErrorStatus(error);
+      if (status) return res.status(status).json({ error: error.message });
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get quiz' });
     }
   }
@@ -70,6 +83,8 @@ export class QuizController {
       res.status(HTTP_STATUS.CREATED).json({ data: attempt });
     } catch (error: any) {
       logger.error('Start quiz attempt error:', error);
+      const status = accessErrorStatus(error);
+      if (status) return res.status(status).json({ error: error.message });
       res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
     }
   }
@@ -83,6 +98,8 @@ export class QuizController {
       res.status(HTTP_STATUS.OK).json({ message: 'Quiz submitted', data: result });
     } catch (error: any) {
       logger.error('Submit quiz error:', error);
+      const status = accessErrorStatus(error);
+      if (status) return res.status(status).json({ error: error.message });
       res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
     }
   }
@@ -95,6 +112,8 @@ export class QuizController {
       res.status(HTTP_STATUS.OK).json({ data: attempts });
     } catch (error: any) {
       logger.error('Get user attempts error:', error);
+      const status = accessErrorStatus(error);
+      if (status) return res.status(status).json({ error: error.message });
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get attempts' });
     }
   }
@@ -108,10 +127,12 @@ export class QuizController {
       const { quizId } = req.params;
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
-      const result = await QuizService.getAllAttempts(quizId, page, limit);
+      const result = await QuizService.getAllAttempts(quizId, { userId: req.user.userId, role: req.user.role }, page, limit);
       res.status(HTTP_STATUS.OK).json(result);
     } catch (error: any) {
       logger.error('Get all attempts error:', error);
+      const status = accessErrorStatus(error);
+      if (status) return res.status(status).json({ error: error.message });
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get attempts' });
     }
   }

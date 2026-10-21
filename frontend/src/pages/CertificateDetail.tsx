@@ -4,7 +4,7 @@ import { learningService, Certificate } from '../services/learning.service';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
-import { FiDownload, FiShare2, FiArrowLeft, FiCheckCircle, FiXCircle, FiClock, FiAward, FiExternalLink } from 'react-icons/fi';
+import { FiDownload, FiShare2, FiArrowLeft, FiCheckCircle, FiXCircle, FiClock, FiAward, FiExternalLink, FiShield } from 'react-icons/fi';
 
 export default function CertificateDetail() {
   const { certificateId } = useParams<{ certificateId: string }>();
@@ -66,6 +66,7 @@ export default function CertificateDetail() {
   const isExpired = certificate.expiresAt && new Date(certificate.expiresAt) < new Date();
   const isValid = certificate.isVerified && !isExpired;
   const isPathCert = certificate.type === 'PATH_CERTIFICATE';
+  const blockchainStatus = certificate.metadata?.blockchain?.status;
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -130,6 +131,25 @@ export default function CertificateDetail() {
                 {isValid ? <FiCheckCircle size={14} /> : <FiXCircle size={14} />}
                 <span>{isValid ? 'Đã xác minh' : 'Đã thu hồi'}</span>
               </div>
+              {/* Blockchain badge */}
+              {blockchainStatus === 'CONFIRMED' && (
+                <div className="flex items-center gap-2 text-sm px-4 py-2 rounded-full bg-purple-50 text-purple-600">
+                  <FiShield size={14} />
+                  <span>Blockchain Verified</span>
+                </div>
+              )}
+              {blockchainStatus === 'PENDING' && (
+                <div className="flex items-center gap-2 text-sm px-4 py-2 rounded-full bg-amber-50 text-amber-600">
+                  <FiClock size={14} />
+                  <span>Blockchain Verification Pending</span>
+                </div>
+              )}
+              {blockchainStatus === 'FAILED' && (
+                <div className="flex items-center gap-2 text-sm px-4 py-2 rounded-full bg-slate-50 text-slate-500">
+                  <FiShield size={14} />
+                  <span>Blockchain Unverified</span>
+                </div>
+              )}
             </div>
 
             <p className="text-xs text-slate-400 font-mono">Mã: {certificate.certificateNumber}</p>

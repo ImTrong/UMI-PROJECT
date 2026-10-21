@@ -1,6 +1,7 @@
 import { Response, Request } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { ProgressService } from '../services/progress.service';
+import { CourseAccessError } from '../services/course-access.service';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 
@@ -96,6 +97,9 @@ export class ProgressController {
       });
     } catch (error: any) {
       logger.error('Mark lesson complete error:', error);
+      if (error instanceof CourseAccessError) {
+        return res.status(error.statusCode).json({ error: error.message });
+      }
       if (error.message === ERROR_MESSAGES.COURSE_NOT_FOUND || error.message === ERROR_MESSAGES.LESSON_NOT_FOUND) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
       }
@@ -109,14 +113,20 @@ export class ProgressController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { courseId } = req.params;
-      const enrollment = await ProgressService.enrollInCourse(req.user.userId, courseId);
+      const enrollment = await ProgressService.enrollInCourse(req.user.userId, courseId, false);
       res.status(HTTP_STATUS.CREATED).json({ message: 'Successfully enrolled in course', data: enrollment });
     } catch (error: any) {
       logger.error('Enroll in course error:', error);
+      if (error instanceof CourseAccessError) {
+        return res.status(error.statusCode).json({ error: error.message });
+      }
       if (error.message === ERROR_MESSAGES.COURSE_NOT_FOUND) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
       }
-      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to enroll in course' });
+      if (error.message?.includes('paid course')) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: error.message || 'Failed to enroll in course' });
     }
   }
 
@@ -129,11 +139,14 @@ export class ProgressController {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'userId is required' });
       }
 
-      const enrollment = await ProgressService.enrollInCourse(userId, courseId);
+      const enrollment = await ProgressService.enrollInCourse(userId, courseId, true);
       res.status(HTTP_STATUS.CREATED).json({ message: 'Successfully enrolled in course internally', data: enrollment });
     } catch (error: any) {
       logger.error('Internal enroll in course error:', error);
-      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to enroll in course internally' });
+      if (error instanceof CourseAccessError) {
+        return res.status(error.statusCode).json({ error: error.message });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: error.message || 'Failed to enroll in course internally' });
     }
   }
 
