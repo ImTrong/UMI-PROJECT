@@ -124,6 +124,50 @@ export class UserService {
     return userProfile;
   }
 
+  // Public profile - chỉ trả thông tin công khai, không cần auth
+  static async getPublicProfile(userId: string) {
+    const userProfile = await prisma.userProfile.findUnique({
+      where: { userId },
+      select: {
+        userId: true,
+        fullName: true,
+        avatar: true,
+        bio: true,
+        role: true,
+        createdAt: true,
+        education: {
+          orderBy: { startDate: 'desc' as const },
+          select: {
+            id: true,
+            institution: true,
+            degree: true,
+            fieldOfStudy: true,
+            startDate: true,
+            endDate: true,
+          },
+        },
+        work: {
+          orderBy: { startDate: 'desc' as const },
+          select: {
+            id: true,
+            company: true,
+            position: true,
+            location: true,
+            startDate: true,
+            endDate: true,
+            current: true,
+          },
+        },
+      },
+    });
+
+    if (!userProfile) {
+      throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
+    }
+
+    return userProfile;
+  }
+
   static async getBatchUserProfiles(userIds: string[]) {
     if (!userIds || userIds.length === 0) {
       return [];

@@ -123,8 +123,9 @@ export default function CourseAnalytics() {
             <FiDollarSign size={24} />
           </div>
           <div className="z-10">
-            <p className="text-sm font-medium text-slate-500 mb-1">Doanh thu dự kiến</p>
+            <p className="text-sm font-medium text-slate-500 mb-1">Giá trị niêm yết ước tính</p>
             <p className="text-2xl font-bold text-slate-900">{formatVND(totalRevenue)}</p>
+            <span className="text-[10px] text-slate-400 block">Thù lao GV theo hợp đồng riêng</span>
           </div>
         </div>
 

@@ -22,6 +22,9 @@ export interface OrderItem {
   price: number;
   discount: number;
   finalPrice: number;
+  fulfillmentStatus?: string;
+  refundableAmount?: number;
+  refundedAmount?: number;
 }
 
 export interface Order {
@@ -35,7 +38,13 @@ export interface Order {
   status: 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
   paymentStatus: 'UNPAID' | 'PAID' | 'REFUNDED' | 'FAILED';
   paymentId?: string;
+  paymentMethod?: string;
+  paymentProvider?: string;
+  payosOrderCode?: string | number;
   notes?: string;
+  refundableAmount?: number;
+  refundedAmount?: number;
+  reconciliationStatus?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
@@ -58,6 +67,7 @@ export interface OrderFilters {
   limit?: number;
   status?: Order['status'];
   paymentStatus?: Order['paymentStatus'];
+  reconciliationOnly?: boolean;
   fromDate?: string;
   toDate?: string;
 }
@@ -170,6 +180,16 @@ export const orderService = {
     byStatus: Array<{ status: string; _count: number; _sum: { totalPrice: number } }>;
     totalOrders: number;
     totalRevenue: number;
+    cancelledPaidRevenue?: number;
+    cancelledPaidCount?: number;
+    pendingPaidRevenue?: number;
+    pendingPaidCount?: number;
+    totalCollectedRevenue?: number;
+    totalRefundableAmount?: number;
+    totalRefundedAmount?: number;
+    netRealizedRevenue?: number;
+    reconciliationRequiredCount?: number;
+    reconciliationOrders?: Order[];
   }> {
     const response = await orderApi.get('/api/orders/stats');
     return response.data.data;

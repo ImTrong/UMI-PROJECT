@@ -257,8 +257,11 @@ export class PaymentController {
         isAdmin
       );
 
+      const isPending = refund.status === 'PENDING';
       res.status(HTTP_STATUS.OK).json({
-        message: SUCCESS_MESSAGES.PAYMENT_REFUNDED,
+        message: isPending
+          ? 'Yêu cầu hoàn tiền đã được tạo thành công (Trạng thái: Đang chờ xử lý)'
+          : SUCCESS_MESSAGES.PAYMENT_REFUNDED,
         data: refund,
       });
     } catch (error: any) {
@@ -352,6 +355,70 @@ export class PaymentController {
     }
   }
 
+  static async getReconciliationReport(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user || req.user.role !== 'ADMIN') {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({
+          error: ERROR_MESSAGES.FORBIDDEN,
+        });
+      }
+
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = Math.min(parseInt(req.query.limit as string) || 50, 200);
+      const filters: any = {};
+      if (req.query.provider) filters.provider = req.query.provider;
+      if (req.query.fromDate) filters.fromDate = new Date(req.query.fromDate as string);
+      if (req.query.toDate) filters.toDate = new Date(req.query.toDate as string);
+
+      const report = await PaymentService.getReconciliationReport(page, limit, filters);
+      res.status(HTTP_STATUS.OK).json({
+        data: report,
+      });
+    } catch (error: any) {
+      logger.error('Get reconciliation report error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: 'Failed to get reconciliation report',
+      });
+    }
+  }
+
+  static async confirmManualRefund(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user || req.user.role !== 'ADMIN') {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({
+          error: ERROR_MESSAGES.FORBIDDEN,
+        });
+      }
+
+      const { refundId } = req.params;
+      const { transferReference, actualAmount, notes } = req.body;
+
+      if (!transferReference || typeof transferReference !== 'string' || !transferReference.trim()) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'Mã tham chiếu chuyển khoản ngân hàng (transferReference) là bắt buộc',
+        });
+      }
+
+      const result = await PaymentService.confirmManualRefund({
+        refundId,
+        adminUserId: req.user.userId,
+        transferReference: transferReference.trim(),
+        actualAmount: actualAmount ? Number(actualAmount) : undefined,
+        notes: typeof notes === 'string' ? notes.trim() : undefined,
+      });
+
+      res.status(HTTP_STATUS.OK).json({
+        message: 'Xác nhận hoàn tiền thủ công thành công',
+        data: result,
+      });
+    } catch (error: any) {
+      logger.error('Confirm manual refund error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: error.message || 'Failed to confirm refund',
+      });
+    }
+  }
+
   static async createSetupIntent(req: AuthRequest, res: Response) {
     try {
       if (!req.user) {
@@ -414,6 +481,31 @@ export class PaymentController {
       logger.error('Get payment methods error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to get payment methods',
+      });
+    }
+  }
+
+  static async completeMockPayment(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) {
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
+          error: ERROR_MESSAGES.UNAUTHORIZED,
+        });
+      }
+
+      const { orderId } = req.body;
+      if (!orderId) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: 'orderId is required',
+        });
+      }
+
+      const result = await PaymentService.completeMockPayment(orderId, req.user.userId);
+      res.status(HTTP_STATUS.OK).json(result);
+    } catch (error: any) {
+      logger.error('Complete mock payment error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
+        error: error.message || 'Failed to complete mock payment',
       });
     }
   }

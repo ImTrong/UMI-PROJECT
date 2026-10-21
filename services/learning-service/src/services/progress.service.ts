@@ -1,10 +1,16 @@
 import { PrismaClient } from '@prisma/client';
 import axios, { AxiosResponse } from 'axios';
-import { ERROR_MESSAGES } from '../utils/constants';
+import { ERROR_MESSAGES, HTTP_STATUS } from '../utils/constants';
 import { ActivityService } from './activity.service';
 import { BadgeService } from './badge.service';
 import { ActivityAction, CourseDetails, LessonDetails } from '../types';
 import logger from '../utils/logger';
+import {
+  ACCESS_ERROR_MESSAGES,
+  CourseAccessError,
+  CourseAccessService,
+  isVerifiedFreeCourse,
+} from './course-access.service';
 
 const prisma = new PrismaClient();
 
@@ -178,41 +184,47 @@ export class ProgressService {
     return courseProgress;
   }
 
+  /**
+   * Single gate for "may this user learn this course" used by progress and quiz flows.
+   * - Already enrolled (server-side CourseProgress) -> allowed, progress untouched.
+   * - Not enrolled + course verifiably free (published, price === 0) -> enroll through the
+   *   official enrollInCourse flow (which re-validates).
+   * - Anything else (paid, null/missing price, lookup failure) -> refused, nothing written.
+   */
+  static async ensureLearningAccess(userId: string, courseId: string, knownCourse?: CourseDetails) {
+    const existing = await CourseAccessService.findEnrollment(userId, courseId);
+    if (existing) return existing;
+
+    const course = knownCourse ?? await CourseAccessService.fetchCourse(courseId);
+    if (!isVerifiedFreeCourse(course)) {
+      logger.warn(`Learning access denied: user=${userId} course=${courseId} (not enrolled, course not verifiably free)`);
+      throw new CourseAccessError(ACCESS_ERROR_MESSAGES.ENROLLMENT_REQUIRED, HTTP_STATUS.FORBIDDEN);
+    }
+
+    return this.enrollInCourse(userId, courseId, false);
+  }
+
   static async markLessonComplete(data: LessonCompleteData) {
     const { userId, courseId, lessonId, timeSpentSeconds = 0 } = data;
 
-    const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://localhost:3003';
-    let course: CourseDetails;
-    let allLessons: LessonDetails[] = [];
-    try {
-      const [courseResponse, lessonsResponse] = await Promise.all([
-        axios.get<{ data: CourseDetails }>(`${courseServiceUrl}/api/courses/${courseId}`),
-        axios.get<{ data: LessonDetails[] }>(`${courseServiceUrl}/api/courses/internal/${courseId}/lessons`),
-      ]);
-      course = courseResponse.data.data;
-      allLessons = lessonsResponse.data.data || [];
-    } catch {
-      throw new Error(ERROR_MESSAGES.COURSE_NOT_FOUND);
-    }
+    // 1. Resolve course + lessons from course-service (trusted source). Fails closed.
+    const [course, allLessons] = await Promise.all([
+      CourseAccessService.fetchCourse(courseId),
+      CourseAccessService.fetchCourseLessons(courseId),
+    ]);
 
     const lesson = allLessons.find((l: LessonDetails) => l.id === lessonId);
     if (!lesson) throw new Error(ERROR_MESSAGES.LESSON_NOT_FOUND);
 
+    // 2. Authorize BEFORE any write. Never auto-creates enrollment for paid/unverified courses.
+    await this.ensureLearningAccess(userId, courseId, course);
+
     await this.initializeUserProgress(userId);
 
-    let courseProgress = await prisma.courseProgress.findUnique({
-      where: { userId_courseId: { userId, courseId } },
-    });
-
+    let courseProgress = await CourseAccessService.findEnrollment(userId, courseId);
     if (!courseProgress) {
-      courseProgress = await prisma.courseProgress.create({
-        data: {
-          userId,
-          courseId,
-          courseTitle: course.title,
-          totalLessons: allLessons.length || 0,
-        },
-      });
+      // Defensive: enrollment must exist by now; never fabricate one here.
+      throw new CourseAccessError(ACCESS_ERROR_MESSAGES.ENROLLMENT_REQUIRED, HTTP_STATUS.FORBIDDEN);
     }
 
     courseProgress = await this.syncCourseProgressTotals(userId, courseId) || courseProgress;
@@ -221,24 +233,35 @@ export class ProgressService {
       where: { userId_courseId_lessonId: { userId, courseId, lessonId } },
     });
 
-    const wasCompleted = lessonProgress?.completed || false;
+    let wasCompleted = lessonProgress?.completed || false;
 
     if (!lessonProgress) {
-      lessonProgress = await prisma.lessonProgress.create({
-        data: {
-          userId,
-          courseId,
-          lessonId,
-          lessonTitle: lesson.title,
-          timeSpentSeconds,
-          watchCount: 1,
-          completed: true,
-          completedAt: new Date(),
-        },
-      });
+      try {
+        lessonProgress = await prisma.lessonProgress.create({
+          data: {
+            userId,
+            courseId,
+            lessonId,
+            lessonTitle: lesson.title,
+            timeSpentSeconds,
+            watchCount: 1,
+            completed: true,
+            completedAt: new Date(),
+          },
+        });
+      } catch (createError: any) {
+        // Concurrent duplicate request: the other request already recorded this completion.
+        if (createError?.code !== 'P2002') throw createError;
+        lessonProgress = await prisma.lessonProgress.findUnique({
+          where: { userId_courseId_lessonId: { userId, courseId, lessonId } },
+        });
+        if (!lessonProgress) throw createError;
+        wasCompleted = lessonProgress.completed;
+      }
     } else if (!wasCompleted) {
-      lessonProgress = await prisma.lessonProgress.update({
-        where: { id: lessonProgress.id },
+      // Atomic claim: only one concurrent request may flip completed false -> true.
+      const claimed = await prisma.lessonProgress.updateMany({
+        where: { id: lessonProgress.id, completed: false },
         data: {
           timeSpentSeconds: lessonProgress.timeSpentSeconds + timeSpentSeconds,
           watchCount: lessonProgress.watchCount + 1,
@@ -247,6 +270,12 @@ export class ProgressService {
           completedAt: new Date(),
         },
       });
+      if (claimed.count === 0) {
+        wasCompleted = true;
+      }
+      lessonProgress = (await prisma.lessonProgress.findUnique({
+        where: { id: lessonProgress.id },
+      })) || lessonProgress;
     }
 
     if (!wasCompleted) {
@@ -387,11 +416,11 @@ export class ProgressService {
           },
         });
       } else {
-        // No quizzes → auto-pass
+        // No quizzes → auto-pass, but do NOT fake 100% quiz score
         await prisma.courseProgress.update({
           where: { userId_courseId: { userId, courseId } },
           data: {
-            averageQuizScore: 100,
+            averageQuizScore: null,
             passed: true,
             allowRetake: false,
             completedAt: new Date(),
@@ -408,14 +437,33 @@ export class ProgressService {
     });
     const isPassed = latestProgress?.passed;
 
+    // Record achievement points in CourseCompletionRecord
+    if (isPassed && latestProgress?.completedAt) {
+      try {
+        const { AchievementService } = require('./achievement.service');
+        await AchievementService.recordCourseCompletion(
+          userId,
+          courseId,
+          latestProgress.completedAt,
+          courseTitle,
+          latestProgress.averageQuizScore
+        );
+      } catch (achieveErr) {
+        logger.error('Failed to record achievement for course completion:', achieveErr);
+      }
+    }
+
     // Send real-time course completion notification
     try {
       const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
       if (isPassed) {
+        const scoreText = latestProgress?.averageQuizScore != null
+          ? ` với điểm ${latestProgress.averageQuizScore.toFixed(1)}%`
+          : '';
         await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
           userId,
           title: '🎉 Khóa học hoàn thành!',
-          message: `Chúc mừng bạn đã hoàn thành xuất sắc khóa học "${courseTitle}" với điểm ${latestProgress?.averageQuizScore?.toFixed(1)}%. Bạn có thể nhận chứng nhận ngay!`,
+          message: `Chúc mừng bạn đã hoàn thành xuất sắc khóa học "${courseTitle}"${scoreText}. Bạn có thể nhận chứng nhận ngay!`,
           type: 'SUCCESS',
           link: `/course-exam/${courseId}`,
         });
@@ -509,17 +557,21 @@ export class ProgressService {
     }
   }
 
-  static async enrollInCourse(userId: string, courseId: string) {
-    const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://localhost:3003';
-    let course: CourseDetails;
-    try {
-      const response: AxiosResponse<{ data: CourseDetails }> = await axios.get(
-        `${courseServiceUrl}/api/courses/${courseId}`
+  static async enrollInCourse(userId: string, courseId: string, isInternal: boolean = false) {
+    const course = await CourseAccessService.fetchCourse(courseId);
+    if (!course.published) {
+      throw new CourseAccessError(ACCESS_ERROR_MESSAGES.NOT_PUBLISHED, HTTP_STATUS.FORBIDDEN);
+    }
+
+    // Bảo mật: chỉ luồng nội bộ (đã xác thực service token) mới được ghi danh khóa học có phí.
+    // Endpoint công khai chỉ ghi danh khi course-service xác nhận rõ price === 0;
+    // price thiếu / null / không hợp lệ KHÔNG được coi là miễn phí.
+    if (!isInternal && !isVerifiedFreeCourse(course)) {
+      const priceIsPaid = typeof course.price === 'number' && Number.isFinite(course.price) && course.price > 0;
+      throw new CourseAccessError(
+        priceIsPaid ? ACCESS_ERROR_MESSAGES.PAID_COURSE : ACCESS_ERROR_MESSAGES.PRICE_UNVERIFIED,
+        HTTP_STATUS.FORBIDDEN
       );
-      course = response.data.data;
-      if (!course.published) throw new Error('Course is not published');
-    } catch {
-      throw new Error(ERROR_MESSAGES.COURSE_NOT_FOUND);
     }
 
     await this.initializeUserProgress(userId);
@@ -529,34 +581,43 @@ export class ProgressService {
     });
     if (existing) return existing;
 
-    const lessonsResponse: AxiosResponse<{ data: LessonDetails[] }> = await axios.get(
-      `${courseServiceUrl}/api/courses/internal/${courseId}/lessons`
-    );
+    const lessons = await CourseAccessService.fetchCourseLessons(courseId);
 
-    const enrollment = await prisma.courseProgress.create({
-      data: {
+    try {
+      const enrollment = await prisma.courseProgress.create({
+        data: {
+          userId,
+          courseId,
+          courseTitle: course.title,
+          totalLessons: lessons.length,
+          enrolledAt: new Date(),
+          lastAccessedAt: new Date(),
+        },
+      });
+
+      await prisma.userProgress.update({
+        where: { userId },
+        data: { totalCoursesEnrolled: { increment: 1 } },
+      });
+
+      await ActivityService.logActivity({
         userId,
         courseId,
-        courseTitle: course.title,
-        totalLessons: lessonsResponse.data.data.length,
-        enrolledAt: new Date(),
-        lastAccessedAt: new Date(),
-      },
-    });
+        action: ActivityAction.COURSE_ENROLL,
+        metadata: { courseTitle: course.title },
+      });
 
-    await prisma.userProgress.update({
-      where: { userId },
-      data: { totalCoursesEnrolled: { increment: 1 } },
-    });
-
-    await ActivityService.logActivity({
-      userId,
-      courseId,
-      action: ActivityAction.COURSE_ENROLL,
-      metadata: { courseTitle: course.title },
-    });
-
-    return enrollment;
+      return enrollment;
+    } catch (createError: any) {
+      // Race condition idempotency: nếu 2 request đến cùng lúc, trả về bản ghi đã tạo
+      if (createError.code === 'P2002' || createError.message?.includes('duplicate') || createError.message?.includes('Unique constraint')) {
+        const raceExisting = await prisma.courseProgress.findUnique({
+          where: { userId_courseId: { userId, courseId } },
+        });
+        if (raceExisting) return raceExisting;
+      }
+      throw createError;
+    }
   }
 
   static async healthCheck() {

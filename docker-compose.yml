@@ -72,7 +72,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_STRIPE_PUBLISHABLE_KEY: "pk_test_51TNRP6LcXlRTJQeea6CegbblTnct3HwbgoxQp1yNjwYryR3f3SNKcOufRgfwsuitWpxz2OWBa8UKT8GXdko00ih300rMSsMzJq"
+        VITE_STRIPE_PUBLISHABLE_KEY: "${VITE_STRIPE_PUBLISHABLE_KEY:-pk_test_placeholder}"
     container_name: elearning-frontend
     ports:
       - "3000:80"
@@ -126,7 +126,7 @@ services:
     restart: unless-stopped
     command: sh -c "npx prisma db push && node dist-seed/prisma/seed.js && node dist/src/index.js"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/auth/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/auth/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -160,7 +160,7 @@ services:
     restart: unless-stopped
     command: sh -c "sleep 5 && npx prisma db push && node dist-seed/prisma/seed.js && node dist/src/index.js"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3002/api/users/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/api/users/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -197,7 +197,7 @@ services:
     restart: unless-stopped
     command: sh -c "npx prisma db push && node dist-seed/prisma/seed.js && node dist/index.js"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3003/api/courses/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/api/courses/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -223,6 +223,7 @@ services:
       COURSE_SERVICE_URL: "http://course-service:3003"
       PAYMENT_SERVICE_URL: "http://payment-service:3005"
       LEARNING_SERVICE_URL: "http://learning-service:3006"
+      INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN:-internal_secret_token_umi}"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -230,7 +231,7 @@ services:
       - elearning-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3004/api/orders/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3004/api/orders/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -251,7 +252,12 @@ services:
       PORT: 3005
       NODE_ENV: development
       DATABASE_URL: "mongodb://admin:securepassword123@mongodb:27017/payment_db?authSource=admin"
-      STRIPE_SECRET_KEY: "sk_test_51TNRP6LcXlRTJQee7kyueHw8lmtrATfOSOKLRmX4VDzgR5muRuvqY03GBdkwNtjuRJ8jMNMcVOI2TsKV2ASQ6107000ujSxrae"
+      STRIPE_SECRET_KEY: "${STRIPE_SECRET_KEY:-}"
+      STRIPE_WEBHOOK_SECRET: "${STRIPE_WEBHOOK_SECRET:-}"
+      PAYOS_CLIENT_ID: "${PAYOS_CLIENT_ID:-}"
+      PAYOS_API_KEY: "${PAYOS_API_KEY:-}"
+      PAYOS_CHECKSUM_KEY: "${PAYOS_CHECKSUM_KEY:-}"
+      INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN:-internal_secret_token_umi}"
       AUTH_SERVICE_URL: "http://auth-service:3001"
       USER_SERVICE_URL: "http://user-service:3002"
       ORDER_SERVICE_URL: "http://order-service:3004"
@@ -263,7 +269,7 @@ services:
     restart: unless-stopped
     command: sh -c "npx prisma db push && node dist/index.js"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3005/api/payments/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3005/api/payments/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -288,6 +294,7 @@ services:
       USER_SERVICE_URL: "http://user-service:3002"
       COURSE_SERVICE_URL: "http://course-service:3003"
       AI_SERVICE_URL: "http://ai-service:3007"
+      INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN:-internal_secret_token_umi}"
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
       MINIO_ACCESS_KEY: minioadmin
@@ -298,6 +305,13 @@ services:
       HLS_TEMP_DIR: "/tmp/hls-processing"
       VIDEO_UPLOAD_DIR: "/tmp/video-uploads"
       MAX_VIDEO_SIZE_MB: "2048"
+      # Blockchain Certificate Verification
+      BLOCKCHAIN_ENABLED: "${BLOCKCHAIN_ENABLED:-false}"
+      BLOCKCHAIN_NETWORK: "polygon-amoy"
+      BLOCKCHAIN_CHAIN_ID: "80002"
+      BLOCKCHAIN_RPC_URL: "${BLOCKCHAIN_RPC_URL:-}"
+      BLOCKCHAIN_PRIVATE_KEY: "${BLOCKCHAIN_PRIVATE_KEY:-}"
+      BLOCKCHAIN_CONTRACT_ADDRESS: "${BLOCKCHAIN_CONTRACT_ADDRESS:-}"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -306,7 +320,7 @@ services:
     restart: unless-stopped
     command: sh -c "npx prisma db push && node -e \"const { PrismaClient } = require('@prisma/client'); const p = new PrismaClient(); p.learningPath.count().then(c => { if(c === 0) { console.log('No paths found, seeding...'); process.exit(0); } else { console.log(c + ' paths exist, skipping seed.'); process.exit(1); } }).catch(() => process.exit(0))\" && node dist-seed/prisma/seed-paths.js; node dist/index.js"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3006/api/learning/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3006/api/learning/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -388,7 +402,7 @@ services:
   # MinIO File Storage Service
   # ============================================
   minio:
-    image: quay.io/minio/minio:latest
+    image: elestio/minio:latest
     container_name: elearning-minio
     ports:
       - "9000:9000"   # S3 API port
@@ -414,7 +428,7 @@ services:
   # MinIO Client - Initialize buckets
   # ============================================
   minio-init:
-    image: quay.io/minio/mc:latest
+    image: elestio/minio:latest
     container_name: elearning-minio-init
     depends_on:
       - minio

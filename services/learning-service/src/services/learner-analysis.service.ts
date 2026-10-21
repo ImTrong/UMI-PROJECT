@@ -374,7 +374,7 @@ export class LearnerAnalysisService {
     pathId: string;
     title: string;
     careerGoal: string;
-    skills: string[];
+    skills: any[];
     enrolled: boolean;
     status: string;
     courseIds: string[];
@@ -395,7 +395,7 @@ export class LearnerAnalysisService {
       pathId: e.learningPath.id,
       title: e.learningPath.title,
       careerGoal: e.learningPath.careerGoal || '',
-      skills: e.learningPath.skills || [],
+      skills: (e.learningPath.skills || []) as any[],
       enrolled: true,
       status: e.status,
       courseIds: e.learningPath.courseIds || [],

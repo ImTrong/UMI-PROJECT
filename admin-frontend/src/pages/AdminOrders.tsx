@@ -17,7 +17,17 @@ export default function AdminOrders() {
   
   // Data Overview Stats
   const [stats, setStats] = useState({
-    totalOrders: 0, totalRevenue: 0,
+    totalOrders: 0,
+    totalRevenue: 0,
+    cancelledPaidRevenue: 0,
+    cancelledPaidCount: 0,
+    pendingPaidRevenue: 0,
+    pendingPaidCount: 0,
+    totalCollectedRevenue: 0,
+    totalRefundableAmount: 0,
+    totalRefundedAmount: 0,
+    netRealizedRevenue: 0,
+    reconciliationRequiredCount: 0,
     byStatus: [] as any[]
   });
 
@@ -40,11 +50,13 @@ export default function AdminOrders() {
   const loadData = async () => {
     setLoading(true);
     try {
+      const isReconciliationFilter = statusFilter === 'RECONCILIATION';
       const [ordersRes, statsRes] = await Promise.all([
         orderService.getAllOrders({ 
           page, 
           limit: 10,
-          status: statusFilter as Order['status'] || undefined
+          status: isReconciliationFilter ? undefined : (statusFilter as Order['status'] || undefined),
+          reconciliationOnly: isReconciliationFilter ? true : undefined,
         }),
         orderService.getOrderStats()
       ]);
@@ -53,7 +65,16 @@ export default function AdminOrders() {
       setStats({
         totalOrders: statsRes.totalOrders,
         totalRevenue: statsRes.totalRevenue,
-        byStatus: statsRes.byStatus
+        cancelledPaidRevenue: statsRes.cancelledPaidRevenue || 0,
+        cancelledPaidCount: statsRes.cancelledPaidCount || 0,
+        pendingPaidRevenue: statsRes.pendingPaidRevenue || 0,
+        pendingPaidCount: statsRes.pendingPaidCount || 0,
+        totalCollectedRevenue: statsRes.totalCollectedRevenue || statsRes.totalRevenue,
+        totalRefundableAmount: statsRes.totalRefundableAmount || 0,
+        totalRefundedAmount: statsRes.totalRefundedAmount || 0,
+        netRealizedRevenue: statsRes.netRealizedRevenue || statsRes.totalRevenue,
+        reconciliationRequiredCount: statsRes.reconciliationRequiredCount || 0,
+        byStatus: statsRes.byStatus || []
       });
     } catch (error) {
       toast.error('Tải dữ liệu giám sát giao dịch thất bại');
@@ -86,13 +107,36 @@ export default function AdminOrders() {
   };
 
   // UI Helpers
-  const getStatusBadge = (status: Order['status']) => {
-    switch (status) {
+  const getStatusBadge = (order: Order) => {
+    // Ưu tiên hiển thị cảnh báo đối soát nếu đơn CANCELLED nhưng ĐÃ THU TIỀN
+    if (order.paymentStatus === 'PAID' && order.status === 'CANCELLED') {
+      return (
+        <span className="inline-flex items-center gap-1 bg-red-100 text-red-800 px-2.5 py-1 rounded-full text-xs font-semibold border border-red-200">
+          <FiXCircle size={14}/> Đã thu tiền (Đơn đã hủy - Cần đối soát)
+        </span>
+      );
+    }
+    if (order.reconciliationStatus === 'PARTIAL_DUPLICATE_PAYMENT') {
+      return (
+        <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full text-xs font-semibold border border-amber-200">
+          <FiClock size={14}/> Trùng một phần (Cần hoàn tiền)
+        </span>
+      );
+    }
+    if (order.reconciliationStatus === 'FULL_DUPLICATE_PAYMENT') {
+      return (
+        <span className="inline-flex items-center gap-1 bg-purple-100 text-purple-800 px-2.5 py-1 rounded-full text-xs font-semibold border border-purple-200">
+          <FiXCircle size={14}/> Trùng 100% (Cần hoàn toàn bộ)
+        </span>
+      );
+    }
+
+    switch (order.status) {
       case 'COMPLETED': return <span className="inline-flex items-center gap-1 bg-green-100 text-green-700 px-2.5 py-1 rounded-full text-xs font-medium"><FiCheckCircle size={14}/> Hoàn thành</span>;
       case 'PENDING': return <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-700 px-2.5 py-1 rounded-full text-xs font-medium"><FiClock size={14}/> Chờ xử lý</span>;
       case 'PROCESSING': return <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-700 px-2.5 py-1 rounded-full text-xs font-medium"><FiTrendingUp size={14}/> Đang xử lý</span>;
       case 'CANCELLED': case 'FAILED': return <span className="inline-flex items-center gap-1 bg-red-100 text-red-700 px-2.5 py-1 rounded-full text-xs font-medium"><FiXCircle size={14}/> Đã hủy/Thất bại</span>;
-      default: return <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs">{status}</span>;
+      default: return <span className="bg-gray-100 text-gray-700 px-2.5 py-1 rounded-full text-xs">{order.status}</span>;
     }
   };
 
@@ -107,41 +151,57 @@ export default function AdminOrders() {
           <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
             <FiShoppingCart className="text-primary-500" /> Giám sát Giao dịch & Đơn hàng
           </h1>
-          <p className="text-sm text-gray-500 mt-1">Theo dõi quá trình mua khóa học, xử lý sai sót và hỗ trợ học viên</p>
+          <p className="text-sm text-gray-500 mt-1">Đối chiếu thực thu, xử lý thu tiền trùng và hỗ trợ đối soát học viên</p>
         </div>
       </div>
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition">
-          <div className="w-12 h-12 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center text-2xl">
+      {/* Stats Summary - Đối chiếu chi tiết không để mất tiền đã thu */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 hover:shadow-md transition">
+          <div className="w-11 h-11 bg-primary-50 text-primary-600 rounded-full flex items-center justify-center text-xl shrink-0">
             <FiDollarSign />
           </div>
           <div>
-             <p className="text-sm text-gray-500 font-medium">Tổng Doanh thu Giao dịch</p>
-             <p className="text-2xl font-bold text-gray-900">{formatVND(stats.totalRevenue)}</p>
+             <p className="text-xs text-gray-500 font-medium">Tổng Thực thu Cổng TT</p>
+             <p className="text-xl font-bold text-gray-900">{formatVND(stats.totalCollectedRevenue)}</p>
+             <p className="text-[11px] text-green-600 mt-0.5">COMPLETED: {formatVND(stats.totalRevenue)}</p>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition">
-          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center text-2xl">
+
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 hover:shadow-md transition">
+          <div className="w-11 h-11 bg-red-50 text-red-600 rounded-full flex items-center justify-center text-xl shrink-0">
+            <FiXCircle />
+          </div>
+          <div>
+             <p className="text-xs text-gray-500 font-medium">Đã thu (Đơn hủy / Chưa đồng bộ)</p>
+             <p className="text-xl font-bold text-red-600">
+               {formatVND((stats.cancelledPaidRevenue || 0) + (stats.pendingPaidRevenue || 0))}
+             </p>
+             <p className="text-[11px] text-gray-500 mt-0.5">
+               {stats.cancelledPaidCount} đơn hủy, {stats.pendingPaidCount} chưa sync
+             </p>
+          </div>
+        </div>
+
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 hover:shadow-md transition">
+          <div className="w-11 h-11 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center text-xl shrink-0">
             <FiClock />
           </div>
           <div>
-             <p className="text-sm text-gray-500 font-medium">Tổng Đơn hàng</p>
-             <p className="text-2xl font-bold text-gray-900">{stats.totalOrders}</p>
+             <p className="text-xs text-gray-500 font-medium">Khoản CẦN hoàn đối soát</p>
+             <p className="text-xl font-bold text-amber-600">{formatVND(stats.totalRefundableAmount)}</p>
+             <p className="text-[11px] text-gray-500 mt-0.5">Đã hoàn: {formatVND(stats.totalRefundedAmount)}</p>
           </div>
         </div>
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-4 hover:shadow-md transition">
-          <div className="w-12 h-12 bg-green-50 text-green-600 rounded-full flex items-center justify-center text-2xl">
+
+        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex items-center gap-3 hover:shadow-md transition">
+          <div className="w-11 h-11 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center text-xl shrink-0">
             <FiCheckCircle />
           </div>
           <div>
-             <p className="text-sm text-gray-500 font-medium">Tỷ lệ Thành công</p>
-             <p className="text-2xl font-bold text-gray-900">
-               {stats.totalOrders > 0 
-                  ? `${((stats.byStatus.find((s: any) => s.status === 'COMPLETED')?._count || 0) / stats.totalOrders * 100).toFixed(1)}%` 
-                  : '0%'}
-             </p>
+             <p className="text-xs text-gray-500 font-medium">Cần xử lý đối soát</p>
+             <p className="text-xl font-bold text-purple-700">{stats.reconciliationRequiredCount} đơn</p>
+             <p className="text-[11px] text-gray-500 mt-0.5">Tổng số: {stats.totalOrders} đơn hàng</p>
           </div>
         </div>
       </div>
@@ -161,6 +221,7 @@ export default function AdminOrders() {
               className="text-sm px-3 py-1.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 outline-none"
             >
               <option value="">Tất cả Trạng thái</option>
+              <option value="RECONCILIATION">⚠️ Cần đối soát / Thu tiền đơn hủy ({stats.reconciliationRequiredCount})</option>
               <option value="PENDING">Chờ xử lý</option>
               <option value="PROCESSING">Đang xử lý</option>
               <option value="COMPLETED">Hoàn thành</option>
@@ -196,9 +257,16 @@ export default function AdminOrders() {
                 {orders.map((order) => (
                   <tr key={order.id} className="hover:bg-gray-50/50 transition-colors group">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="font-mono text-sm font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded">
-                        #{order.orderNumber}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-semibold text-gray-700 bg-gray-100 px-2 py-1 rounded">
+                          #{order.orderNumber}
+                        </span>
+                        {order.paymentProvider && (
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${order.paymentProvider === 'payos' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>
+                            {order.paymentProvider === 'payos' ? 'VietQR' : 'Stripe'}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                        <p className="text-sm font-medium text-gray-900">{order.userId.substring(0, 10)}...</p>
@@ -206,9 +274,15 @@ export default function AdminOrders() {
                     <td className="px-6 py-4 whitespace-nowrap">
                        <p className="text-sm font-bold text-gray-900">{formatVND(order.totalPrice)}</p>
                        <p className="text-xs text-gray-500">{order.items?.length || 0} khóa học</p>
+                       {order.refundableAmount && order.refundableAmount > 0 ? (
+                         <p className="text-[11px] text-amber-600 font-semibold mt-0.5">
+                           Cần hoàn: {formatVND(order.refundableAmount)}
+                           {order.refundedAmount && order.refundedAmount > 0 ? ` (Đã hoàn: ${formatVND(order.refundedAmount)})` : ''}
+                         </p>
+                       ) : null}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                       {getStatusBadge(order.status)}
+                       {getStatusBadge(order)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                        <span title={format(new Date(order.createdAt), 'dd MMMM yyyy, HH:mm:ss')}>
@@ -260,7 +334,7 @@ export default function AdminOrders() {
              <form onSubmit={handleUpdateStatus} className="p-5 space-y-4">
                 <div>
                    <label className="block text-sm font-medium text-gray-700 mb-1">Trạng thái hiện tại</label>
-                   <div className="mb-4">{getStatusBadge(editOrder.status)}</div>
+                   <div className="mb-4">{getStatusBadge(editOrder)}</div>
 
                    <label className="block text-sm font-medium text-gray-700 mb-1">Cập nhật thành</label>
                    <select

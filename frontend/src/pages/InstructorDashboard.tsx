@@ -117,8 +117,9 @@ export default function InstructorDashboard() {
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-slate-500">Tổng doanh thu</p>
+              <p className="text-sm text-slate-500">Giá trị niêm yết ước tính</p>
               <p className="text-2xl font-bold">{formatVND(stats.totalRevenue)}</p>
+              <span className="text-xs text-slate-400 block mt-1">Thù lao GV theo hợp đồng riêng</span>
             </div>
             <FiDollarSign className="text-3xl text-primary-500" />
           </div>

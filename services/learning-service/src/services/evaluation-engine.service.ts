@@ -117,7 +117,7 @@ export class EvaluationEngineService {
         const pathSkills = learningPath?.skills || [];
         
         const skillUpdates = SkillMappingService.mapEvaluationToSkills(
-          criterionResults, pathSkills, evaluationId, pipeline as EvaluationStage[]
+          criterionResults, pathSkills as any[], evaluationId, pipeline as EvaluationStage[]
         );
         await SkillProfileService.updateFromEvaluation(
           submission.userId, skillUpdates, overallStrengths, overallWeaknesses

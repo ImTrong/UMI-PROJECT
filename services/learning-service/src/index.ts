@@ -3,6 +3,7 @@ import app from './app';
 import logger from './utils/logger';
 import fs from 'fs';
 import { startStudyReminderJob } from './jobs/study-reminder.job';
+import { startLeaderboardFinalizeJob } from './jobs/leaderboard-finalize.job';
 
 dotenv.config();
 
@@ -19,4 +20,6 @@ app.listen(PORT, () => {
   
   // Start background jobs
   startStudyReminderJob();
+  startLeaderboardFinalizeJob();
 });
+

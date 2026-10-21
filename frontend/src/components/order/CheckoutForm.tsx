@@ -1,17 +1,18 @@
 import { useState } from 'react';
 import { CartItem } from '../../services/order.service';
-import { FiCreditCard, FiShield } from 'react-icons/fi';
+import { FiShield } from 'react-icons/fi';
 import { formatVND } from '../../utils/currency';
 
 interface CheckoutFormProps {
   items: CartItem[];
   totalPrice: number;
-  onSubmit: (notes: string) => Promise<void>;
+  onSubmit: (notes: string, paymentMethod: 'stripe' | 'payos') => Promise<void>;
   isLoading?: boolean;
 }
 
 export const CheckoutForm = ({ items, totalPrice, onSubmit, isLoading }: CheckoutFormProps) => {
   const [notes, setNotes] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'stripe' | 'payos'>('payos');
   const [agreeTerms, setAgreeTerms] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -20,7 +21,7 @@ export const CheckoutForm = ({ items, totalPrice, onSubmit, isLoading }: Checkou
       alert('Vui lòng đồng ý với các điều khoản và điều kiện');
       return;
     }
-    await onSubmit(notes);
+    await onSubmit(notes, paymentMethod);
   };
 
   return (
@@ -69,14 +70,66 @@ export const CheckoutForm = ({ items, totalPrice, onSubmit, isLoading }: Checkou
             />
           </div>
 
-          <div className="bg-slate-50 rounded-xl p-4">
-            <div className="flex items-center space-x-2 mb-3">
-              <FiCreditCard className="text-slate-500" />
-              <span className="font-medium">Phương thức thanh toán</span>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              Chọn phương thức thanh toán
+            </label>
+            <div className="space-y-3">
+              <label
+                className={`flex items-start p-3.5 border-2 rounded-xl cursor-pointer transition-all ${
+                  paymentMethod === 'payos'
+                    ? 'border-primary-600 bg-primary-50/40 shadow-sm'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="payos"
+                  checked={paymentMethod === 'payos'}
+                  onChange={() => setPaymentMethod('payos')}
+                  className="mt-1 text-primary-600 focus:ring-primary-500"
+                />
+                <div className="ml-3 flex-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-900 text-sm">
+                      🏦 Chuyển khoản QR Ngân hàng (VietQR / payOS)
+                    </span>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                      Khuyên dùng
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Quét mã QR qua app ngân hàng hoặc ví điện tử tại VN. Xác nhận ngay lập tức.
+                  </p>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start p-3.5 border-2 rounded-xl cursor-pointer transition-all ${
+                  paymentMethod === 'stripe'
+                    ? 'border-primary-600 bg-primary-50/40 shadow-sm'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="stripe"
+                  checked={paymentMethod === 'stripe'}
+                  onChange={() => setPaymentMethod('stripe')}
+                  className="mt-1 text-primary-600 focus:ring-primary-500"
+                />
+                <div className="ml-3 flex-1">
+                  <span className="font-medium text-slate-900 text-sm">
+                    💳 Thẻ Quốc tế (Stripe)
+                  </span>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Hỗ trợ Visa, MasterCard, JCB. Thanh toán bảo mật chuẩn PCI-DSS.
+                  </p>
+                </div>
+              </label>
             </div>
-            <p className="text-sm text-slate-600">
-              Bạn sẽ được chuyển hướng một cách an toàn đến trang thanh toán sau khi xác nhận đơn hàng.
-            </p>
           </div>
 
           <div className="flex items-start space-x-2">

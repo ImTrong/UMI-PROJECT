@@ -296,7 +296,7 @@ model LearningPath {
   shortDescription String?
   bannerUrl       String?
   careerGoal      String?
-  skills          String[]             @default([])
+  skills          Json                 @default("[]")
   prerequisiteRules Json?              // { courseId: string, requiredCourseIds: string[] }[]
   completionRule  String               @default("ALL_COURSES") // "ALL_COURSES", "MIN_PERCENT:80"
   recommended     Boolean              @default(false)
@@ -584,3 +584,126 @@ model LearnerAnalysis {
   @@index([invalidatedAt])
   @@map("learner_analyses")
 }
+
+// ==================== Monthly Leaderboard & Achievements ====================
+
+model MonthlyLeaderboard {
+  id                 String    @id @default(auto()) @map("_id") @db.ObjectId
+  month              Int       // 1-12
+  year               Int       // e.g. 2026
+  status             String    @default("ACTIVE") // ACTIVE, FINALIZING, FINALIZED, FAILED
+  finalizedAt        DateTime?
+  finalizedBy        String?   // "SYSTEM_CRON" or adminId
+  totalParticipants  Int       @default(0)
+  totalPointsAwarded Int       @default(0)
+  policyVersion      String    @default("1.0")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  entries     LeaderboardEntry[]
+
+  @@unique([month, year])
+  @@map("monthly_leaderboards")
+}
+
+model LeaderboardEntry {
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  leaderboardId     String   @db.ObjectId
+  userId            String   @db.ObjectId
+  rank              Int
+  points            Float    @default(0)       // Tổng điểm thành tích tháng
+  completedCourses  Int      @default(0)
+  averageScore      Float?                     // Điểm trung bình quiz (chỉ tính khóa có quiz)
+  lastCompletedAt   DateTime
+  rewardPoints      Int      @default(0)       // Điểm thưởng nhận được (1000, 700, 500, 200, 0)
+  rewardBadgeId     String?  @db.ObjectId      // Reference to Badge if rewarded
+  scoreBreakdown    Json     @default("[]")    // Chi tiết điểm từng khóa học đóng góp
+  isTie             Boolean  @default(false)   // Đánh dấu nếu đồng hạng
+
+  leaderboard       MonthlyLeaderboard @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
+
+  @@unique([leaderboardId, userId])
+  @@index([leaderboardId, rank])
+  @@map("leaderboard_entries")
+}
+
+// ==================== Course Completion & Achievement History ====================
+
+model CourseCompletionRecord {
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId               String   @db.ObjectId
+  courseId             String   @db.ObjectId
+  courseTitle          String
+  completedAt          DateTime
+  passed               Boolean  @default(true)
+  totalDurationSeconds Int      @default(0)
+  level                String   @default("BEGINNER")
+  baseDurationPoints   Float    @default(0)
+  levelMultiplier      Float    @default(1.0)
+  achievementPoints    Float    @default(0)
+  averageQuizScore     Float?
+  hasQuiz              Boolean  @default(false)
+  policyVersion        String   @default("1.0")
+  pointsBreakdown      Json     @default("{}")
+  status               String   @default("VALID") // "VALID" | "SUSPECT" | "EXCLUDED"
+  month                Int      // Kỳ tháng (Asia/Ho_Chi_Minh)
+  year                 Int      // Kỳ năm (Asia/Ho_Chi_Minh)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([userId, courseId])
+  @@index([userId, month, year])
+  @@index([month, year, status])
+  @@map("course_completion_records")
+}
+
+// ==================== Reward Point Ledger & Transactions ====================
+
+model UserRewardPoint {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId      String   @unique @db.ObjectId
+  balance     Int      @default(0) // Số dư điểm thưởng hiện tại (phi tiền tệ)
+  totalEarned Int      @default(0)
+  totalSpent  Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("user_reward_points")
+}
+
+model RewardPointTransaction {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId         String   @db.ObjectId
+  amount         Int      // Dương nếu cộng, âm nếu trừ
+  type           String   // "LEADERBOARD_REWARD" | "COURSE_REDEMPTION" | "COURSE_REDEMPTION_REFUND" | "ADMIN_ADJUSTMENT"
+  description    String
+  balanceAfter   Int
+  sourceId       String?  // leaderboardId hoặc courseId
+  idempotencyKey String?  @unique
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([type])
+  @@map("reward_point_transactions")
+}
+
+// ==================== Leaderboard Admin Audit Logs ====================
+
+model LeaderboardAuditLog {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  adminId      String   @db.ObjectId
+  adminEmail   String
+  action       String   // "MANUAL_FINALIZE" | "ADJUST_POINTS" | "FLAG_STUDENT" | "RESTORE_STUDENT" | "SYNC_COMPLETIONS"
+  targetUserId String?  @db.ObjectId
+  month        Int?
+  year         Int?
+  reason       String
+  details      Json     @default("{}")
+  createdAt    DateTime @default(now())
+
+  @@index([month, year])
+  @@index([adminId])
+  @@map("leaderboard_audit_logs")
+}
+

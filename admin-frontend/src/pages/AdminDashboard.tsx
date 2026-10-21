@@ -126,14 +126,14 @@ export default function AdminDashboard() {
           total: ordersAnalytics.totalOrders,
           pending: ordersAnalytics.totalOrders - ordersAnalytics.completedOrders, // rough estimate or fetch from status
           completed: ordersAnalytics.completedOrders,
-          revenue: ordersAnalytics.totalRevenue,
+          revenue: ordersAnalytics.totalCollectedRevenue ?? ordersAnalytics.totalRevenue,
           monthlyRevenue: ordersAnalytics.thisMonthRevenue,
         },
         payments: {
           total: ordersAnalytics.totalOrders, // dummy since we map it to orders mostly
           succeeded: ordersAnalytics.completedOrders,
           failed: 0,
-          totalAmount: ordersAnalytics.totalRevenue,
+          totalAmount: ordersAnalytics.totalCollectedRevenue ?? ordersAnalytics.totalRevenue,
         },
         learning: {
           totalEnrollments: 0,

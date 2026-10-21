@@ -3,7 +3,8 @@ import axios, { AxiosResponse } from 'axios';
 import { ERROR_MESSAGES } from '../utils/constants';
 import { CertificateGenerator } from '../utils/certificate-generator';
 import { ActivityService } from './activity.service';
-import { ActivityAction, CourseDetails, UserDetails, CertificateMetadata } from '../types';
+import { blockchainCertificateService } from './blockchain-certificate.service';
+import { ActivityAction, CourseDetails, UserDetails, CertificateMetadata, BlockchainMetadata } from '../types';
 import logger from '../utils/logger';
 import { minioInternalClient, BUCKETS } from '../config/minio.config';
 
@@ -69,8 +70,9 @@ export class CertificateService {
     const certificateConfig = (course as any).certificateConfig || null;
 
     let pdfPath = '';
+    let pdfBuffer: Buffer | null = null;
     try {
-      pdfPath = await CertificateGenerator.generate({
+      const result = await CertificateGenerator.generate({
         certificateNumber,
         userName: user.fullName,
         courseTitle: course.title,
@@ -79,10 +81,13 @@ export class CertificateService {
         type: 'COURSE_COMPLETION',
         certificateConfig,
       });
+      pdfPath = result.filename;
+      pdfBuffer = result.pdfBuffer;
     } catch (error) {
       logger.error('Failed to generate PDF:', error);
     }
 
+    // Build metadata with blockchain info
     const metadata: CertificateMetadata = {
       courseInstructor: course.instructorId,
       courseLevel: course.level,
@@ -91,6 +96,15 @@ export class CertificateService {
       grade: 'Pass',
       certificateConfig,
     };
+
+    // Hash PDF and prepare blockchain metadata (if enabled and PDF was generated)
+    if (blockchainCertificateService.isEnabled() && pdfBuffer && pdfBuffer.length > 0) {
+      const documentHash = blockchainCertificateService.hashPdfBuffer(pdfBuffer);
+      metadata.blockchain = blockchainCertificateService.createPendingMetadata(
+        certificateNumber,
+        documentHash
+      );
+    }
 
     const certificate = await prisma.certificate.create({
       data: {
@@ -117,6 +131,12 @@ export class CertificateService {
       action: ActivityAction.CERTIFICATE_GENERATED,
       metadata: { certificateNumber, courseTitle: course.title },
     });
+
+    // Background blockchain registration (non-blocking)
+    if (metadata.blockchain && pdfBuffer) {
+      this.registerOnBlockchain(certificate.id, certificateNumber, metadata.blockchain.documentHash, issueDate)
+        .catch(err => logger.error(`Background blockchain registration failed for ${certificateNumber}:`, err));
+    }
 
     return certificate;
   }
@@ -205,8 +225,9 @@ export class CertificateService {
     }
 
     let pdfPath = '';
+    let pdfBuffer: Buffer | null = null;
     try {
-      pdfPath = await CertificateGenerator.generate({
+      const result = await CertificateGenerator.generate({
         certificateNumber,
         userName: user.fullName,
         courseTitle: path.title,
@@ -215,6 +236,8 @@ export class CertificateService {
         type: 'PATH_CERTIFICATE',
         certificateConfig,
       });
+      pdfPath = result.filename;
+      pdfBuffer = result.pdfBuffer;
     } catch (error) {
       logger.error('Failed to generate path certificate PDF:', error);
     }
@@ -226,6 +249,15 @@ export class CertificateService {
       grade: 'Pass',
       certificateConfig,
     };
+
+    // Hash PDF and prepare blockchain metadata (if enabled and PDF was generated)
+    if (blockchainCertificateService.isEnabled() && pdfBuffer && pdfBuffer.length > 0) {
+      const documentHash = blockchainCertificateService.hashPdfBuffer(pdfBuffer);
+      metadata.blockchain = blockchainCertificateService.createPendingMetadata(
+        certificateNumber,
+        documentHash
+      );
+    }
 
     const certificate = await prisma.certificate.create({
       data: {
@@ -252,7 +284,86 @@ export class CertificateService {
       metadata: { certificateNumber, pathTitle: path.title },
     });
 
+    // Background blockchain registration (non-blocking)
+    if (metadata.blockchain && pdfBuffer) {
+      this.registerOnBlockchain(certificate.id, certificateNumber, metadata.blockchain.documentHash, issueDate)
+        .catch(err => logger.error(`Background blockchain registration failed for ${certificateNumber}:`, err));
+    }
+
     return certificate;
+  }
+
+  /**
+   * Background blockchain registration.
+   * Updates certificate metadata with txHash on success, or FAILED status on error.
+   */
+  private static async registerOnBlockchain(
+    certificateId: string,
+    certificateNumber: string,
+    documentHash: string,
+    issuedAt: Date
+  ): Promise<void> {
+    try {
+      const result = await blockchainCertificateService.registerCertificate(
+        certificateNumber,
+        documentHash,
+        issuedAt
+      );
+
+      if (result) {
+        // Update metadata with confirmed transaction
+        const certificate = await prisma.certificate.findUnique({ where: { id: certificateId } });
+        if (!certificate) return;
+
+        const existingMetadata = (certificate.metadata as CertificateMetadata) || {};
+        const blockchainMeta: BlockchainMetadata = {
+          ...(existingMetadata.blockchain as BlockchainMetadata),
+          transactionHash: result.transactionHash,
+          status: 'CONFIRMED',
+          registeredAt: new Date().toISOString(),
+        };
+
+        await prisma.certificate.update({
+          where: { id: certificateId },
+          data: {
+            metadata: {
+              ...existingMetadata,
+              blockchain: blockchainMeta,
+            } as any,
+          },
+        });
+
+        logger.info(`⛓️  Certificate ${certificateNumber} blockchain registration CONFIRMED: ${result.transactionHash}`);
+      } else {
+        // Mark as FAILED
+        await this.updateBlockchainStatus(certificateId, 'FAILED');
+        logger.warn(`⛓️  Certificate ${certificateNumber} blockchain registration returned null`);
+      }
+    } catch (error: any) {
+      await this.updateBlockchainStatus(certificateId, 'FAILED');
+      logger.error(`⛓️  Certificate ${certificateNumber} blockchain registration error:`, error.message);
+    }
+  }
+
+  /**
+   * Update just the blockchain status in certificate metadata.
+   */
+  static async updateBlockchainStatus(certificateId: string, status: string): Promise<void> {
+    try {
+      const certificate = await prisma.certificate.findUnique({ where: { id: certificateId } });
+      if (!certificate) return;
+
+      const existingMetadata = (certificate.metadata as CertificateMetadata) || {};
+      if (existingMetadata.blockchain) {
+        existingMetadata.blockchain.status = status as any;
+        await prisma.certificate.update({
+          where: { id: certificateId },
+          data: { metadata: existingMetadata },
+        });
+      }
+    } catch (error) {
+      logger.error(`Failed to update blockchain status for certificate ${certificateId}:`, error);
+    }
   }
 
   private static generateCertificateNumber(userId: string, courseId: string): string {
@@ -324,13 +435,14 @@ export class CertificateService {
     if (!exists) {
       logger.warn(`Certificate file missing for ${certificate.certificateNumber}, regenerating...`);
       try {
-        fileKey = await CertificateGenerator.generate({
+        const result = await CertificateGenerator.generate({
           certificateNumber: certificate.certificateNumber,
           userName: certificate.userName,
           courseTitle: certificate.courseTitle,
           issueDate: certificate.issueDate,
           verificationUrl: certificate.verificationUrl || '',
         });
+        fileKey = result.filename;
 
         // Update DB with new path
         await prisma.certificate.update({
@@ -346,6 +458,17 @@ export class CertificateService {
     return fileKey;
   }
 
+  /**
+   * Verify certificate — enhanced with blockchain verification.
+   * 
+   * Cases handled:
+   * 1. DB valid + blockchain hash MATCH → VALID + BLOCKCHAIN VERIFIED
+   * 2. DB valid + blockchain hash NOT MATCH → Certificate Integrity Failed
+   * 3. DB revoked + blockchain REVOKED → Certificate Revoked
+   * 4. DB expired → Certificate Expired
+   * 5. Blockchain PENDING → Valid but not yet blockchain confirmed
+   * 6. No blockchain metadata → Legacy certificate (still valid by DB)
+   */
   static async verifyCertificate(certificateNumber: string) {
     const certificate = await prisma.certificate.findUnique({
       where: { certificateNumber },
@@ -361,17 +484,192 @@ export class CertificateService {
       return { valid: false, message: 'Certificate has expired', expiredAt: certificate.expiresAt };
     }
 
-    return {
+    const metadata = certificate.metadata as CertificateMetadata;
+    const blockchainMeta = metadata?.blockchain as BlockchainMetadata | undefined;
+
+    // Base response (DB-verified)
+    const response: any = {
       valid: true,
       message: 'Certificate is valid',
       certificate: {
         certificateNumber: certificate.certificateNumber,
         userName: certificate.userName,
         courseTitle: certificate.courseTitle,
+        type: certificate.type,
         issueDate: certificate.issueDate,
         expiresAt: certificate.expiresAt,
       },
     };
+
+    // Blockchain verification
+    if (blockchainMeta && blockchainMeta.status === 'CONFIRMED' && blockchainCertificateService.isEnabled()) {
+      try {
+        // Download PDF from MinIO and hash it
+        const fileKey = certificate.certificateUrl;
+        if (fileKey) {
+          const stream = await minioInternalClient.getObject(BUCKETS.CERTIFICATES, fileKey);
+          const chunks: Buffer[] = [];
+          for await (const chunk of stream) {
+            chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          }
+          const pdfBuffer = Buffer.concat(chunks);
+
+          const integrityResult = await blockchainCertificateService.verifyDocumentIntegrity(
+            certificateNumber,
+            pdfBuffer
+          );
+
+          response.blockchain = {
+            verified: integrityResult.verified,
+            network: blockchainMeta.network,
+            chainId: blockchainMeta.chainId,
+            contractAddress: blockchainMeta.contractAddress,
+            transactionHash: blockchainMeta.transactionHash,
+            documentHash: blockchainMeta.documentHash,
+            explorerUrl: blockchainMeta.transactionHash
+              ? blockchainCertificateService.getExplorerUrl(blockchainMeta.transactionHash)
+              : undefined,
+          };
+
+          if (!integrityResult.verified) {
+            response.message = 'Certificate is valid but document integrity check failed';
+            response.integrityWarning = true;
+          }
+
+          // Check on-chain status for revocation
+          if (integrityResult.onChainStatus === 2) {
+            response.valid = false;
+            response.message = 'Certificate has been revoked on blockchain';
+            response.blockchain.verified = false;
+          }
+        }
+      } catch (error: any) {
+        logger.error('Blockchain verification error during certificate verify:', error.message);
+        // Non-fatal: certificate is still valid by DB, just can't verify blockchain
+        response.blockchain = {
+          verified: false,
+          network: blockchainMeta.network,
+          chainId: blockchainMeta.chainId,
+          error: 'Blockchain verification temporarily unavailable',
+        };
+      }
+    } else if (blockchainMeta && blockchainMeta.status === 'PENDING') {
+      response.blockchain = {
+        verified: false,
+        status: 'PENDING',
+        network: blockchainMeta.network,
+        chainId: blockchainMeta.chainId,
+        message: 'Blockchain confirmation pending',
+      };
+    } else if (blockchainMeta && blockchainMeta.status === 'FAILED') {
+      response.blockchain = {
+        verified: false,
+        status: 'FAILED',
+        network: blockchainMeta.network,
+        chainId: blockchainMeta.chainId,
+        message: 'Blockchain registration failed',
+      };
+    } else if (blockchainMeta && blockchainMeta.status === 'REVOKED') {
+      response.valid = false;
+      response.message = 'Certificate has been revoked';
+      response.blockchain = {
+        verified: false,
+        status: 'REVOKED',
+        network: blockchainMeta.network,
+        chainId: blockchainMeta.chainId,
+        revokeTransactionHash: blockchainMeta.revokeTransactionHash,
+        explorerUrl: blockchainMeta.revokeTransactionHash
+          ? blockchainCertificateService.getExplorerUrl(blockchainMeta.revokeTransactionHash)
+          : undefined,
+      };
+    }
+    // No blockchain metadata → legacy certificate, no blockchain section in response
+
+    return response;
+  }
+
+  /**
+   * Revoke a certificate — blockchain-first approach.
+   * 
+   * Flow:
+   * 1. Validate certificate exists
+   * 2. If blockchain enabled + CONFIRMED: revoke on-chain FIRST
+   * 3. Only after blockchain confirms: update DB isVerified = false
+   * 4. If blockchain fails: keep isVerified = true, status = REVOKE_FAILED
+   */
+  static async revokeCertificate(certificateId: string, adminUserId: string) {
+    const certificate = await prisma.certificate.findUnique({
+      where: { id: certificateId },
+    });
+
+    if (!certificate) throw new Error('Certificate not found');
+    if (!certificate.isVerified) throw new Error('Certificate is already revoked');
+
+    const metadata = (certificate.metadata as CertificateMetadata) || {};
+    const blockchainMeta = metadata.blockchain as BlockchainMetadata | undefined;
+
+    // Step 1: If blockchain is enabled and certificate is CONFIRMED, revoke on-chain first
+    if (blockchainCertificateService.isEnabled() && blockchainMeta && blockchainMeta.status === 'CONFIRMED') {
+      // Set REVOKE_PENDING
+      metadata.blockchain = { ...blockchainMeta, status: 'REVOKE_PENDING' };
+      await prisma.certificate.update({
+        where: { id: certificateId },
+        data: { metadata },
+      });
+
+      // Blockchain revocation
+      const result = await blockchainCertificateService.revokeCertificate(certificate.certificateNumber);
+
+      if (result) {
+        // Blockchain confirmed → NOW update DB
+        metadata.blockchain = {
+          ...blockchainMeta,
+          status: 'REVOKED',
+          revokeTransactionHash: result.transactionHash,
+          revokedAt: new Date().toISOString(),
+        };
+        metadata.revokedAt = new Date().toISOString();
+        metadata.revokedBy = adminUserId;
+
+        const updated = await prisma.certificate.update({
+          where: { id: certificateId },
+          data: {
+            isVerified: false,
+            metadata,
+          },
+        });
+
+        logger.info(`⛓️  Certificate ${certificate.certificateNumber} revoked on blockchain + DB`);
+        return updated;
+      } else {
+        // Blockchain failed → keep isVerified = true, mark as REVOKE_FAILED
+        metadata.blockchain = { ...blockchainMeta, status: 'REVOKE_FAILED' };
+        await prisma.certificate.update({
+          where: { id: certificateId },
+          data: { metadata },
+        });
+
+        throw new Error('Blockchain revocation failed. Certificate NOT revoked. Please retry.');
+      }
+    }
+
+    // Step 2: No blockchain or not CONFIRMED — just update DB
+    metadata.revokedAt = new Date().toISOString();
+    metadata.revokedBy = adminUserId;
+    if (blockchainMeta) {
+      metadata.blockchain = { ...blockchainMeta, status: 'REVOKED', revokedAt: new Date().toISOString() };
+    }
+
+    const updated = await prisma.certificate.update({
+      where: { id: certificateId },
+      data: {
+        isVerified: false,
+        metadata,
+      },
+    });
+
+    logger.info(`Certificate ${certificate.certificateNumber} revoked in DB by admin ${adminUserId}`);
+    return updated;
   }
 
   static async healthCheck() {

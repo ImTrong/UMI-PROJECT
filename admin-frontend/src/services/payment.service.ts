@@ -160,8 +160,32 @@ export const paymentService = {
     totalRevenue: number;
     totalTransactions: number;
     byStatus: Array<{ status: string; _count: number; _sum: { amount: number } }>;
+    unsyncedCount?: number;
+    unsyncedRevenue?: number;
+    lateOnCancelledCount?: number;
+    lateOnCancelledRevenue?: number;
+    pendingRefundAmount?: number;
+    completedRefundAmount?: number;
+    netRevenue?: number;
   }> {
     const response = await paymentApi.get('/api/payments/stats');
+    return response.data.data;
+  },
+
+  async getReconciliationReport(): Promise<{
+    unsyncedList: any[];
+    lateOnCancelledList: any[];
+    pendingRefundList: any[];
+  }> {
+    const response = await paymentApi.get('/api/payments/reconciliation-report');
+    return response.data.data;
+  },
+
+  async confirmManualRefund(
+    refundId: string,
+    data: { transferReference: string; actualAmount?: number; notes?: string }
+  ): Promise<any> {
+    const response = await paymentApi.post(`/api/payments/refunds/${refundId}/confirm`, data);
     return response.data.data;
   },
 
@@ -172,5 +196,15 @@ export const paymentService = {
   }> {
     const response = await paymentApi.get('/api/payments/refunds/stats');
     return response.data.data;
+  },
+
+  async getExhaustedStripeEvents(limit = 50): Promise<{ data: any[]; count: number }> {
+    const response = await paymentApi.get(`/api/payments/stripe-events/exhausted?limit=${limit}`);
+    return response.data;
+  },
+
+  async replayStripeEvent(stripeEventId: string): Promise<{ success: boolean; message: string }> {
+    const response = await paymentApi.post('/api/payments/stripe-events/replay', { stripeEventId });
+    return response.data;
   },
 };

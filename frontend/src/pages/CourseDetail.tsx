@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { SecurePDFViewer } from '../components/learning/SecurePDFViewer';
 import { courseService, Course, Lesson, Review } from '../services/course.service';
+import { userService, InstructorPublicProfile } from '../services/user.service';
 import { RatingStars } from '../components/course/RatingStars';
 import { ReviewCard } from '../components/course/ReviewCard';
 import { useAuth } from '../hooks/useAuth';
@@ -10,7 +11,7 @@ import { useDispatch } from 'react-redux';
 import { AppDispatch } from '../store';
 import { addToCart } from '../store/cartSlice';
 import toast from 'react-hot-toast';
-import { FiPlay, FiUsers, FiStar, FiBookOpen, FiShoppingCart, FiMessageCircle, FiCreditCard } from 'react-icons/fi';
+import { FiPlay, FiUsers, FiBookOpen, FiShoppingCart, FiMessageCircle, FiCreditCard, FiAward, FiArrowRight } from 'react-icons/fi';
 import { formatVND } from '../utils/currency';
 import { orderService } from '../services/order.service';
 import { learningService } from '../services/learning.service';
@@ -33,6 +34,32 @@ export default function CourseDetail() {
   const [cartLoading, setCartLoading] = useState(false);
   const [buyNowLoading, setBuyNowLoading] = useState(false);
   const [previewLesson, setPreviewLesson] = useState<Lesson | null>(null);
+  const [instructor, setInstructor] = useState<InstructorPublicProfile | null>(null);
+  const [instructorStats, setInstructorStats] = useState<{ totalCourses: number; totalStudents: number; totalReviews: number; averageRating: number } | null>(null);
+  const [reviewFilterStar, setReviewFilterStar] = useState<number | null>(null);
+  const [reviewSort, setReviewSort] = useState<'newest' | 'highest' | 'lowest'>('newest');
+  const [allReviews, setAllReviews] = useState<Review[]>([]);
+
+  const totalRatings = Object.values(ratingDistribution).reduce((a, b) => a + b, 0);
+
+  // Computed: filtered + sorted reviews
+  const filteredAndSortedReviews = useMemo(() => {
+    let result = [...allReviews];
+    // Filter by star
+    if (reviewFilterStar !== null) {
+      result = result.filter(r => r.rating === reviewFilterStar);
+    }
+    // Sort
+    if (reviewSort === 'highest') {
+      result.sort((a, b) => b.rating - a.rating);
+    } else if (reviewSort === 'lowest') {
+      result.sort((a, b) => a.rating - b.rating);
+    } else {
+      // newest first (default)
+      result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    return result;
+  }, [allReviews, reviewFilterStar, reviewSort]);
 
 
   // Kích hoạt tính năng bảo mật chuột phải, phím tắt và kéo thả khi đang xem thử bài giảng
@@ -96,11 +123,24 @@ export default function CourseDetail() {
         const lessonsData = await courseService.getCourseLessons(courseData.id);
         setLessons(lessonsData);
         
-        const reviewsData = await courseService.getCourseReviews(courseData.id);
+        const reviewsData = await courseService.getCourseReviews(courseData.id, 1, 50);
         setReviews(reviewsData.reviews);
+        setAllReviews(reviewsData.reviews);
         
         const distribution = await courseService.getRatingDistribution(courseData.id);
         setRatingDistribution(distribution);
+
+        // Fetch instructor profile & stats
+        try {
+          const [instructorData, statsData] = await Promise.all([
+            userService.getPublicProfile(courseData.instructorId),
+            courseService.getInstructorStats(courseData.instructorId),
+          ]);
+          setInstructor(instructorData);
+          setInstructorStats(statsData);
+        } catch {
+          // Instructor data not available - non-blocking
+        }
         
         if (isAuthenticated) {
           try {
@@ -145,11 +185,19 @@ export default function CourseDetail() {
       } else {
         const newReview = await courseService.createReview(course!.id, reviewForm);
         setReviews([newReview, ...reviews]);
+        setUserReview(newReview);
         toast.success('Gửi đánh giá thành công');
       }
       setReviewForm({ rating: 0, comment: '' });
       setShowReviewForm(false);
       setEditingReview(null);
+      // Refresh rating distribution and course data
+      const [freshCourse, freshDist] = await Promise.all([
+        slug ? courseService.getCourseBySlug(slug) : courseService.getCourseById(course!.id),
+        courseService.getRatingDistribution(course!.id),
+      ]);
+      setCourse(freshCourse);
+      setRatingDistribution(freshDist);
     } catch (error: any) {
       toast.error(error.response?.data?.error || 'Không thể gửi đánh giá');
     }
@@ -166,7 +214,15 @@ export default function CourseDetail() {
       try {
         await courseService.deleteReview(reviewId);
         setReviews(reviews.filter(r => r.id !== reviewId));
+        setUserReview(null);
         toast.success('Đã xóa đánh giá');
+        // Refresh rating distribution and course data
+        const [freshCourse, freshDist] = await Promise.all([
+          slug ? courseService.getCourseBySlug(slug) : courseService.getCourseById(course!.id),
+          courseService.getRatingDistribution(course!.id),
+        ]);
+        setCourse(freshCourse);
+        setRatingDistribution(freshDist);
       } catch (error) {
         toast.error('Không thể xóa đánh giá');
       }
@@ -183,7 +239,6 @@ export default function CourseDetail() {
 
   if (!course) return null;
 
-  const totalRatings = Object.values(ratingDistribution).reduce((a, b) => a + b, 0);
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Course Header */}
@@ -194,8 +249,8 @@ export default function CourseDetail() {
             <p className="text-primary-100 mb-4">{course.description}</p>
             <div className="flex flex-wrap gap-4 text-sm">
               <div className="flex items-center">
-                <RatingStars rating={course.rating} size={16} />
-                <span className="ml-2">{course.rating.toFixed(1)} ({course.totalReviews} đánh giá)</span>
+                <RatingStars rating={course.rating || 0} size={16} />
+                <span className="ml-2">{(course.rating || 0).toFixed(1)} ({course.totalReviews || 0} đánh giá)</span>
               </div>
               <div className="flex items-center">
                 <FiUsers className="mr-1" />
@@ -207,7 +262,7 @@ export default function CourseDetail() {
               </div>
             </div>
             <div className="mt-6">
-              <span className="text-3xl font-bold">{formatVND(course.price)}</span>
+              <span className="text-3xl font-bold">{formatVND(course.price || 0)}</span>
             </div>
             {isEnrolled ? (
               <button 
@@ -293,7 +348,7 @@ export default function CourseDetail() {
           </div>
 
           {/* Requirements */}
-          {course.requirements.length > 0 && (
+          {course.requirements && course.requirements.length > 0 && (
             <div className="card">
               <h2 className="text-xl font-semibold mb-4">Yêu cầu</h2>
               <ul className="list-disc list-inside space-y-1">
@@ -305,7 +360,7 @@ export default function CourseDetail() {
           )}
 
           {/* Target Audience */}
-          {course.targetAudience.length > 0 && (
+          {course.targetAudience && course.targetAudience.length > 0 && (
             <div className="card">
               <h2 className="text-xl font-semibold mb-4">Đối tượng phù hợp</h2>
               <ul className="list-disc list-inside space-y-1">
@@ -323,13 +378,17 @@ export default function CourseDetail() {
             {/* Rating Summary */}
             <div className="flex items-start space-x-8 mb-6">
               <div className="text-center">
-                <div className="text-4xl font-bold text-primary-600">{course.rating.toFixed(1)}</div>
-                <RatingStars rating={course.rating} size={20} />
-                <div className="text-sm text-slate-500 mt-1">{course.totalReviews} lượt đánh giá</div>
+                <div className="text-4xl font-bold text-primary-600">{(course.rating || 0).toFixed(1)}</div>
+                <RatingStars rating={course.rating || 0} size={20} />
+                <div className="text-sm text-slate-500 mt-1">{course.totalReviews || 0} lượt đánh giá</div>
               </div>
               <div className="flex-1 space-y-1">
                 {[5, 4, 3, 2, 1].map((star) => (
-                  <div key={star} className="flex items-center space-x-2">
+                  <button
+                    key={star}
+                    onClick={() => setReviewFilterStar(reviewFilterStar === star ? null : star)}
+                    className={`flex items-center space-x-2 w-full rounded-lg px-1 py-0.5 transition-colors ${reviewFilterStar === star ? 'bg-yellow-50 ring-1 ring-yellow-300' : 'hover:bg-slate-50'}`}
+                  >
                     <span className="text-sm w-8">{star} ★</span>
                     <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
                       <div
@@ -342,9 +401,32 @@ export default function CourseDetail() {
                     <span className="text-sm text-slate-500 w-12">
                       {ratingDistribution[star] || 0}
                     </span>
-                  </div>
+                  </button>
                 ))}
               </div>
+            </div>
+
+            {/* Filter & Sort Controls */}
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
+                {reviewFilterStar !== null && (
+                  <button
+                    onClick={() => setReviewFilterStar(null)}
+                    className="text-xs px-3 py-1.5 bg-yellow-50 text-yellow-700 border border-yellow-200 rounded-full font-medium hover:bg-yellow-100 transition-colors flex items-center gap-1"
+                  >
+                    {reviewFilterStar} ★ &nbsp;✕
+                  </button>
+                )}
+              </div>
+              <select
+                value={reviewSort}
+                onChange={(e) => setReviewSort(e.target.value as 'newest' | 'highest' | 'lowest')}
+                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+              >
+                <option value="newest">Mới nhất</option>
+                <option value="highest">Đánh giá cao nhất</option>
+                <option value="lowest">Đánh giá thấp nhất</option>
+              </select>
             </div>
 
             {/* Write Review Button */}
@@ -403,10 +485,14 @@ export default function CourseDetail() {
 
             {/* Reviews List */}
             <div className="space-y-4">
-              {reviews.length === 0 ? (
-                <p className="text-slate-500 text-center py-4">Chưa có đánh giá nào. Hãy là người đầu tiên đánh giá!</p>
+              {filteredAndSortedReviews.length === 0 ? (
+                <p className="text-slate-500 text-center py-4">
+                  {reviewFilterStar !== null
+                    ? `Chưa có đánh giá ${reviewFilterStar} sao nào.`
+                    : 'Chưa có đánh giá nào. Hãy là người đầu tiên đánh giá!'}
+                </p>
               ) : (
-                reviews.map((review) => (
+                filteredAndSortedReviews.map((review) => (
                   <ReviewCard
                     key={review.id}
                     review={review}
@@ -424,38 +510,88 @@ export default function CourseDetail() {
         <div className="space-y-6">
           {/* Instructor Info */}
           <div className="card">
-            <h3 className="font-semibold mb-3">Giảng viên</h3>
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center">
-                <FiStar className="text-primary-600" />
-              </div>
-              <div>
-                <p className="font-medium">Giảng viên phụ trách</p>
-                <p className="text-sm text-slate-500">Mã giảng viên: {course.instructorId}</p>
+            <h3 className="text-lg font-bold text-slate-900 mb-4">Giảng viên</h3>
+            <div className="flex items-start gap-4">
+              {instructor?.avatar ? (
+                <img
+                  src={instructor.avatar}
+                  alt={instructor.fullName}
+                  className="w-16 h-16 rounded-full object-cover border-2 border-primary-100 shrink-0"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary-400 to-primary-600 flex items-center justify-center text-white font-bold text-xl shrink-0">
+                  {(instructor?.fullName || 'G').charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <p className="font-bold text-slate-900 text-base">{instructor?.fullName || 'Giảng viên'}</p>
+                {instructor?.work && instructor.work.length > 0 && (
+                  <p className="text-sm text-slate-500 mt-0.5">
+                    {instructor.work.find(w => w.current)?.position || instructor.work[0]?.position}
+                  </p>
+                )}
+                {instructorStats && (
+                  <div className="flex items-center gap-1 mt-1">
+                    <RatingStars rating={instructorStats.averageRating} size={14} />
+                    <span className="text-sm font-semibold text-slate-700">{instructorStats.averageRating.toFixed(1)}</span>
+                  </div>
+                )}
               </div>
             </div>
-            {user?.id !== course.instructorId && (
-              <button
-                onClick={() => {
-                  if (!isAuthenticated) {
-                    navigate('/login');
-                    return;
-                  }
-                  const event = new CustomEvent('open-chat-session', {
-                    detail: {
-                      participantId: course.instructorId,
-                      courseId: course.id,
-                      courseTitle: course.title
-                    }
-                  });
-                  window.dispatchEvent(event);
-                }}
-                className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2 border border-primary-600 text-primary-600 bg-white hover:bg-primary-50 rounded-xl font-semibold text-sm transition-all shadow-sm cursor-pointer"
-              >
-                <FiMessageCircle size={16} />
-                <span>Nhắn tin cho giảng viên</span>
-              </button>
+
+            {instructorStats && (
+              <div className="grid grid-cols-3 gap-2 mt-4">
+                <div className="text-center py-2 bg-slate-50 rounded-xl">
+                  <div className="text-lg font-bold text-slate-900">{instructorStats.totalStudents.toLocaleString()}</div>
+                  <div className="text-[10px] text-slate-500 font-medium">Học viên</div>
+                </div>
+                <div className="text-center py-2 bg-slate-50 rounded-xl">
+                  <div className="text-lg font-bold text-slate-900">{instructorStats.totalReviews}</div>
+                  <div className="text-[10px] text-slate-500 font-medium">Đánh giá</div>
+                </div>
+                <div className="text-center py-2 bg-slate-50 rounded-xl">
+                  <div className="text-lg font-bold text-slate-900">{instructorStats.totalCourses}</div>
+                  <div className="text-[10px] text-slate-500 font-medium">Khóa học</div>
+                </div>
+              </div>
             )}
+
+            {instructor?.bio && (
+              <p className="mt-3 text-sm text-slate-600 line-clamp-3">{instructor.bio}</p>
+            )}
+
+            <div className="mt-4 space-y-2">
+              <Link
+                to={`/instructors/${course.instructorId}`}
+                className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-xl font-semibold text-sm transition-all hover:bg-slate-800 active:scale-[0.98]"
+              >
+                <FiAward size={16} />
+                <span>Xem hồ sơ giảng viên</span>
+                <FiArrowRight size={14} />
+              </Link>
+              {user?.id !== course.instructorId && (
+                <button
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      navigate('/login');
+                      return;
+                    }
+                    const event = new CustomEvent('open-chat-session', {
+                      detail: {
+                        participantId: course.instructorId,
+                        courseId: course.id,
+                        courseTitle: course.title
+                      }
+                    });
+                    window.dispatchEvent(event);
+                  }}
+                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 border border-primary-600 text-primary-600 bg-white hover:bg-primary-50 rounded-xl font-semibold text-sm transition-all shadow-sm cursor-pointer"
+                >
+                  <FiMessageCircle size={16} />
+                  <span>Nhắn tin cho giảng viên</span>
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Course Features */}

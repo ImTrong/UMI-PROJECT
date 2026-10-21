@@ -40,8 +40,28 @@ export interface CertificateMetadata {
   pathTitle?: string;
   finalProjectScore?: number;
   certificateConfig?: any;
+  blockchain?: BlockchainMetadata;
   [key: string]: any;
 }
+
+// ==================== Blockchain Types ====================
+
+export type BlockchainStatus = 'NOT_REGISTERED' | 'PENDING' | 'CONFIRMED' | 'FAILED' | 'REVOKED' | 'REVOKE_PENDING' | 'REVOKE_FAILED';
+
+export interface BlockchainMetadata {
+  network: string;
+  chainId: number;
+  contractAddress: string;
+  certificateIdHash: string;
+  documentHash: string;
+  transactionHash?: string;
+  status: BlockchainStatus;
+  registeredAt?: string;
+  revokedAt?: string;
+  revokeTransactionHash?: string;
+  [key: string]: string | number | undefined;
+}
+
 
 export interface ActivityMetadata {
   lessonTitle?: string;
@@ -163,7 +183,7 @@ export const BADGE_CONFIG: Record<BadgeType, BadgeConfig> = {
 export interface CourseExamResult {
   courseId: string;
   courseTitle: string;
-  averageQuizScore: number;
+  averageQuizScore: number | null;
   passingScore: number;
   passed: boolean;
   totalQuizzes: number;

@@ -25,6 +25,9 @@ WORKDIR /app
 COPY services/user-service ./services/user-service
 WORKDIR /app/services/user-service
 
+# Fix symlink for shared module due to npm ci unpacking an unbuilt file dependency
+RUN rm -rf node_modules/@umi/file-storage && ln -s /app/shared/file-storage node_modules/@umi/file-storage
+
 RUN npx prisma generate
 
 # Build service (creates both dist/ and dist-seed/)

@@ -4,7 +4,7 @@ import { learningService, Certificate } from '../services/learning.service';
 import { CertificateCard } from '../components/learning/CertificateCard';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
-import { FiAward, FiBookOpen, FiMap } from 'react-icons/fi';
+import { FiAward, FiBookOpen, FiMap, FiCheckCircle } from 'react-icons/fi';
 
 type TabType = 'all' | 'course' | 'path';
 
@@ -83,8 +83,16 @@ export default function Certificates() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold text-slate-900 mb-2">Chứng nhận & Chứng chỉ</h1>
-      <p className="text-slate-500 mb-6">Quản lý chứng nhận hoàn thành khóa học và chứng chỉ lộ trình của bạn</p>
+      <div className="flex justify-between items-end mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Chứng nhận & Chứng chỉ</h1>
+          <p className="text-slate-500">Quản lý chứng nhận hoàn thành khóa học và chứng chỉ lộ trình của bạn</p>
+        </div>
+        <Link to="/verify-certificate" className="btn-primary flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+          <FiCheckCircle size={18} />
+          <span>Tra cứu / Xác minh</span>
+        </Link>
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 overflow-x-auto pb-1">

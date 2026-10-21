@@ -8,7 +8,8 @@ import {
   FiList,
   FiShoppingCart,
   FiLogOut,
-  FiActivity
+  FiActivity,
+  FiAward
 } from 'react-icons/fi';
 
 interface SidebarProps {
@@ -22,6 +23,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
 
   const adminMenu = [
     { name: 'Bảng điều khiển', href: '/admin/dashboard', icon: FiGrid },
+    { name: 'Bảng xếp hạng', href: '/admin/leaderboard', icon: FiAward },
     { name: 'Khóa học', href: '/admin/courses', icon: FiBookOpen },
     { name: 'Danh mục', href: '/admin/categories', icon: FiList },
     { name: 'Lộ trình học tập', href: '/admin/learning-paths', icon: FiActivity },
