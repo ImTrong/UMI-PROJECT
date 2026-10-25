@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { userService } from '../services/user.service';
+import { userService, InstructorApplicationView } from '../services/user.service';
 import { updateUser } from '../store/authSlice';
 import toast from 'react-hot-toast';
 import {
@@ -18,14 +18,18 @@ import {
   FiArrowRight,
   FiArrowLeft,
   FiShield,
+  FiClock,
+  FiXCircle,
 } from 'react-icons/fi';
 
 const STEPS = [
   { id: 'INTRO', title: 'Giới thiệu', icon: FiInfo },
   { id: 'INFO', title: 'Thông tin', icon: FiUser },
   { id: 'CONFIRM', title: 'Xác nhận', icon: FiShield },
-  { id: 'SUCCESS', title: 'Hoàn tất', icon: FiCheckCircle },
+  { id: 'SUBMITTED', title: 'Chờ duyệt', icon: FiClock },
 ];
+
+const formatDate = (value?: string | null) => (value ? new Date(value).toLocaleString('vi-VN') : '');
 
 export default function BecomeInstructor() {
   const navigate = useNavigate();
@@ -41,6 +45,60 @@ export default function BecomeInstructor() {
   });
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  // IMPLEMENT-01: the server decides - the latest application and the current role come from GET /become-instructor/me
+  const [application, setApplication] = useState<InstructorApplicationView | null>(null);
+  const [statusLoading, setStatusLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    userService.getMyInstructorApplication()
+      .then((status) => {
+        if (cancelled) return;
+        setApplication(status.application);
+        // an ADMIN approved the application since the session started: refresh the stored role from the server's answer
+        if (status.role === 'INSTRUCTOR' && user?.role !== 'INSTRUCTOR') dispatch(updateUser({ role: 'INSTRUCTOR' }));
+      })
+      .catch(() => { /* no status: the form stays available, the server still refuses a duplicate */ })
+      .finally(() => { if (!cancelled) setStatusLoading(false); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (statusLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-[400px]">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+      </div>
+    );
+  }
+
+  // Application waiting for review (also right after submitting): no form, only its status
+  if (application?.status === 'PENDING' && user?.role !== 'INSTRUCTOR') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-white to-teal-50 py-16 px-4">
+        <div className="max-w-2xl mx-auto text-center">
+          <div className="bg-white rounded-3xl shadow-sm p-12">
+            <div className="bg-amber-100 text-amber-600 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <FiClock size={40} />
+            </div>
+            <h2 className="text-3xl font-bold text-slate-900 mb-4">Đơn đăng ký đang chờ duyệt</h2>
+            <p className="text-slate-600 mb-2">
+              Quản trị viên UMI sẽ xem xét đơn của bạn. Bạn sẽ nhận được thông báo khi có kết quả.
+            </p>
+            <p className="text-slate-500 text-sm mb-8">
+              Lĩnh vực: <strong>{application.expertise}</strong> · Gửi lúc {formatDate(application.submittedAt)}
+            </p>
+            <button
+              onClick={() => navigate('/')}
+              className="px-8 py-3 rounded-xl border-2 border-slate-100 text-slate-700 hover:bg-slate-50 font-medium"
+            >
+              Về trang chủ
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // If already instructor, redirect
   if (user?.role === 'INSTRUCTOR') {
@@ -118,9 +176,9 @@ export default function BecomeInstructor() {
       });
 
       if (response?.data) {
-        dispatch(updateUser({ role: 'INSTRUCTOR' }));
-        setCurrentStep(3); // Success step
-        toast.success('Xin chúc mừng! Bạn đã trở thành Giảng viên.');
+        // the role does NOT change here: an administrator reviews the application first
+        setApplication(response.data);
+        toast.success('Đã gửi đơn đăng ký. Vui lòng chờ quản trị viên xét duyệt.');
       }
     } catch (error: any) {
       const errorMsg =
@@ -149,6 +207,17 @@ export default function BecomeInstructor() {
               </p>
             </div>
 
+            {application?.status === 'REJECTED' && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start space-x-3">
+                <FiXCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+                <div className="text-sm text-red-800">
+                  <p className="font-semibold mb-1">Đơn đăng ký trước chưa được duyệt{application.reviewedAt ? ` (${formatDate(application.reviewedAt)})` : ''}</p>
+                  {application.rejectionReason && <p>Lý do: {application.rejectionReason}</p>}
+                  <p className="mt-1">Bạn có thể bổ sung thông tin và gửi lại đơn.</p>
+                </div>
+              </div>
+            )}
+
             <div className="grid md:grid-cols-2 gap-5">
               {[
                 {
@@ -161,8 +230,8 @@ export default function BecomeInstructor() {
                 },
                 {
                   icon: FiBriefcase,
-                  title: 'Tăng thêm thu nhập',
-                  desc: 'Kiếm tiền từ mỗi học viên đăng ký khóa học. Thu nhập không giới hạn.',
+                  title: 'Thù lao theo hợp đồng',
+                  desc: 'Thù lao giảng dạy được thỏa thuận riêng trong hợp đồng giữa bạn và UMI.',
                   color: 'from-green-500 to-emerald-500',
                   bg: 'bg-green-50',
                   border: 'border-green-100',
@@ -204,7 +273,7 @@ export default function BecomeInstructor() {
                 onClick={handleNextStep}
                 className="btn-primary px-10 py-4 text-lg rounded-2xl shadow-sm hover:shadow-sm transition-all duration-300 inline-flex items-center space-x-2 font-bold"
               >
-                <span>Bắt đầu đăng ký</span>
+                <span>{application?.status === 'REJECTED' ? 'Gửi lại đơn đăng ký' : 'Bắt đầu đăng ký'}</span>
                 <FiArrowRight size={20} />
               </button>
             </div>
@@ -390,7 +459,7 @@ export default function BecomeInstructor() {
               <FiInfo className="text-amber-600 flex-shrink-0 mt-0.5" size={20} />
               <div className="text-sm text-amber-800">
                 <p className="font-semibold mb-1">Lưu ý quan trọng</p>
-                <p>Sau khi xác nhận, tài khoản của bạn sẽ được nâng cấp lên quyền <strong>Giảng viên</strong>. Bạn có thể bắt đầu tạo và quản lý khóa học ngay lập tức.</p>
+                <p>Sau khi gửi, đơn của bạn sẽ được <strong>quản trị viên UMI xét duyệt</strong>. Tài khoản chỉ được chuyển sang quyền Giảng viên khi đơn được duyệt; bạn sẽ nhận thông báo về kết quả.</p>
               </div>
             </div>
 
@@ -442,11 +511,11 @@ export default function BecomeInstructor() {
 
             <div>
               <h2 className="text-4xl font-extrabold text-slate-900 mb-3">
-                🎉 Xin chúc mừng!
+                Đã gửi đơn đăng ký
               </h2>
               <p className="text-xl text-slate-600 max-w-lg mx-auto leading-relaxed">
-                Bạn đã chính thức trở thành <strong className="text-primary-700">Giảng viên UMI</strong>.
-                Hãy bắt đầu tạo khóa học đầu tiên và chia sẻ kiến thức của bạn với cộng đồng!
+                Đơn của bạn đang chờ <strong className="text-primary-700">quản trị viên UMI</strong> xét duyệt.
+                Bạn sẽ nhận được thông báo khi có kết quả.
               </p>
             </div>
 

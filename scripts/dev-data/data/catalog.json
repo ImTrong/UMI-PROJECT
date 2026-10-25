@@ -1,0 +1,11 @@
+{
+  "dataset": "DATA-01",
+  "categories": [
+    { "key": "CAT_FRONTEND", "name": "Lập trình Frontend", "slug": "lap-trinh-frontend", "icon": "🖥️", "description": "Xây dựng giao diện web hiện đại: HTML, CSS, JavaScript, TypeScript, React, Next.js và tối ưu trải nghiệm người dùng." },
+    { "key": "CAT_BACKEND", "name": "Lập trình Backend", "slug": "lap-trinh-backend", "icon": "⚙️", "description": "Thiết kế API, xử lý nghiệp vụ phía máy chủ, xác thực, kiểm thử và kiến trúc dịch vụ với Node.js, Java và Go." },
+    { "key": "CAT_DATABASE", "name": "Cơ sở dữ liệu", "slug": "co-so-du-lieu", "icon": "🗄️", "description": "SQL, mô hình hóa dữ liệu, chỉ mục, giao dịch, PostgreSQL, MongoDB, Redis và tối ưu hiệu năng truy vấn." },
+    { "key": "CAT_DEVOPS", "name": "DevOps & Cloud", "slug": "devops-cloud", "icon": "☁️", "description": "Linux, Docker, Kubernetes, CI/CD, hạ tầng như mã nguồn, giám sát và vận hành hệ thống trên cloud." },
+    { "key": "CAT_SECURITY", "name": "An toàn thông tin", "slug": "an-toan-thong-tin", "icon": "🛡️", "description": "Bảo mật ứng dụng web, mật mã ứng dụng, kiểm thử xâm nhập có đạo đức và giám sát an ninh." },
+    { "key": "CAT_AI_DATA", "name": "AI & Khoa học dữ liệu", "slug": "ai-khoa-hoc-du-lieu", "icon": "🤖", "description": "Phân tích dữ liệu với Python, học máy, học sâu, xử lý ngôn ngữ tự nhiên và kỹ thuật dữ liệu." }
+  ]
+}

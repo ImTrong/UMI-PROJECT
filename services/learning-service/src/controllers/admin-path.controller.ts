@@ -1,10 +1,24 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { AdminPathService, AdminPathFilters } from '../services/admin-path.service';
+import { AdminPathService, AdminPathFilters, LearningPathInputError, pickLearningPathFields } from '../services/admin-path.service';
+import { CourseAccessError } from '../services/course-access.service';
 import { HTTP_STATUS } from '../utils/constants';
 import logger from '../utils/logger';
 
 export class AdminPathController {
+  /** FIX-INS-11: invalid fields / unknown courses -> 400, course-service unavailable -> 503. */
+  private static respondInputError(error: unknown, res: Response): boolean {
+    if (error instanceof LearningPathInputError) {
+      res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message, fields: error.fields });
+      return true;
+    }
+    if (error instanceof CourseAccessError) {
+      res.status(error.statusCode).json({ error: error.message });
+      return true;
+    }
+    return false;
+  }
+
   static async getPaths(req: AuthRequest, res: Response) {
     try {
       const page = parseInt(req.query.page as string) || 1;
@@ -43,10 +57,12 @@ export class AdminPathController {
       if (!req.user || !req.user.userId) {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: 'Unauthorized' });
       }
-      const data = req.body;
+      // FIX-INS-11: allowlisted fields only; createdBy is the (ADMIN) caller
+      const data = pickLearningPathFields(req.body, 'create');
       const path = await AdminPathService.createPath(data, req.user.userId);
       res.status(HTTP_STATUS.CREATED).json({ message: 'Path created successfully', data: path });
     } catch (error) {
+      if (AdminPathController.respondInputError(error, res)) return;
       logger.error('Create admin path error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to create path' });
     }
@@ -55,10 +71,11 @@ export class AdminPathController {
   static async updatePath(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;
-      const data = req.body;
+      const data = pickLearningPathFields(req.body, 'update');
       const path = await AdminPathService.updatePath(id, data);
       res.status(HTTP_STATUS.OK).json({ message: 'Path updated successfully', data: path });
     } catch (error: any) {
+      if (AdminPathController.respondInputError(error, res)) return;
       logger.error('Update admin path error:', error);
       if (error.message === 'Learning path not found') {
         return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
@@ -76,7 +93,11 @@ export class AdminPathController {
       }
       const path = await AdminPathService.updateStatus(id, status);
       res.status(HTTP_STATUS.OK).json({ message: 'Status updated successfully', data: path });
-    } catch (error) {
+    } catch (error: any) {
+      if (AdminPathController.respondInputError(error, res)) return;
+      if (error?.message === 'Learning path not found') {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
       logger.error('Update admin path status error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to update status' });
     }

@@ -5,6 +5,8 @@ import { ProjectAnalyzerService } from './project-analyzer.service';
 import { EvaluationEngineService } from './evaluation-engine.service';
 import { ActivityAction, FinalProjectData, EvaluationResult, SubmissionDataItem, ProcessingStatus } from '../types';
 import logger from '../utils/logger';
+import { UserNotificationClient } from './user-notification.client';
+import { PathAccessService, PATH_NOT_FOUND } from './path-access.service';
 
 let fileStorage: any = null;
 try {
@@ -26,9 +28,34 @@ try {
 
 const prisma = new PrismaClient();
 
+/** FIX-INS-13: a refused upload-url request (404 hidden / unknown project, 403 not allowed to submit, 400 bad body). */
+export class FinalProjectUploadError extends Error {
+  constructor(message: string, public readonly statusCode: number) {
+    super(message);
+    this.name = 'FinalProjectUploadError';
+  }
+}
+
+/** FIX-INS-10: the only fields a client may set on a final project. learningPathId comes from the route, createdBy from the caller. */
+export const FINAL_PROJECT_WRITABLE_FIELDS = [
+  'title', 'description', 'instructions', 'objectives', 'references', 'maxScore', 'passingScore', 'allowedFileTypes',
+  'maxFileSizeMB', 'maxAttempts', 'deadline', 'submissionTypes', 'evaluationPipeline',
+] as const;
+
+export const FINAL_PROJECT_MOVE_REFUSED = 'learningPathId cannot be changed';
+
+export function pickFinalProjectFields(body: any): Partial<FinalProjectData> {
+  const picked: Record<string, unknown> = {};
+  if (!body || typeof body !== 'object') return picked;
+  for (const key of FINAL_PROJECT_WRITABLE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(body, key)) picked[key] = body[key];
+  }
+  return picked as Partial<FinalProjectData>;
+}
+
 export class FinalProjectService {
   /**
-   * Create a final project for a learning path (Admin/Instructor)
+   * Create a final project for a learning path (ADMIN only since FIX-INS-10 - checked by the controller)
    */
   static async createFinalProject(data: FinalProjectData, createdBy: string) {
     // Check if final project already exists
@@ -94,6 +121,10 @@ export class FinalProjectService {
   static async updateFinalProject(projectId: string, data: Partial<FinalProjectData>, userId: string) {
     const project = await prisma.finalProject.findUnique({ where: { id: projectId } });
     if (!project) throw new Error(ERROR_MESSAGES.FINAL_PROJECT_NOT_FOUND);
+    // FIX-INS-10: a final project never moves to another learning path (learningPathId / createdBy are not written below)
+    if (data.learningPathId !== undefined && data.learningPathId !== project.learningPathId) {
+      throw new Error(FINAL_PROJECT_MOVE_REFUSED);
+    }
 
     const updated = await prisma.finalProject.update({
       where: { id: projectId },
@@ -122,12 +153,8 @@ export class FinalProjectService {
    * Returns { unlocked: boolean, reasons: string[], completedCourses, totalCourses }
    */
   static async checkUnlockCondition(userId: string, learningPathId: string) {
-    // Get the path and its course IDs
-    const path = await prisma.learningPath.findUnique({
-      where: { id: learningPathId },
-    });
-
-    if (!path) throw new Error('Learning path not found');
+    // Get the path and its course IDs - FIX-INS-12: only a path this learner may see (unlock status, upload, every submit)
+    const path = await PathAccessService.requireViewable(learningPathId, userId);
 
     const courseIds = path.courseIds || [];
     if (courseIds.length === 0) {
@@ -664,9 +691,7 @@ export class FinalProjectService {
 
         // Send notification
         try {
-          const notifAxios = require('axios');
-          const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
-          await notifAxios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+          await UserNotificationClient.send({
             userId: submission.userId,
             title: isPassed ? '🎉 Bài kiểm tra cuối kỳ ĐẠT!' : '📝 Bài kiểm tra cuối kỳ đã được chấm',
             message: isPassed
@@ -835,9 +860,7 @@ export class FinalProjectService {
 
       // Send notification to student
       try {
-        const notifAxios = require('axios');
-        const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
-        await notifAxios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+        await UserNotificationClient.send({
           userId: submission.userId,
           title: isPassed ? '🎉 Bài kiểm tra cuối kỳ ĐẠT!' : '📝 Bài kiểm tra cuối kỳ đã được chấm',
           message: isPassed
@@ -869,6 +892,33 @@ export class FinalProjectService {
   /**
    * Get upload URL for final project file
    */
+  /**
+   * FIX-INS-13 - may this learner upload a file for a submission to `projectId` (a FinalProject id) right now? The same gates as
+   * submitting (submitFinalProject): the project exists, its learning path is visible to the learner (FIX-INS-12) and unlocked for
+   * them (enrollment + course certificates), the deadline has not passed, no passing submission yet, attempts left. Seeing the
+   * path is not enough. userId is the authenticated caller; nothing from the request is trusted. Throws FinalProjectUploadError.
+   */
+  static async requireUploadPermission(projectId: string, userId: string) {
+    const project = await prisma.finalProject.findUnique({ where: { id: projectId } });
+    if (!project) throw new FinalProjectUploadError(ERROR_MESSAGES.FINAL_PROJECT_NOT_FOUND, 404);
+    let unlockStatus;
+    try {
+      unlockStatus = await this.checkUnlockCondition(userId, project.learningPathId);
+    } catch (error: any) {
+      if (error?.message === PATH_NOT_FOUND) throw new FinalProjectUploadError(ERROR_MESSAGES.FINAL_PROJECT_NOT_FOUND, 404);
+      throw error;
+    }
+    if (!unlockStatus.unlocked) throw new FinalProjectUploadError('Bạn chưa đủ điều kiện để nộp bài kiểm tra cuối kỳ', 403);
+    if (project.deadline && new Date() > project.deadline) throw new FinalProjectUploadError('Đã quá thời hạn nộp bài kiểm tra cuối kỳ', 403);
+    const passingSubmission = await prisma.finalProjectSubmission.findFirst({
+      where: { finalProjectId: projectId, userId, status: 'GRADED', totalScore: { gte: project.passingScore } },
+    });
+    if (passingSubmission) throw new FinalProjectUploadError('Bạn đã đạt bài kiểm tra cuối kỳ này rồi!', 403);
+    const existingCount = await prisma.finalProjectSubmission.count({ where: { finalProjectId: projectId, userId } });
+    if (existingCount >= project.maxAttempts) throw new FinalProjectUploadError(`Bạn đã hết số lần nộp bài (${project.maxAttempts} lần)`, 403);
+    return project;
+  }
+
   static async getUploadUrl(fileName: string, mimeType: string) {
     if (!fileStorage) {
       throw new Error('File storage service is not available');
@@ -927,11 +977,9 @@ export class FinalProjectService {
 
     // Send notification to student
     try {
-      const axios = require('axios');
-      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
       const isPassed = data.score >= submission.finalProject.passingScore;
 
-      await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+      await UserNotificationClient.send({
         userId: submission.userId,
         title: isPassed ? '🎉 Project cuối kỳ đạt điểm!' : '📝 Project cuối kỳ đã được chấm',
         message: isPassed

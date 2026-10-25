@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { BadgeType, BADGE_CONFIG, ActivityAction } from '../types';
 import { ActivityService } from './activity.service';
 import logger from '../utils/logger';
-import axios from 'axios';
+import { UserNotificationClient } from './user-notification.client';
 
 const prisma = new PrismaClient();
 
@@ -47,8 +47,7 @@ export class BadgeService {
 
     // Send real-time notification to user
     try {
-      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
-      await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+      await UserNotificationClient.send({
         userId,
         title: '🎖️ Bạn đã nhận được Huy chương mới!',
         message: `Chúc mừng bạn đã đạt Huy chương "${badgeConfig.name}": ${badgeConfig.description}`,

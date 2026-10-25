@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getGeminiClient } from '../../../config/gemini.config';
 import { IEmbeddingService } from '../types';
+import { RAGError } from '../errors';
 import logger from '../../../utils/logger';
 
 /**
@@ -17,6 +18,7 @@ export class GeminiEmbeddingService implements IEmbeddingService {
   private readonly maxRetries = 3;
   private readonly batchSize = 50;
   private readonly delayBetweenBatchesMs = 100;
+  private readonly timeoutMs = parseInt(process.env.EMBEDDING_TIMEOUT_MS || '15000', 10);
 
   constructor(modelName: string, dimension: number) {
     this.modelName = modelName;
@@ -77,7 +79,8 @@ export class GeminiEmbeddingService implements IEmbeddingService {
     for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
       try {
         const genAI: GoogleGenerativeAI = getGeminiClient();
-        const model = genAI.getGenerativeModel({ model: this.modelName });
+        // RAG-P0: a hung request must fail (EMBEDDING_FAILED) instead of blocking the chat request forever
+        const model = genAI.getGenerativeModel({ model: this.modelName }, { timeout: this.timeoutMs });
 
         const result = await model.embedContent({
           content: { role: 'user', parts: [{ text }] },
@@ -108,7 +111,8 @@ export class GeminiEmbeddingService implements IEmbeddingService {
       }
     }
 
-    throw new Error(
+    throw new RAGError(
+      'EMBEDDING_FAILED',
       `[GeminiEmbedding] All ${this.maxRetries} attempts failed: ${lastError?.message}`,
     );
   }

@@ -1,5 +1,21 @@
 import axios, { AxiosInstance } from 'axios';
 import logger from '../utils/logger';
+import { readServiceToken, SERVICE_TOKEN_HEADER } from '../utils/service-token';
+
+/**
+ * AI -> Learning credential (FIX-INS-05): the learning-service's internal per-learner routes (skill profile, learner analysis)
+ * accept ONLY this token in X-Internal-Service-Token. Without a usable value nothing is sent (no fallback to INTERNAL_SERVICE_TOKEN,
+ * a default or ""), and the caller degrades exactly as when the learning-service is down (null).
+ */
+const AI_LEARNING_TOKEN = 'AI_LEARNING_TOKEN';
+function learningInternalHeaders(): Record<string, string> | null {
+  const token = readServiceToken(AI_LEARNING_TOKEN);
+  if (!token.ok) {
+    logger.error(`Not calling the learning-service internal API: ${token.reason}`);
+    return null;
+  }
+  return { [SERVICE_TOKEN_HEADER]: token.value };
+}
 
 /**
  * Learner profile data aggregated from multiple services
@@ -627,8 +643,11 @@ export class LearningContextService {
    * Phase 3A — non-blocking, returns null on failure
    */
   private static async fetchSkillProfile(userId: string): Promise<any> {
+    // userId is the signed-in user this context is built for (getExtendedContext)
+    const headers = learningInternalHeaders();
+    if (!headers) return null;
     try {
-      const res = await this.learningApi.get(`/api/learning/internal/skill-profile/${userId}`);
+      const res = await this.learningApi.get(`/api/learning/internal/skill-profile/${userId}`, { headers });
       return res.data?.data || null;
     } catch (err: any) {
       logger.debug(`No skill profile found for user ${userId}: ${err.message}`);
@@ -641,8 +660,11 @@ export class LearningContextService {
    * GĐ2 — used by CompetencyAnalysisService
    */
   static async fetchLearnerAnalysis(userId: string): Promise<any> {
+    // userId is the signed-in user (CompetencyAnalysisService.generateFullAnalysis <- req.user.userId)
+    const headers = learningInternalHeaders();
+    if (!headers) return null;
     try {
-      const res = await this.learningApi.get(`/api/learning/internal/learner-analysis/${userId}`);
+      const res = await this.learningApi.get(`/api/learning/internal/learner-analysis/${userId}`, { headers });
       return res.data?.data || null;
     } catch (err: any) {
       logger.warn(`Failed to fetch learner analysis for user ${userId}: ${err.message}`);

@@ -1,4 +1,19 @@
 import { PrismaClient, PaymentStatus, RefundStatus } from '@prisma/client';
+import { assertMockPaymentEnabled } from '../utils/mock-payment';
+import { PaymentConfirmationRejectedError, stripeConfirmationProblem } from '../utils/payment-confirmation';
+import { isDefiniteStripeRejection, verdictFromStripeRefund } from '../utils/stripe-refund-result';
+import {
+  isObjectId,
+  OrderRefundRejectedError,
+  OrderRefundRequest,
+  paymentEvidenceView,
+  paymentStatusView,
+  refundIdempotencyKey,
+  refundOutcome,
+  refundProviderOf,
+  refundView,
+} from '../utils/order-refund';
+import { readServiceToken, SERVICE_TOKEN_HEADER } from '../utils/service-token';
 import axios from 'axios';
 import { StripeService } from './stripe.service';
 import { PayosService } from './payos.service';
@@ -23,9 +38,36 @@ export interface ConfirmPaymentData {
   paymentMethodId: string;
 }
 
+/**
+ * Who asks to confirm a payment (FIX 07B-1.1):
+ *   - 'user': a signed-in user - `userId` comes from the authenticated request (never from the body) and may only confirm a payment
+ *     whose Payment.userId in the database is that user;
+ *   - 'internal': the order-service, authenticated with ORDER_PAYMENT_TOKEN (it checks the order owner itself).
+ */
+export type PaymentActor = { kind: 'user'; userId: string } | { kind: 'internal' };
+
+const OBJECT_ID = /^[0-9a-fA-F]{24}$/;
+
+/** Extra `where` condition for the caller; throws (fail-closed) when the caller cannot be identified. */
+function paymentOwnerFilter(actor: PaymentActor | undefined): { userId?: string } {
+  if (actor?.kind === 'internal') return {};
+  if (actor?.kind === 'user') {
+    // a malformed identity cannot own anything: answered like an unknown payment, before the database is touched
+    if (typeof actor.userId !== 'string' || !OBJECT_ID.test(actor.userId)) throw new Error(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
+    return { userId: actor.userId };
+  }
+  throw new Error('Payment confirmation requires an authenticated caller');
+}
+
 export class PaymentService {
   static async createPaymentIntent(data: CreatePaymentData) {
     const { orderId, orderNumber, userId, amount, currency = 'vnd', type = 'COURSE_PURCHASE', metadata = {} } = data;
+
+    // IMPLEMENT-01: only course purchases. INSTRUCTOR_REGISTRATION (a fee that used to upgrade the payer's role) is no longer
+    // created - instructor applications are free and reviewed by an ADMIN in the user-service. Refused before anything else.
+    if (type !== 'COURSE_PURCHASE') {
+      throw new Error(ERROR_MESSAGES.UNSUPPORTED_PAYMENT_TYPE);
+    }
 
     // Validation for course purchase
     if (type === 'COURSE_PURCHASE' && (!orderId || !orderNumber)) {
@@ -500,8 +542,11 @@ export class PaymentService {
     }
   }
 
-  static async confirmPayment(data: ConfirmPaymentData) {
+  static async confirmPayment(data: ConfirmPaymentData, actor: PaymentActor) {
     const { paymentIntentId, paymentMethodId } = data;
+    // Ownership first (FIX 07B-1.1): a user's lookup is limited to their own payments, so someone else's payment is "not found"
+    // exactly like a missing one, and nothing below (status writes, order / user notifications) can run for it.
+    const ownerFilter = paymentOwnerFilter(actor);
 
     // Check if paymentIntentId is a MongoDB ObjectId (24 hex chars) or a Stripe ID (pi_...)
     const isObjectId = /^[0-9a-fA-F]{24}$/.test(paymentIntentId);
@@ -509,12 +554,22 @@ export class PaymentService {
     // Find payment in database
     const payment = await prisma.payment.findFirst({
       where: isObjectId
-        ? { id: paymentIntentId }
-        : { stripePaymentIntentId: paymentIntentId },
+        ? { id: paymentIntentId, ...ownerFilter }
+        : { stripePaymentIntentId: paymentIntentId, ...ownerFilter },
     });
 
     if (!payment) {
       throw new Error(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
+    }
+    if (ownerFilter.userId && String(payment.userId).toLowerCase() !== ownerFilter.userId.toLowerCase()) {
+      throw new Error(ERROR_MESSAGES.PAYMENT_NOT_FOUND);   // second check on the row itself: never trust the filter alone
+    }
+
+    // Only Stripe payments are confirmed here (FIX 07B-1.2): a payOS payment, or one whose provider is unclear, is refused before
+    // anything is written or any provider is asked - never "failed" because Stripe has no intent for it.
+    const providerProblem = stripeConfirmationProblem(payment);
+    if (providerProblem) {
+      throw new PaymentConfirmationRejectedError(providerProblem);
     }
 
     // If already succeeded, return it directly
@@ -526,46 +581,38 @@ export class PaymentService {
       throw new Error(ERROR_MESSAGES.PAYMENT_ALREADY_PROCESSED);
     }
 
+    const stripePaymentId = payment.stripePaymentIntentId;
+    const isMockPayment =
+      (payment.metadata as any)?.isMock ||
+      !StripeService.isConfigured() ||
+      stripePaymentId?.startsWith('pi_mock_');
+    // Without a real Stripe intent "confirming" marks the payment SUCCEEDED with no money involved: that is the demo flow,
+    // development / test only (FIX 07B-1). Checked before anything is written, so a refusal changes nothing.
+    if (isMockPayment) assertMockPaymentEnabled();
+    if (!isMockPayment && !stripePaymentId) {
+      throw new PaymentConfirmationRejectedError('STRIPE_INTENT_MISSING');   // nothing to ask Stripe about: refused, not failed
+    }
+
     // Update status to processing
     await prisma.payment.update({
       where: { id: payment.id },
       data: { status: PaymentStatus.PROCESSING },
     });
 
+    let updatedPayment;
     try {
-      const stripePaymentId = payment.stripePaymentIntentId;
-      const isMockPayment =
-        (payment.metadata as any)?.isMock ||
-        !StripeService.isConfigured() ||
-        stripePaymentId?.startsWith('pi_mock_');
-
       let newStatus: PaymentStatus;
       let completedAt: Date | null = null;
 
       if (isMockPayment) {
         newStatus = PaymentStatus.SUCCEEDED;
         completedAt = new Date();
-
-        if ((payment as any).type === 'COURSE_PURCHASE' && payment.orderId) {
-          await this.notifyOrderService(payment.orderId, 'PAID');
-        } else if ((payment as any).type === ('INSTRUCTOR_REGISTRATION' as any)) {
-          await this.notifyUserService(payment.userId, 'INSTRUCTOR_REGISTRATION_SUCCESS');
-        }
       } else {
-        if (!stripePaymentId) {
-          throw new Error('Payment does not have a valid Stripe intent ID');
-        }
-        const stripePayment = await StripeService.getPaymentIntent(stripePaymentId);
+        const stripePayment = await StripeService.getPaymentIntent(stripePaymentId as string);
 
         if (stripePayment.status === 'succeeded') {
           newStatus = PaymentStatus.SUCCEEDED;
           completedAt = new Date();
-
-          if ((payment as any).type === 'COURSE_PURCHASE' && payment.orderId) {
-            await this.notifyOrderService(payment.orderId, 'PAID');
-          } else if ((payment as any).type === ('INSTRUCTOR_REGISTRATION' as any)) {
-            await this.notifyUserService(payment.userId, 'INSTRUCTOR_REGISTRATION_SUCCESS');
-          }
         } else if (stripePayment.status === 'requires_payment_method') {
           newStatus = PaymentStatus.FAILED;
         } else if (stripePayment.status === 'canceled') {
@@ -575,36 +622,96 @@ export class PaymentService {
         }
       }
 
-      // Update payment record
-      const updatedPayment = await prisma.payment.update({
+      // Update payment record. A success is recorded BEFORE anyone is told (like the Stripe webhook): orderSynced stays false
+      // until the order service has the news, so the outbox delivers it if the call below fails.
+      const succeeded = newStatus === PaymentStatus.SUCCEEDED;
+      updatedPayment = await prisma.payment.update({
         where: { id: payment.id },
         data: {
           status: newStatus,
           paymentMethodId,
           completedAt,
+          ...(succeeded && { orderSynced: false, metadata: { ...((payment.metadata as any) || {}), orderSynced: false } }),
         },
       });
-
-      logger.info(`Payment confirmed: ${paymentIntentId}, status: ${newStatus}`);
-
-      return updatedPayment;
     } catch (error: any) {
-      // Update payment as failed
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: {
-          status: PaymentStatus.FAILED,
-          errorMessage: error.message,
-        },
-      });
-
-      // Notify services about failure
-      if ((payment as any).type === 'COURSE_PURCHASE' && payment.orderId) {
-        await this.notifyOrderService(payment.orderId, 'FAILED');
-      }
-
+      // A technical error (Stripe unreachable or without this intent, database) is no evidence that THIS payment failed
+      // (FIX 07B-1.2): it gets back the status it had, nobody is told FAILED, and the caller / the Stripe webhook can decide later.
+      await prisma.payment
+        .updateMany({
+          where: { id: payment.id, status: PaymentStatus.PROCESSING },
+          data: { status: payment.status, errorMessage: String(error?.message || 'unknown error').slice(0, 500) },
+        })
+        .catch((restoreError: any) => logger.error(`Could not restore payment ${payment.id} after a confirmation error: ${restoreError?.message}`));
       throw error;
     }
+
+    if (updatedPayment.status === PaymentStatus.SUCCEEDED) {
+      if ((payment as any).type === 'COURSE_PURCHASE' && payment.orderId) {
+        try {
+          await this.notifyOrderService(payment.orderId, 'PAID');
+          updatedPayment = await prisma.payment.update({
+            where: { id: payment.id },
+            data: {
+              orderSynced: true,
+              orderSyncedAt: new Date(),
+              metadata: { ...((updatedPayment.metadata as any) || {}), orderSynced: true, orderSyncedAt: new Date() },
+            },
+          });
+        } catch (err: any) {
+          // the payment DID succeed: it stays SUCCEEDED with orderSynced=false and the outbox worker tells the order service
+          logger.warn(`Payment ${payment.id} confirmed, order sync deferred to the outbox: ${err?.message}`);
+        }
+      } else if ((payment as any).type === ('INSTRUCTOR_REGISTRATION' as any)) {
+        // a registration fee created before IMPLEMENT-01: the user-service only queues an application for ADMIN review
+        await this.notifyUserService(payment.userId, 'INSTRUCTOR_REGISTRATION_SUCCESS');
+      }
+    }
+
+    logger.info(`Payment confirmed: ${paymentIntentId}, status: ${updatedPayment.status}`);
+
+    return updatedPayment;
+  }
+
+  /**
+   * Internal (order-service, ORDER_PAYMENT_TOKEN - FIX 07B-2A.1): the status of the payment of ONE order, read from the database
+   * (kept current by the provider webhooks / outbox). A payment of another order and a missing one get the same "not found".
+   */
+  static async getPaymentStatusForOrder(paymentId: string, orderId: string) {
+    if (!isObjectId(paymentId) || !isObjectId(orderId)) throw new Error(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
+    const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+    if (!payment || payment.orderId !== orderId) throw new Error(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
+    return paymentStatusView(payment);
+  }
+
+  /**
+   * Internal (order-service, ORDER_PAYMENT_TOKEN - ADMIN-DASHBOARD-01): the stored course-purchase payments of several orders, for
+   * the sales statistics. Read-only, database state as written by the provider webhooks / outbox (no provider call); an order
+   * with no payment simply has no row. The caller decides what counts as "paid" - this only reports what is stored.
+   */
+  static async getPaymentEvidenceForOrders(orderIds: string[]) {
+    const payments = await prisma.payment.findMany({
+      where: { orderId: { in: orderIds }, type: 'COURSE_PURCHASE' },
+      orderBy: { createdAt: 'asc' },
+    });
+    return payments.map(paymentEvidenceView);
+  }
+
+  /**
+   * Internal (order-service, ORDER_PAYMENT_TOKEN - FIX 07B-2A.1/2A.2): refund the payment of ONE order through the refund core
+   * (refundPayment). Checked here: the payment belongs to that order, the currency matches, the provider is clear. The request's
+   * idempotency key becomes the Refund row's unique key and Stripe's idempotency key: a replay resumes or returns that refund.
+   */
+  static async refundForOrder(request: OrderRefundRequest) {
+    const payment = await prisma.payment.findUnique({ where: { id: request.paymentId } });
+    if (!payment || payment.orderId !== request.orderId) throw new Error(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
+    if (request.currency !== undefined && request.currency.trim().toLowerCase() !== String(payment.currency || 'vnd').toLowerCase()) {
+      throw new OrderRefundRejectedError('CURRENCY_MISMATCH', 422, 'Refund currency does not match the payment');
+    }
+    if (!refundProviderOf(payment)) throw new OrderRefundRejectedError('PAYMENT_PROVIDER_UNKNOWN', 409, 'Payment provider is not clear');
+
+    const result = await this.refundPayment(payment.id, payment.userId, request.amount, request.reason, false, refundIdempotencyKey(request.idempotencyKey));
+    return { outcome: result.outcome, replayed: result.replayed, refund: refundView(result.refund) };
   }
 
   static async getPaymentByOrder(orderId: string, userId: string) {
@@ -639,6 +746,8 @@ export class PaymentService {
    * Giả lập hoàn thành thanh toán trong chế độ Sandbox/Demo.
    */
   static async completeMockPayment(orderId: string, userId: string) {
+    // development / test only - checked here too, so no caller can reach the demo completion around the route (FIX 07B-1)
+    assertMockPaymentEnabled();
     const payment = await prisma.payment.findFirst({
       where: {
         orderId,
@@ -789,257 +898,299 @@ export class PaymentService {
 
 
   /**
-   * A: Atomic refund with optimistic concurrency control.
+   * Refund core (FIX 07B-2A.2). Invariant, for every payment and at every moment:
+   *     refundedTotal + pendingRefundTotal <= amount
+   * where both counters are DERIVED from the payment's Refund rows (PENDING = reserved, SUCCEEDED = refunded) inside the same MongoDB
+   * transaction that changes a row. Every such transaction also writes the payment document, so concurrent refund writers - in any
+   * process - conflict on it and are serialised (the loser is retried and sees the winner's rows).
    *
-   * Flow:
-   * 1. Validate payment state.
-   * 2. Aggregate Refund records (source of truth) to compute remaining refundable.
-   * 3. Reserve atomically using refundVersion conditional update (CAS).
-   *    If version mismatch → concurrent request got there first → retry or reject.
-   * 4. Create Refund record (PENDING).
-   * 5. Call provider (Stripe) OUTSIDE transaction — with Stripe idempotency key.
-   * 6. On success/failure: update Refund + Payment accounting.
-   * 7. On provider error: release reservation safely.
+   *   1. reserve      one transaction: re-check the payment, compute what is left from the rows, insert the PENDING row (its
+   *                   idempotencyKey is unique in the collection) and the counters. Two keys can never reserve more than is left;
+   *                   the same key twice is one row.
+   *   2. provider     Stripe is called only after that commit, with the row's key as Stripe idempotency key and the row id in the
+   *                   refund metadata; a lease on the row (processingUntil) keeps other instances from calling at the same time.
+   *   3. outcome      succeeded -> SUCCEEDED; Stripe rejected / refund failed -> FAILED (reservation released); timeout, network,
+   *                   5xx, unknown -> UNVERIFIED: the row stays PENDING and RESERVED - a retry with the same key re-sends the SAME
+   *                   request (or reads the known Stripe refund), and the charge.refunded / charge.refund.updated webhooks settle it.
+   *   payOS / no Stripe intent: the row stays PENDING for the admin's manual confirmation (confirmManualRefund), as before.
+   *
+   * Returns { refund, outcome, replayed }. A key already used for another payment / amount -> 422; a refund with this key being
+   * sent by another instance right now -> 409 REFUND_IN_PROGRESS (never a success).
    */
   static async refundPayment(
     paymentId: string,
     userId: string,
     amount?: number,
     reason?: string,
-    isAdmin: boolean = false
-  ) {
-    // ── Step 1: Validate ─────────────────────────────────────────────────
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
-    });
-
+    isAdmin: boolean = false,
+    requestIdempotencyKey?: string
+  ): Promise<{ refund: any; outcome: 'SUCCEEDED' | 'PENDING' | 'FAILED' | 'UNVERIFIED'; replayed: boolean }> {
+    const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
     if (!payment) {
       throw new Error(ERROR_MESSAGES.PAYMENT_NOT_FOUND);
     }
-
     if (!isAdmin && payment.userId !== userId) {
       throw new Error(ERROR_MESSAGES.FORBIDDEN);
     }
 
-    if (payment.status !== PaymentStatus.SUCCEEDED && payment.status !== PaymentStatus.PARTIALLY_REFUNDED) {
-      throw new Error(ERROR_MESSAGES.PAYMENT_ALREADY_PROCESSED);
+    // a caller-supplied key (internal order refund) makes a retry land on the same Refund row and the same Stripe refund
+    const idempotencyKey = requestIdempotencyKey ?? `refund_${paymentId}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    if (requestIdempotencyKey) {
+      const earlier = await prisma.refund.findUnique({ where: { idempotencyKey } });
+      if (earlier) return this.resumeRefund(earlier, payment, amount);
     }
 
-    // ── Step 2: Source of truth = Refund records ─────────────────────────
-    const refundAgg = await prisma.refund.aggregate({
-      where: {
-        paymentId,
-        status: { in: [RefundStatus.SUCCEEDED, RefundStatus.PENDING] },
-      },
-      _sum: { amount: true },
-    });
-    const totalCommitted = refundAgg._sum.amount || 0;
-    const remainingRefundable = payment.amount - totalCommitted;
-
-    if (remainingRefundable <= 0) {
-      throw new Error(ERROR_MESSAGES.REFUND_ALREADY_PROCESSED);
-    }
-
-    const refundAmount = amount || remainingRefundable;
-
-    if (refundAmount > remainingRefundable) {
-      throw new Error(`Refund amount (${refundAmount}) exceeds remaining refundable amount (${remainingRefundable})`);
-    }
-
-    if (refundAmount <= 0) {
-      throw new Error(ERROR_MESSAGES.INVALID_PAYMENT_AMOUNT);
-    }
-
-    // ── Step 3: Atomic reserve with optimistic concurrency (CAS) ────────
-    // updateMany with version guard: only succeeds if nobody else changed refundVersion
-    const currentVersion = payment.refundVersion || 0;
-    const newPendingTotal = (payment.pendingRefundTotal || 0) + refundAmount;
-
-    const reserveResult = await prisma.payment.updateMany({
-      where: {
-        id: payment.id,
-        refundVersion: currentVersion,
-        // Double-check status hasn't changed to terminal
-        status: { in: [PaymentStatus.SUCCEEDED, PaymentStatus.PARTIALLY_REFUNDED] },
-      },
-      data: {
-        pendingRefundTotal: newPendingTotal,
-        refundVersion: currentVersion + 1,
-      },
-    });
-
-    if (reserveResult.count === 0) {
-      throw new Error('Concurrent refund detected — please retry. Another refund request is being processed.');
-    }
-
-    // ── Step 4: Generate idempotency key ────────────────────────────────
-    const idempotencyKey = `refund_${paymentId}_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-
-    // ── Step 5: PayOS / Manual refund path ──────────────────────────────
-    if (payment.provider === 'payos' || !payment.stripePaymentIntentId) {
-      try {
-        const refund = await prisma.refund.create({
+    const manual = payment.provider === 'payos' || !payment.stripePaymentIntentId;
+    let refund: any;
+    try {
+      refund = await this.refundTx(async (tx) => {
+        const current = await tx.payment.findUnique({ where: { id: paymentId } });
+        if (current.status !== PaymentStatus.SUCCEEDED && current.status !== PaymentStatus.PARTIALLY_REFUNDED) {
+          throw new Error(ERROR_MESSAGES.PAYMENT_ALREADY_PROCESSED);
+        }
+        const { refunded, pending } = await this.refundRowTotals(tx, paymentId);
+        const remainingRefundable = current.amount - refunded - pending;
+        if (remainingRefundable <= 0) {
+          throw new Error(ERROR_MESSAGES.REFUND_ALREADY_PROCESSED);
+        }
+        const refundAmount = amount || remainingRefundable;
+        if (refundAmount > remainingRefundable) {
+          throw new Error(`Refund amount (${refundAmount}) exceeds remaining refundable amount (${remainingRefundable})`);
+        }
+        if (refundAmount <= 0) {
+          throw new Error(ERROR_MESSAGES.INVALID_PAYMENT_AMOUNT);
+        }
+        const created = await tx.refund.create({
           data: {
-            paymentId: payment.id,
-            orderId: payment.orderId,
-            orderNumber: payment.orderNumber,
-            userId: payment.userId,
+            paymentId: current.id,
+            orderId: current.orderId,
+            orderNumber: current.orderNumber,
+            userId: current.userId,
             amount: refundAmount,
-            currency: payment.currency,
+            currency: current.currency,
             reason,
             status: RefundStatus.PENDING,
             idempotencyKey,
-            errorMessage: null,
+            processingUntil: manual ? null : new Date(Date.now() + PaymentService.REFUND_LEASE_MS),
           },
         });
+        await this.syncRefundTotals(tx, current.id, manual
+          ? { pendingRefundId: created.id, manualRefundRequired: true, reconciliationStatus: 'MANUAL_REFUND_PENDING' }
+          : {});
+        return created;
+      });
+    } catch (error: any) {
+      if (requestIdempotencyKey && error?.code === 'P2002') {
+        const recorded = await prisma.refund.findUnique({ where: { idempotencyKey } });   // the same key reserved by another instance
+        if (recorded) return this.resumeRefund(recorded, payment, amount);
+      }
+      throw error;
+    }
 
-        // Update metadata (reservation already committed via CAS above)
-        await prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            metadata: {
-              ...((payment.metadata as any) || {}),
-              pendingRefundId: refund.id,
-              pendingRefundAmount: newPendingTotal,
-              refundableAmount: payment.amount - (payment.refundedTotal || 0) - newPendingTotal,
-              manualRefundRequired: true,
-              reconciliationStatus: 'MANUAL_REFUND_PENDING',
-            },
-          },
-        });
+    if (manual) {
+      logger.info(`Manual refund created (PENDING, admin confirmation required): refund ${refund.id} for payment ${payment.id}`);
+      return { refund, outcome: 'PENDING', replayed: false };
+    }
+    return this.sendStripeRefund(refund, payment, false);
+  }
 
-        logger.info(
-          `PayOS manual refund created (PENDING, admin confirmation required): refund ${refund.id} for payment ${payment.id}`
-        );
-        return refund;
-      } catch (error: any) {
-        // Rollback reservation
-        await this.releaseRefundReservation(payment.id, currentVersion + 1, refundAmount);
-        throw error;
+  /** A refund row that already exists for the request's key: same payment and amount -> continue / report it; otherwise 422. */
+  private static async resumeRefund(existing: any, payment: any, amount?: number) {
+    if (existing.paymentId !== payment.id || (amount !== undefined && amount !== null && existing.amount !== amount)) {
+      throw new OrderRefundRejectedError('IDEMPOTENCY_KEY_REUSED', 422, 'This idempotency key belongs to another refund');
+    }
+    if (existing.status === RefundStatus.SUCCEEDED) return { refund: existing, outcome: 'SUCCEEDED' as const, replayed: true };
+    if (existing.status === RefundStatus.FAILED) return { refund: existing, outcome: 'FAILED' as const, replayed: true };
+    const current = await prisma.payment.findUnique({ where: { id: payment.id } });
+    if (current!.provider === 'payos' || !current!.stripePaymentIntentId) return { refund: existing, outcome: 'PENDING' as const, replayed: true };
+    return this.sendStripeRefund(existing, current, true);
+  }
+
+  private static readonly REFUND_LEASE_MS = 120_000;                         // longer than one Stripe call incl. the SDK's retries
+  private static readonly STRIPE_IDEMPOTENCY_WINDOW_MS = 23 * 60 * 60 * 1000;   // Stripe keeps idempotency keys for ~24 h
+
+  /** Talk to Stripe for one PENDING refund row and record what Stripe proved. Never releases a reservation on an unknown outcome. */
+  private static async sendStripeRefund(refund: any, payment: any, replayed: boolean) {
+    const now = new Date();
+    if (replayed) {
+      // only one instance at a time: take the row's lease (free, or expired because its holder stopped)
+      const claim = await prisma.refund.updateMany({
+        where: { id: refund.id, status: RefundStatus.PENDING, OR: [{ processingUntil: null }, { processingUntil: { lt: now } }] },
+        data: { processingUntil: new Date(now.getTime() + PaymentService.REFUND_LEASE_MS) },
+      });
+      if (claim.count === 0) {
+        const current = await prisma.refund.findUnique({ where: { id: refund.id } });
+        if (current && current.status !== RefundStatus.PENDING) return { refund: current, outcome: refundOutcome(current.status), replayed: true };
+        throw new OrderRefundRejectedError('REFUND_IN_PROGRESS', 409, 'This refund is being processed by another request');
       }
     }
 
-    // ── Step 6: Stripe refund path ──────────────────────────────────────
-    let stripeRefund: any;
+    let answer: { id: string; status: string | null };
     try {
-      stripeRefund = await StripeService.refundPayment(
-        payment.stripePaymentIntentId!,
-        refundAmount,
-        reason,
-        payment.currency,
-        idempotencyKey // A.4: Pass idempotency key to Stripe
-      );
-    } catch (stripeError: any) {
-      // A.4: If timeout/network error, we don't know if Stripe processed it.
-      // Release reservation; the charge.refunded webhook will reconcile if Stripe did process.
-      logger.error(`Stripe refund call failed for payment ${paymentId}: ${stripeError.message}`);
-      await this.releaseRefundReservation(payment.id, currentVersion + 1, refundAmount);
-
-      // Create FAILED refund record for audit trail
-      await prisma.refund.create({
-        data: {
-          paymentId: payment.id,
-          orderId: payment.orderId,
-          orderNumber: payment.orderNumber,
-          userId: payment.userId,
-          amount: refundAmount,
-          currency: payment.currency,
-          reason,
-          status: RefundStatus.FAILED,
-          idempotencyKey,
-          errorMessage: stripeError.message,
-        },
+      if (refund.stripeRefundId) {
+        answer = await StripeService.getRefund(refund.stripeRefundId);
+      } else if (replayed && now.getTime() - new Date(refund.createdAt).getTime() > PaymentService.STRIPE_IDEMPOTENCY_WINDOW_MS) {
+        // Stripe would no longer recognise the key: re-sending could refund a second time. Left for the webhook / reconciliation.
+        await prisma.refund.updateMany({ where: { id: refund.id, status: RefundStatus.PENDING }, data: { processingUntil: null } });
+        return { refund: await prisma.refund.findUnique({ where: { id: refund.id } }), outcome: 'UNVERIFIED' as const, replayed };
+      } else {
+        answer = await this.requestStripeRefund(payment.stripePaymentIntentId, refund);
+      }
+    } catch (error: any) {
+      if (!refund.stripeRefundId && isDefiniteStripeRejection(error)) {
+        const failed = await this.markRefundFailed(refund.id, error.message);
+        logger.warn(`Stripe rejected refund ${refund.id}: ${error.message}`);
+        return { refund: failed, outcome: 'FAILED' as const, replayed };
+      }
+      await prisma.refund.updateMany({
+        where: { id: refund.id, status: RefundStatus.PENDING },
+        data: { processingUntil: null, errorMessage: `UNVERIFIED: ${String(error?.message || 'unknown error')}`.slice(0, 500) },
       });
-
-      throw stripeError;
+      logger.error(`Refund ${refund.id} not verified (reservation kept, retry with the same key): ${error?.message}`);
+      return { refund: await prisma.refund.findUnique({ where: { id: refund.id } }), outcome: 'UNVERIFIED' as const, replayed };
     }
 
-    // ── Step 7: Record result ───────────────────────────────────────────
-    const isSucceeded = stripeRefund.status === 'succeeded';
+    const verdict = verdictFromStripeRefund(answer);
+    if (verdict === 'SUCCEEDED') {
+      const done = await this.markRefundSucceeded(refund.id, answer.id);
+      logger.info(`Refund processed: ${answer.id} (succeeded) for payment ${payment.stripePaymentIntentId}`);
+      return { refund: done, outcome: refundOutcome(done?.status), replayed };
+    }
+    if (verdict === 'FAILED') {
+      const failed = await this.markRefundFailed(refund.id, `Stripe refund ${answer.status}`, answer.id);
+      return { refund: failed, outcome: refundOutcome(failed?.status), replayed };
+    }
+    const pending = await this.markRefundPending(refund.id, answer.id);
+    return { refund: pending, outcome: refundOutcome(pending?.status), replayed };
+  }
 
-    const refund = await prisma.refund.create({
-      data: {
-        paymentId: payment.id,
-        orderId: payment.orderId,
-        orderNumber: payment.orderNumber,
-        userId: payment.userId,
-        amount: refundAmount,
-        currency: payment.currency,
-        reason,
-        status: isSucceeded ? RefundStatus.SUCCEEDED : RefundStatus.PENDING,
-        stripeRefundId: stripeRefund.id,
-        idempotencyKey,
-        completedAt: isSucceeded ? new Date() : undefined,
-      },
+  /** The one place that asks Stripe to create a refund: always the row's own amount, currency, reason, key and id. */
+  private static requestStripeRefund(paymentIntentId: string, refund: any) {
+    return StripeService.refundPayment(
+      paymentIntentId,
+      refund.amount,
+      refund.reason ?? undefined,
+      refund.currency,
+      refund.idempotencyKey,
+      { localRefundId: refund.id, idempotencyKey: refund.idempotencyKey }
+    );
+  }
+
+  /** Runs fn in a MongoDB transaction, retried when another refund writer touched the same payment at the same time. */
+  private static async refundTx<T>(fn: (tx: any) => Promise<T>): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await prisma.$transaction(fn, { maxWait: 5000, timeout: 15000 });
+      } catch (error: any) {
+        const conflict = error?.code === 'P2034' || /write ?conflict|TransientTransactionError/i.test(String(error?.message));
+        if (!conflict || attempt >= 10) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 15 * attempt + Math.floor(Math.random() * 25)));
+      }
+    }
+  }
+
+  /** Reserved (PENDING) and refunded (SUCCEEDED, the confirmed actual amount when there is one) of a payment, from its rows. */
+  private static async refundRowTotals(tx: any, paymentId: string) {
+    const rows = await tx.refund.findMany({
+      where: { paymentId, status: { in: [RefundStatus.PENDING, RefundStatus.SUCCEEDED] } },
+      select: { status: true, amount: true, actualAmount: true },
     });
-
-    // A.5: Update accounting — refundedTotal and pendingRefundTotal
-    const newRefundedTotal = (payment.refundedTotal || 0) + (isSucceeded ? refundAmount : 0);
-    const updatedPendingTotal = newPendingTotal - (isSucceeded ? refundAmount : 0);
-    const isFullRefund = newRefundedTotal >= payment.amount;
-
-    let newPaymentStatus: PaymentStatus;
-    if (isFullRefund && isSucceeded) {
-      newPaymentStatus = PaymentStatus.REFUNDED;
-    } else if (newRefundedTotal > 0 && isSucceeded) {
-      newPaymentStatus = PaymentStatus.PARTIALLY_REFUNDED;
-    } else {
-      newPaymentStatus = payment.status;
+    let pending = 0;
+    let refunded = 0;
+    for (const row of rows) {
+      if (row.status === RefundStatus.PENDING) pending += row.amount;
+      else refunded += row.actualAmount ?? row.amount;
     }
-
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: newPaymentStatus,
-        refundedTotal: newRefundedTotal,
-        pendingRefundTotal: Math.max(0, updatedPendingTotal),
-        metadata: {
-          ...((payment.metadata as any) || {}),
-          refundedAmount: newRefundedTotal,
-          refundableAmount: payment.amount - newRefundedTotal - Math.max(0, updatedPendingTotal),
-          reconciliationStatus: isFullRefund ? 'RECONCILED' : (newRefundedTotal > 0 ? 'PARTIALLY_REFUNDED' : 'REFUND_PENDING'),
-        },
-      },
-    });
-
-    // Notify order service only for full refund
-    if (isFullRefund && payment.orderId) {
-      await this.notifyOrderService(payment.orderId, 'REFUNDED').catch((err) =>
-        logger.error(`Failed notifying order service about refund: ${err.message}`)
-      );
-    }
-
-    logger.info(`Refund processed: ${stripeRefund.id} (status: ${stripeRefund.status}) for payment ${payment.stripePaymentIntentId}`);
-    return refund;
+    return { pending, refunded };
   }
 
   /**
-   * Atomically release a refund reservation.
-   * Uses version guard to ensure we're releasing the correct reservation.
+   * Inside a refund transaction: write the payment's counters and status derived from its rows (always writing the payment, which
+   * is what serialises concurrent refund writers). Reports whether the payment became fully refunded by this transaction.
    */
-  private static async releaseRefundReservation(
-    paymentId: string,
-    expectedVersion: number,
-    amountToRelease: number
-  ) {
-    try {
-      const current = await prisma.payment.findUnique({ where: { id: paymentId } });
-      if (!current) return;
+  private static async syncRefundTotals(tx: any, paymentId: string, extraMetadata: Record<string, unknown> = {}) {
+    const payment = await tx.payment.findUnique({ where: { id: paymentId } });
+    const { pending, refunded } = await this.refundRowTotals(tx, paymentId);
+    const isFull = refunded >= payment.amount;
+    const status = isFull
+      ? PaymentStatus.REFUNDED
+      : refunded > 0
+        ? PaymentStatus.PARTIALLY_REFUNDED
+        : payment.status === PaymentStatus.PARTIALLY_REFUNDED || payment.status === PaymentStatus.REFUNDED
+          ? PaymentStatus.SUCCEEDED
+          : payment.status;
+    await tx.payment.update({
+      where: { id: paymentId },
+      data: {
+        status,
+        refundedTotal: refunded,
+        pendingRefundTotal: pending,
+        refundVersion: { increment: 1 },
+        metadata: {
+          ...((payment.metadata as any) || {}),
+          refundedAmount: refunded,
+          pendingRefundAmount: pending,
+          refundableAmount: payment.amount - refunded - pending,
+          reconciliationStatus: isFull ? 'RECONCILED' : refunded > 0 ? 'PARTIALLY_REFUNDED' : pending > 0 ? 'REFUND_PENDING' : (payment.metadata as any)?.reconciliationStatus ?? null,
+          ...extraMetadata,
+        },
+      },
+    });
+    return { payment, refunded, pending, becameFullyRefunded: isFull && payment.status !== PaymentStatus.REFUNDED };
+  }
 
-      const releasedPending = Math.max(0, (current.pendingRefundTotal || 0) - amountToRelease);
-      await prisma.payment.updateMany({
-        where: {
-          id: paymentId,
-          refundVersion: expectedVersion,
-        },
-        data: {
-          pendingRefundTotal: releasedPending,
-          refundVersion: expectedVersion + 1,
-        },
+  /** Stripe proved the refund succeeded. Idempotent: a SUCCEEDED row changes nothing (no double counting, no 2nd notice); FAILED is final. */
+  private static async markRefundSucceeded(refundId: string, stripeRefundId?: string) {
+    const outcome = await this.refundTx(async (tx) => {
+      const row = await tx.refund.findUnique({ where: { id: refundId } });
+      if (!row) return { refund: null, totals: null };
+      if (row.status === RefundStatus.SUCCEEDED) {
+        if (!row.stripeRefundId && stripeRefundId) {
+          return { refund: await tx.refund.update({ where: { id: refundId }, data: { stripeRefundId } }), totals: null };
+        }
+        return { refund: row, totals: null };
+      }
+      if (row.status === RefundStatus.FAILED) {
+        // FAILED is final (only written when Stripe rejected the request or reported the refund failed): a stray or late
+        // "succeeded" event does not revive it - it is logged for reconciliation instead
+        logger.error(`Refund ${refundId} is FAILED but a provider event says succeeded (${stripeRefundId ?? 'no id'}): reconciliation needed`);
+        return { refund: row, totals: null };
+      }
+      const refund = await tx.refund.update({
+        where: { id: refundId },
+        data: { status: RefundStatus.SUCCEEDED, stripeRefundId: stripeRefundId ?? row.stripeRefundId, completedAt: new Date(), processingUntil: null, errorMessage: null },
       });
-      logger.info(`Released refund reservation: ${amountToRelease} for payment ${paymentId}`);
-    } catch (err: any) {
-      logger.error(`Failed to release refund reservation for ${paymentId}: ${err.message}`);
+      return { refund, totals: await this.syncRefundTotals(tx, row.paymentId) };
+    });
+    await this.notifyFullRefund(outcome.totals);
+    return outcome.refund;
+  }
+
+  /** Stripe proved the refund did not happen: the reservation is released. Only a PENDING row can fail. */
+  private static async markRefundFailed(refundId: string, reason: string, stripeRefundId?: string) {
+    return this.refundTx(async (tx) => {
+      const row = await tx.refund.findUnique({ where: { id: refundId } });
+      if (!row || row.status !== RefundStatus.PENDING) return row;
+      const refund = await tx.refund.update({
+        where: { id: refundId },
+        data: { status: RefundStatus.FAILED, stripeRefundId: stripeRefundId ?? row.stripeRefundId, processingUntil: null, errorMessage: String(reason).slice(0, 500) },
+      });
+      await this.syncRefundTotals(tx, row.paymentId);
+      return refund;
+    });
+  }
+
+  /** Stripe accepted the refund but has not finished it: remember its id, keep the reservation, free the lease. */
+  private static async markRefundPending(refundId: string, stripeRefundId: string) {
+    await prisma.refund.updateMany({ where: { id: refundId, status: RefundStatus.PENDING }, data: { stripeRefundId, processingUntil: null, errorMessage: null } });
+    return prisma.refund.findUnique({ where: { id: refundId } });
+  }
+
+  private static async notifyFullRefund(totals: { payment: any; becameFullyRefunded: boolean } | null) {
+    if (totals?.becameFullyRefunded && totals.payment.orderId) {
+      await this.notifyOrderService(totals.payment.orderId, 'REFUNDED').catch((err) =>
+        logger.error(`Failed notifying order service about refund: ${err.message}`)
+      );
     }
   }
 
@@ -1113,77 +1264,34 @@ export class PaymentService {
     }
     const confirmedAt = new Date();
 
-    // A.6: Atomically confirm refund using CAS on refundVersion
-    const currentVersion = payment.refundVersion || 0;
-    const casResult = await prisma.payment.updateMany({
-      where: {
-        id: payment.id,
-        refundVersion: currentVersion,
-      },
-      data: {
-        refundVersion: currentVersion + 1,
-      },
-    });
-
-    if (casResult.count === 0) {
-      throw new Error('Concurrent refund confirmation detected — please retry.');
-    }
-
-    const updatedRefund = await prisma.refund.update({
-      where: { id: refundId },
-      data: {
-        status: RefundStatus.SUCCEEDED,
-        actualAmount: refundAmount,
-        transferReference,
-        confirmedBy: adminUserId,
-        confirmedAt,
-        notes: notes?.trim() || null,
-        completedAt: confirmedAt,
-      },
-    });
-
-    // Recompute totals from source of truth (Refund records)
-    const allSucceededRefunds = await prisma.refund.aggregate({
-      where: { paymentId: refund.paymentId, status: RefundStatus.SUCCEEDED },
-      _sum: { amount: true, actualAmount: true },
-    });
-    // Use actualAmount if available (manual refunds), else amount
-    const totalRefunded = allSucceededRefunds._sum.actualAmount || allSucceededRefunds._sum.amount || 0;
-
-    const isFullyRefunded = totalRefunded >= payment.amount;
-
-    // Recompute pending from Refund records too
-    const pendingAgg = await prisma.refund.aggregate({
-      where: { paymentId: refund.paymentId, status: RefundStatus.PENDING },
-      _sum: { amount: true },
-    });
-    const remainingPending = pendingAgg._sum.amount || 0;
-
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: isFullyRefunded ? PaymentStatus.REFUNDED : (totalRefunded > 0 ? PaymentStatus.PARTIALLY_REFUNDED : payment.status),
-        refundedTotal: totalRefunded,
-        pendingRefundTotal: remainingPending,
-        metadata: {
-          ...((payment.metadata as any) || {}),
-          pendingRefundAmount: remainingPending,
-          refundableAmount: payment.amount - totalRefunded - remainingPending,
-          refundedAmount: totalRefunded,
-          reconciliationStatus: isFullyRefunded ? 'RECONCILED' : 'PARTIALLY_REFUNDED',
-          manualRefundConfirmedBy: adminUserId,
-          manualRefundConfirmedAt: confirmedAt,
+    // FIX 07B-2A.2: the row and the payment's counters change in one transaction (serialised with every other refund writer)
+    const { updatedRefund, totals } = await this.refundTx(async (tx) => {
+      const current = await tx.refund.findUnique({ where: { id: refundId } });
+      if (!current || current.status !== RefundStatus.PENDING) {
+        throw new Error('Refund is not in PENDING status and cannot be confirmed');
+      }
+      const updated = await tx.refund.update({
+        where: { id: refundId },
+        data: {
+          status: RefundStatus.SUCCEEDED,
+          actualAmount: refundAmount,
           transferReference,
-          manualRefundNotes: notes?.trim() || null,
+          confirmedBy: adminUserId,
+          confirmedAt,
+          notes: notes?.trim() || null,
+          completedAt: confirmedAt,
         },
-      },
+      });
+      const synced = await this.syncRefundTotals(tx, payment.id, {
+        manualRefundConfirmedBy: adminUserId,
+        manualRefundConfirmedAt: confirmedAt,
+        transferReference,
+        manualRefundNotes: notes?.trim() || null,
+      });
+      return { updatedRefund: updated, totals: synced };
     });
-
-    if (isFullyRefunded && payment.orderId) {
-      await this.notifyOrderService(payment.orderId, 'REFUNDED').catch((err) =>
-        logger.error('[confirmManualRefund] Failed notifying order service:', err)
-      );
-    }
+    const totalRefunded = totals.refunded;
+    await this.notifyFullRefund(totals);
 
     logger.info(
       `Manual refund ${refundId} confirmed by admin ${adminUserId} (Ref: ${transferReference}, Amount: ${refundAmount}). Total refunded: ${totalRefunded}`
@@ -1317,6 +1425,7 @@ export class PaymentService {
           );
         }
       } else if ((payment as any).type === ('INSTRUCTOR_REGISTRATION' as any)) {
+        // a registration fee created before IMPLEMENT-01: the user-service only queues an application for ADMIN review
         await this.notifyUserService(payment.userId, 'INSTRUCTOR_REGISTRATION_SUCCESS');
       }
 
@@ -1359,94 +1468,75 @@ export class PaymentService {
       return;
     }
 
-    // I3: Calculate total refunded from Stripe's perspective
-    const isZeroDecimal = ['vnd', 'jpy', 'krw'].includes((charge.currency || '').toLowerCase());
-    const chargeAmountLocal = isZeroDecimal ? charge.amount : charge.amount / 100;
-    const totalStripeRefunded = isZeroDecimal ? charge.amount_refunded : charge.amount_refunded / 100;
-    const isFullyRefunded = totalStripeRefunded >= chargeAmountLocal;
-
-    // Process each refund in the charge.refunds list
-    if (charge.refunds?.data) {
+    if (Array.isArray(charge.refunds?.data)) {
       for (const stripeRefund of charge.refunds.data) {
-        if (stripeRefund.status !== 'succeeded') continue;
-
-        // Find or update local refund record by stripeRefundId (idempotent)
-        const existingRefund = await prisma.refund.findFirst({
-          where: { stripeRefundId: stripeRefund.id },
-        });
-
-        if (existingRefund) {
-          if (existingRefund.status !== RefundStatus.SUCCEEDED) {
-            await prisma.refund.update({
-              where: { id: existingRefund.id },
-              data: { status: RefundStatus.SUCCEEDED, completedAt: new Date() },
-            });
-          }
-        } else {
-          // Create refund record from webhook if not exists
-          const refundAmountLocal = isZeroDecimal ? stripeRefund.amount : stripeRefund.amount / 100;
-          await prisma.refund.create({
-            data: {
-              paymentId: payment.id,
-              orderId: payment.orderId,
-              orderNumber: payment.orderNumber,
-              userId: payment.userId,
-              amount: refundAmountLocal,
-              currency: charge.currency,
-              reason: stripeRefund.reason || 'Refund via Stripe',
-              status: RefundStatus.SUCCEEDED,
-              stripeRefundId: stripeRefund.id,
-              completedAt: new Date(),
-            },
-          });
-        }
+        await this.applyStripeRefund(stripeRefund, payment, charge.currency);
       }
     } else {
-      // Fallback: update first pending refund
+      // Fallback (no refund list in the event): the oldest PENDING refund of this payment, as before
       const pendingRefund = await prisma.refund.findFirst({
         where: { paymentId: payment.id, status: RefundStatus.PENDING },
+        orderBy: { createdAt: 'asc' },
       });
-      if (pendingRefund) {
-        await prisma.refund.update({
-          where: { id: pendingRefund.id },
-          data: { status: RefundStatus.SUCCEEDED, completedAt: new Date() },
+      if (pendingRefund) await this.markRefundSucceeded(pendingRefund.id);
+    }
+    // Re-derive the counters from the rows even when no row changed (as before FIX 07B-2A.2): counters that drifted from the rows
+    // are repaired, a repeated webhook adds nothing (derived, not incremented). It runs in a refund transaction that writes the
+    // payment, so it is serialised with concurrent reservations; the order hears REFUNDED only on the transition to fully refunded.
+    const resynced = await this.refundTx((tx) => this.syncRefundTotals(tx, payment.id));
+    await this.notifyFullRefund(resynced);
+    const after = await prisma.payment.findUnique({ where: { id: payment.id } });
+    logger.info(`charge.refunded processed for ${charge.payment_intent} (refunded: ${after?.refundedTotal}/${payment.amount}, pending: ${after?.pendingRefundTotal})`);
+  }
+
+  /** The local row of a Stripe refund: by Stripe's id, else by the row id / key this service put in the refund metadata. */
+  private static async findLocalRefund(stripeRefund: any, paymentId?: string) {
+    const byStripeId = await prisma.refund.findFirst({ where: { stripeRefundId: stripeRefund.id } });
+    if (byStripeId) return byStripeId;
+    const meta = stripeRefund.metadata || {};
+    let row: any = null;
+    if (isObjectId(meta.localRefundId)) row = await prisma.refund.findUnique({ where: { id: meta.localRefundId } });
+    if (!row && typeof meta.idempotencyKey === 'string' && meta.idempotencyKey) row = await prisma.refund.findUnique({ where: { idempotencyKey: meta.idempotencyKey } });
+    if (row && paymentId && row.paymentId !== paymentId) return null;   // metadata pointing at another payment's row is ignored
+    return row;
+  }
+
+  /** One refund reported by a Stripe webhook: idempotent, the counters and order follow-up go through the refund transactions. */
+  private static async applyStripeRefund(stripeRefund: any, payment: any, currency: string) {
+    const local = await this.findLocalRefund(stripeRefund, payment.id);
+    const verdict = verdictFromStripeRefund(stripeRefund);
+    if (local) {
+      if (verdict === 'SUCCEEDED') await this.markRefundSucceeded(local.id, stripeRefund.id);
+      else if (verdict === 'FAILED') await this.markRefundFailed(local.id, stripeRefund.failure_reason || `Stripe refund ${stripeRefund.status}`, stripeRefund.id);
+      else if (!local.stripeRefundId) await this.markRefundPending(local.id, stripeRefund.id);
+      return;
+    }
+    if (verdict !== 'SUCCEEDED') return;
+    // a refund made outside this service (e.g. in the Stripe dashboard): recorded once, under a key derived from Stripe's id
+    const zeroDecimal = ['vnd', 'jpy', 'krw'].includes(String(currency || stripeRefund.currency || '').toLowerCase());
+    try {
+      const totals = await this.refundTx(async (tx) => {
+        await tx.refund.create({
+          data: {
+            paymentId: payment.id,
+            orderId: payment.orderId,
+            orderNumber: payment.orderNumber,
+            userId: payment.userId,
+            amount: zeroDecimal ? stripeRefund.amount : stripeRefund.amount / 100,
+            currency: currency || stripeRefund.currency,
+            reason: stripeRefund.reason || 'Refund via Stripe',
+            status: RefundStatus.SUCCEEDED,
+            stripeRefundId: stripeRefund.id,
+            idempotencyKey: `stripe_refund:${stripeRefund.id}`,
+            completedAt: new Date(),
+          },
         });
-      }
+        return this.syncRefundTotals(tx, payment.id);
+      });
+      await this.notifyFullRefund(totals);
+    } catch (error: any) {
+      if (error?.code !== 'P2002') throw error;   // the same webhook delivered twice: already recorded
     }
-
-    // A.5: Recompute totals from source of truth (Refund records), not from Stripe amounts
-    // This prevents double-counting when both refundPayment and webhook update the same payment
-    const succeededRefundAgg = await prisma.refund.aggregate({
-      where: { paymentId: payment.id, status: RefundStatus.SUCCEEDED },
-      _sum: { amount: true },
-    });
-    const pendingRefundAgg = await prisma.refund.aggregate({
-      where: { paymentId: payment.id, status: RefundStatus.PENDING },
-      _sum: { amount: true },
-    });
-
-    const computedRefundedTotal = succeededRefundAgg._sum.amount || 0;
-    const computedPendingTotal = pendingRefundAgg._sum.amount || 0;
-    const computedFullyRefunded = computedRefundedTotal >= payment.amount;
-
-    const newStatus = computedFullyRefunded ? PaymentStatus.REFUNDED :
-      (computedRefundedTotal > 0 ? PaymentStatus.PARTIALLY_REFUNDED : payment.status);
-
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: newStatus,
-        refundedTotal: computedRefundedTotal,
-        pendingRefundTotal: computedPendingTotal,
-      },
-    });
-
-    if (computedFullyRefunded && payment.orderId) {
-      await this.notifyOrderService(payment.orderId, 'REFUNDED').catch((err) =>
-        logger.error(`Failed notifying order service about full refund: ${err.message}`)
-      );
-    }
-    logger.info(`Payment ${computedFullyRefunded ? 'fully' : 'partially'} refunded via webhook: ${charge.payment_intent} (refunded: ${computedRefundedTotal}/${payment.amount})`);
   }
 
   private static async handlePaymentIntentCanceled(paymentIntent: any) {
@@ -1471,37 +1561,24 @@ export class PaymentService {
   }
 
   private static async handleRefundUpdated(refundObject: any) {
-    // Find the related refund record by stripe refund id
-    const refund = await prisma.refund.findFirst({
-      where: { stripeRefundId: refundObject.id },
-    });
-
-    if (refund) {
-      let newStatus: RefundStatus;
-      if (refundObject.status === 'succeeded') {
-        newStatus = RefundStatus.SUCCEEDED;
-      } else if (refundObject.status === 'failed') {
-        newStatus = RefundStatus.FAILED;
-      } else {
-        newStatus = RefundStatus.PENDING;
-      }
-
-      await prisma.refund.update({
-        where: { id: refund.id },
-        data: {
-          status: newStatus,
-          completedAt: newStatus === RefundStatus.SUCCEEDED ? new Date() : undefined,
-          errorMessage: refundObject.failure_reason || undefined,
-        },
-      });
-
-      logger.info(`Refund updated: ${refundObject.id}, status: ${newStatus}`);
-    }
+    const refund = await this.findLocalRefund(refundObject);
+    if (!refund) return;
+    const verdict = verdictFromStripeRefund(refundObject);
+    if (verdict === 'SUCCEEDED') await this.markRefundSucceeded(refund.id, refundObject.id);
+    else if (verdict === 'FAILED') await this.markRefundFailed(refund.id, refundObject.failure_reason || `Stripe refund ${refundObject.status}`, refundObject.id);
+    else if (!refund.stripeRefundId) await this.markRefundPending(refund.id, refundObject.id);
+    logger.info(`Refund updated: ${refundObject.id}, status: ${verdict}`);
   }
 
   private static async notifyOrderService(orderId: string, status: string, maxRetries = 3) {
     const orderServiceUrl = process.env.ORDER_SERVICE_URL || 'http://localhost:3004';
-    const internalToken = process.env.INTERNAL_SERVICE_TOKEN || '';
+    // The order webhook accepts only the Order <-> Payment credential (FIX 07B-2A). Without a usable ORDER_PAYMENT_TOKEN nothing
+    // is sent and this throws like an unreachable order service, so every caller keeps its existing path (outbox / retry).
+    const token = readServiceToken('ORDER_PAYMENT_TOKEN');
+    if (!token.ok) {
+      logger.error(`Not notifying order service about ${status} for order ${orderId}: ${token.reason}`);
+      throw new Error(`Failed to notify order service: ${token.reason}`);
+    }
 
     let lastError: any = null;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -1509,7 +1586,7 @@ export class PaymentService {
         await axios.post(
           `${orderServiceUrl}/api/orders/webhook/payment`,
           { orderId, status },
-          { headers: { 'X-Internal-Service-Token': internalToken }, timeout: 5000 }
+          { headers: { [SERVICE_TOKEN_HEADER]: token.value }, timeout: 5000 }
         );
         logger.info(`Notified order service about payment ${status} for order ${orderId} (attempt ${attempt})`);
         return;
@@ -1524,20 +1601,32 @@ export class PaymentService {
       }
     }
 
-    logger.error(`Exhausted all ${maxRetries} retries notifying order service for order ${orderId}:`, lastError);
+    // never the error object itself: an axios error carries the request headers, i.e. the token
+    const lastStatus = lastError?.response?.status;
+    logger.error(`Exhausted all ${maxRetries} retries notifying order service for order ${orderId}: ${lastStatus ? `HTTP ${lastStatus}` : lastError?.code || lastError?.message}`);
     throw new Error(`Failed to notify order service after ${maxRetries} attempts: ${lastError?.message}`);
   }
 
   private static async notifyUserService(userId: string, status: string) {
+    // The role-upgrade route of the User Service accepts only the Payment -> User credential (FIX 07B-1). Without a usable
+    // PAYMENT_USER_TOKEN nothing is sent: no fallback to INTERNAL_SERVICE_TOKEN, a default or an empty value.
+    const token = readServiceToken('PAYMENT_USER_TOKEN');
+    if (!token.ok) {
+      logger.error(`Not notifying user service about ${status} for user ${userId}: ${token.reason}`);
+      return;
+    }
     try {
       const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
-      await axios.post(`${userServiceUrl}/api/users/become-instructor/confirm`, {
-        userId,
-        status,
-      });
+      await axios.post(
+        `${userServiceUrl}/api/users/become-instructor/confirm`,
+        { userId, status },
+        { headers: { [SERVICE_TOKEN_HEADER]: token.value } }
+      );
       logger.info(`Notified user service about ${status} for user ${userId}`);
-    } catch (error) {
-      logger.error(`Failed to notify user service:`, error);
+    } catch (error: any) {
+      // never the error object itself: an axios error carries the request headers, i.e. the token
+      const httpStatus = error?.response?.status;
+      logger.error(`Failed to notify user service about ${status} for user ${userId}: ${httpStatus ? `HTTP ${httpStatus}` : String(error?.code || error?.message || 'unknown error').split(token.value).join('[redacted]')}`);
     }
   }
 

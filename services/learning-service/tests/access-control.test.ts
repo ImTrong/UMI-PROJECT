@@ -8,8 +8,11 @@
 import { describe, it, beforeEach, afterEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { installFakePrisma, db } from './helpers/fake-prisma';
+import { useRandomCourseLearningToken } from './helpers/internal-token';
 
 installFakePrisma();
+// FIX-INS-06: lessons come from the course-service's internal route, which needs the Course <-> Learning credential
+const COURSE_LEARNING_TOKEN = useRandomCourseLearningToken();
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const axios = require('axios').default || require('axios');
@@ -27,7 +30,9 @@ const courses = new Map<string, CourseStub>();
 const httpError = (status: number) => Object.assign(new Error(`HTTP ${status}`), { response: { status } });
 
 const installAxiosStub = () =>
-  mock.method(axios, 'get', async (url: string) => {
+  mock.method(axios, 'get', async (url: string, config?: any) => {
+    // like the real course-service (FIX-INS-06): the internal lessons route answers 403 without COURSE_LEARNING_TOKEN
+    if (url.includes('/api/courses/internal/') && config?.headers?.['x-internal-service-token'] !== COURSE_LEARNING_TOKEN) throw httpError(403);
     const m = url.match(/\/api\/courses\/(?:internal\/)?([^/]+?)(\/lessons)?$/);
     const stub = m ? courses.get(m[1]) : undefined;
     if (!stub) throw httpError(404);

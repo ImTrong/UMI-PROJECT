@@ -15,13 +15,13 @@ import { syncPendingOrders } from '../src/jobs/order-sync.job';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const rawUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
-if (!rawUrl) {
-  throw new Error('TEST_DATABASE_URL or DATABASE_URL environment variable must be defined.');
+// This suite writes and deletes rows. It runs ONLY against an isolated local test database given in TEST_DATABASE_URL - never the
+// service's DATABASE_URL from .env (that is the running stack's payment_db, reachable on localhost:27017).
+const rawUrl = process.env.TEST_DATABASE_URL;
+if (!rawUrl || !/^mongodb:\/\/(127\.0\.0\.1|localhost):\d+\/[^/?]*test[^/?]*(\?|$)/i.test(rawUrl) || /:27017\//.test(rawUrl)) {
+  throw new Error('TEST_DATABASE_URL must point to an isolated local test database (127.0.0.1, not port 27017, database name containing "test").');
 }
-const mongoUrl = rawUrl.includes('mongodb:27017')
-  ? rawUrl.replace('mongodb:27017', 'localhost:27017') + (rawUrl.includes('directConnection') ? '' : '&directConnection=true')
-  : rawUrl;
+const mongoUrl = rawUrl;
 
 const prisma = new PrismaClient({
   datasources: { db: { url: mongoUrl } },
@@ -303,6 +303,8 @@ async function runAllTests() {
         currency: 'vnd',
         reason: 'Partial refund 1',
         status: RefundStatus.PENDING,
+        // FIX 07B-2A.2 made Refund.idempotencyKey unique; the service always sets one, so the fixture does too
+        idempotencyKey: `${runId}_C5_refund1`,
       },
     });
 
@@ -367,6 +369,7 @@ async function runAllTests() {
         currency: 'vnd',
         reason: 'Complete remaining refund',
         status: RefundStatus.PENDING,
+        idempotencyKey: `${runId}_C6_refund2`,
       },
     });
 

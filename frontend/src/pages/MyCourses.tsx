@@ -41,8 +41,9 @@ export default function MyCourses() {
         await courseService.deleteCourse(courseId);
         toast.success('Xóa khóa học thành công');
         loadCourses(pagination.page);
-      } catch (error) {
-        toast.error('Không thể xóa khóa học');
+      } catch (error: any) {
+        // e.g. 409 COURSE_HAS_LEARNERS: the server explains why (FIX-INS-02)
+        toast.error(error.response?.data?.error || 'Không thể xóa khóa học');
       }
     }
   };

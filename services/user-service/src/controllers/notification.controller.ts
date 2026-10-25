@@ -1,6 +1,7 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { NotificationService } from '../services/notification.service';
+import { NotificationService, IdempotencyKeyReusedError, IdempotencyRetryError } from '../services/notification.service';
+import { IDEMPOTENCY_HEADER, readIdempotencyKey } from '../services/notification-idempotency';
 import { HTTP_STATUS } from '../utils/constants';
 import logger from '../utils/logger';
 
@@ -98,10 +99,21 @@ export class NotificationController {
     }
   }
 
-  // Internal API for other services to create notifications
+  // Internal API for other services to create notifications.
+  // The caller is authenticated by `verifyInternalService` (X-Internal-Service-Token) where the route is registered in app.ts.
+  // With an X-Idempotency-Key header the request is idempotent (FIX 06C-4B2B1): 201 when created, 200 + deduplicated for a
+  // replay, 400 for an invalid key, 422 when the key was used for a different notification, 409 when the client must retry.
+  // Without the header the existing flow below is unchanged.
   static async createInternalNotification(req: AuthRequest, res: Response) {
+    let key: string | undefined;
     try {
-      // Typically you'd verify if the request came from another internal microservice using an internal token
+      key = readIdempotencyKey(req.headers[IDEMPOTENCY_HEADER], req.body);
+    } catch (error: any) {
+      return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message, code: 'INVALID_IDEMPOTENCY_KEY' });
+    }
+    if (key !== undefined) return NotificationController.createIdempotent(req, res, key);
+
+    try {
       const result = await NotificationService.createNotification(req.body);
 
       res.status(HTTP_STATUS.CREATED).json({
@@ -113,6 +125,35 @@ export class NotificationController {
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to create notification',
       });
+    }
+  }
+
+  private static async createIdempotent(req: AuthRequest, res: Response, key: string) {
+    try {
+      const result = await NotificationService.createNotificationIdempotent(req.body, key);
+      if (!result.deduplicated) {
+        return res.status(HTTP_STATUS.CREATED).json({ message: 'Notification created successfully', data: result.notification, deduplicated: false });
+      }
+      return res.status(HTTP_STATUS.OK).json({
+        message: 'Notification already created',
+        data: result.notification,
+        deduplicated: true,
+        ...(result.payloadChanged ? { payloadChanged: true } : {}),
+      });
+    } catch (error: any) {
+      if (error instanceof IdempotencyKeyReusedError) {
+        return res.status(HTTP_STATUS.UNPROCESSABLE_ENTITY).json({
+          error: 'The idempotency key was already used for a different notification',
+          code: error.code,
+          fields: error.fields,
+        });
+      }
+      if (error instanceof IdempotencyRetryError) {
+        res.setHeader('Retry-After', '1');
+        return res.status(HTTP_STATUS.CONFLICT).json({ error: error.message, code: error.code });
+      }
+      logger.error('Create idempotent internal notification error:', error);
+      return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to create notification' });
     }
   }
 }

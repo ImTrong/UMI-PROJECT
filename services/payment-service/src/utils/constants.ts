@@ -12,6 +12,8 @@ export const HTTP_STATUS = {
 export const ERROR_MESSAGES = {
   PAYMENT_NOT_FOUND: 'Payment not found',
   PAYMENT_ALREADY_PROCESSED: 'Payment already processed',
+  // IMPLEMENT-01: becoming an instructor is free and reviewed by an ADMIN - no new registration-fee payment is created
+  UNSUPPORTED_PAYMENT_TYPE: 'Unsupported payment type',
   INVALID_PAYMENT_AMOUNT: 'Invalid payment amount',
   STRIPE_ERROR: 'Stripe API error',
   WEBHOOK_SIGNATURE_INVALID: 'Invalid webhook signature',

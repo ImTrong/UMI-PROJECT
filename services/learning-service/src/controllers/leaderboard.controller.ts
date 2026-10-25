@@ -2,11 +2,25 @@ import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { LeaderboardService } from '../services/leaderboard.service';
 import { AchievementService } from '../services/achievement.service';
-import { RewardPointService } from '../services/reward-point.service';
+import { RewardPointService, COURSE_REDEMPTION_POINTS } from '../services/reward-point.service';
+import { CourseAccessError } from '../services/course-access.service';
+import { UserEligibilityError } from '../services/user-eligibility.service';
 import { getCurrentVietnamMonthYear } from '../config/scoring-policy';
 import { HTTP_STATUS, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 import axios from 'axios';
+
+/**
+ * Learner eligibility (role / active account) is verified by the User Service. When that cannot be done the
+ * ranking is NOT guessed: answer 503 so the client retries, instead of showing an unverified list.
+ */
+const respondIfEligibilityUnavailable = (error: unknown, res: Response): boolean => {
+  if (!(error instanceof UserEligibilityError)) return false;
+  res.status(HTTP_STATUS.SERVICE_UNAVAILABLE).json({
+    error: 'Bảng xếp hạng tạm thời chưa khả dụng vì chưa xác minh được tư cách tham gia. Vui lòng thử lại sau.',
+  });
+  return true;
+};
 
 export class LeaderboardController {
   /**
@@ -28,6 +42,7 @@ export class LeaderboardController {
       });
     } catch (error) {
       logger.error('Get current leaderboard error:', error);
+      if (respondIfEligibilityUnavailable(error, res)) return;
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get leaderboard' });
     }
   }
@@ -56,6 +71,7 @@ export class LeaderboardController {
       });
     } catch (error) {
       logger.error('Get history leaderboard error:', error);
+      if (respondIfEligibilityUnavailable(error, res)) return;
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get leaderboard history' });
     }
   }
@@ -75,6 +91,7 @@ export class LeaderboardController {
       res.status(HTTP_STATUS.OK).json({ data: rank });
     } catch (error) {
       logger.error('Get user rank error:', error);
+      if (respondIfEligibilityUnavailable(error, res)) return;
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get rank' });
     }
   }
@@ -127,7 +144,8 @@ export class LeaderboardController {
       }
 
       const points = await RewardPointService.getUserPoints(req.user.userId);
-      res.status(HTTP_STATUS.OK).json({ data: points });
+      // courseRedemptionPoints is informational (display); the redeem API never reads a price from the client
+      res.status(HTTP_STATUS.OK).json({ data: { ...points, courseRedemptionPoints: COURSE_REDEMPTION_POINTS } });
     } catch (error) {
       logger.error('Get reward points error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get reward points' });
@@ -165,9 +183,14 @@ export class LeaderboardController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
 
-      const { courseId, pointsRequired } = req.body;
+      // Only courseId and the idempotency key are read from the body. Any price-like field
+      // (pointsRequired, amount, balance, ...) sent by a client is ignored.
+      const { courseId } = req.body;
       if (!courseId) {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Course ID is required' });
+      }
+      if (typeof courseId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(courseId)) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Invalid course ID format' });
       }
 
       const clientRequestId =
@@ -186,7 +209,6 @@ export class LeaderboardController {
       const result = await RewardPointService.redeemCourseWithPoints(
         req.user.userId,
         courseId,
-        pointsRequired || 500,
         clientRequestId.trim()
       );
 
@@ -203,6 +225,9 @@ export class LeaderboardController {
       });
     } catch (error: any) {
       logger.error('Redeem course error:', error);
+      if (error instanceof CourseAccessError) {
+        return res.status(error.statusCode).json({ error: error.message });
+      }
       const isConflict = error.message?.includes('Xung đột khóa idempotency');
       res.status(isConflict ? 409 : HTTP_STATUS.BAD_REQUEST).json({
         error: error.message || 'Failed to redeem course',

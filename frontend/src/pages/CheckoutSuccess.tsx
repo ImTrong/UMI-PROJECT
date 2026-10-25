@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { orderService, Order } from '../services/order.service';
+import { orderPaymentState } from '../services/payment-confirmation';
 import { FiCheckCircle, FiClock, FiAlertCircle } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
@@ -28,9 +29,11 @@ export default function CheckoutSuccess() {
 
         setOrder(orderData);
 
-        if (orderData.paymentStatus === 'PAID' || orderData.status === 'COMPLETED' || orderData.status === 'PROCESSING') {
+        // paid only when the order says so (set by the payment webhook / outbox); PROCESSING alone is not a payment (FIX 07B-1.3)
+        const state = orderPaymentState(orderData);
+        if (state === 'PAID') {
           setStatus('success');
-        } else if (orderData.status === 'FAILED' || orderData.status === 'CANCELLED') {
+        } else if (state === 'FAILED') {
           setStatus('error');
         } else {
           // Still pending, needs to wait and retry

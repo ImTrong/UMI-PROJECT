@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { adminPathService, AdminLearningPath, SubmissionFieldType, CertificateConfig } from '../../services/admin-path.service';
 import { courseApi } from '../../services/api';
-import { courseService } from '../../services/course.service';
 import toast from 'react-hot-toast';
 import { FiArrowLeft, FiSave, FiPlus, FiTrash2, FiArrowUp, FiArrowDown, FiUploadCloud, FiAward } from 'react-icons/fi';
 
@@ -283,7 +282,7 @@ export default function AdminLearningPathForm() {
     
     setUploading(true);
     try {
-      const { uploadUrl, fileUrl } = await courseService.getUploadUrl('learning-path-assets', file.name, file.type);
+      const { uploadUrl, fileUrl } = await adminPathService.getImageUploadUrl(file.name, file.type);
       
       await fetch(uploadUrl, {
         method: 'PUT',

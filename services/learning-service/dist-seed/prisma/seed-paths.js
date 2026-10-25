@@ -3,6 +3,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.seedLearningPaths = seedLearningPaths;
 const client_1 = require("@prisma/client");
 const axios_1 = __importDefault(require("axios"));
 const prisma = new client_1.PrismaClient();
@@ -845,15 +846,29 @@ const pipelineByCategory = {
     'Ngoại ngữ': languagePipeline,
     'Kỹ năng mềm': softSkillPipeline,
 };
-// ==================== Main Seed Function ====================
-async function main() {
+async function seedLearningPaths(client = prisma, http = axios_1.default) {
+    let existingPaths;
+    let existingProjects;
+    try {
+        [existingPaths, existingProjects] = await Promise.all([client.learningPath.count(), client.finalProject.count()]);
+        if (!Number.isInteger(existingPaths) || !Number.isInteger(existingProjects))
+            throw new Error('unexpected count result');
+    }
+    catch (error) {
+        console.error(`Could not check the existing learning paths / final projects (${error?.message || 'error'}). Nothing was seeded.`);
+        return { status: 'CHECK_FAILED', error: String(error?.message || error) };
+    }
+    if (existingPaths > 0 || existingProjects > 0) {
+        console.log(`${existingPaths} learning paths and ${existingProjects} final projects already exist - nothing changed.`);
+        return { status: 'SKIPPED_EXISTING', paths: existingPaths, projects: existingProjects };
+    }
     const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3003';
     console.log('Fetching available courses from course-service...');
     let courses = [];
     let retries = 12; // Wait up to 60 seconds
     while (retries > 0) {
         try {
-            const response = await axios_1.default.get(`${courseServiceUrl}/api/courses?limit=100`);
+            const response = await http.get(`${courseServiceUrl}/api/courses?limit=100`);
             courses = response.data.courses || [];
             if (courses.length > 0) {
                 console.log(`Found ${courses.length} courses in course-service.`);
@@ -874,9 +889,6 @@ async function main() {
     }
     const fallbackIds = ['65f1234567890abcdef00001', '65f1234567890abcdef00002'];
     const defaultCreatorId = '65abcdef1234567890abcde1';
-    console.log('Clearing existing paths and final projects...');
-    await prisma.finalProject.deleteMany({});
-    await prisma.learningPath.deleteMany({});
     console.log('Seeding 60 enriched learning paths with final projects...');
     let pathCount = 0;
     let projectCount = 0;
@@ -916,7 +928,7 @@ async function main() {
             }
             const slug = createSlug(`${def.title}-${Math.random().toString(36).substring(2, 6)}`);
             // --- Create LearningPath ---
-            const learningPath = await prisma.learningPath.create({
+            const learningPath = await client.learningPath.create({
                 data: {
                     title: def.title,
                     description: def.desc,
@@ -946,7 +958,7 @@ async function main() {
             pathCount++;
             // --- Create FinalProject for this path ---
             const pipeline = pipelineFactory(def.title);
-            await prisma.finalProject.create({
+            await client.finalProject.create({
                 data: {
                     learningPathId: learningPath.id,
                     title: def.projectTitle,
@@ -964,12 +976,19 @@ async function main() {
         }
     }
     console.log(`Successfully seeded ${pathCount} learning paths and ${projectCount} final projects!`);
+    return { status: 'SEEDED', paths: pathCount, projects: projectCount };
 }
-main()
-    .catch((e) => {
-    console.error(e);
-    process.exit(1);
-})
-    .finally(async () => {
-    await prisma.$disconnect();
-});
+// Run only when executed directly (npm run prisma:seed), never on import.
+if (require.main === module) {
+    seedLearningPaths()
+        .then((outcome) => {
+        process.exitCode = outcome.status === 'CHECK_FAILED' ? 2 : 0;
+    })
+        .catch((e) => {
+        console.error(e);
+        process.exitCode = 1;
+    })
+        .finally(async () => {
+        await prisma.$disconnect();
+    });
+}

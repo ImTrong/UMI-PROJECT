@@ -63,6 +63,12 @@ export const adminPathService = {
     return response.data.data;
   },
 
+  // FIX-INS-14: learning-path images are uploaded through the learning-service (ADMIN only); fileUrl is a displayable preview URL
+  getImageUploadUrl: async (fileName: string, contentType: string): Promise<{ uploadUrl: string; fileUrl: string; fileKey: string }> => {
+    const response = await learningApi.post('/api/learning/admin/paths/upload-url', { fileName, contentType });
+    return response.data.data;
+  },
+
   createPath: async (data: Partial<AdminLearningPath>) => {
     const response = await learningApi.post('/api/learning/admin/paths', data);
     return response.data.data;

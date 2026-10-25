@@ -1,0 +1,134 @@
+{
+  "dataset": "DATA-01",
+  "note": "Tài khoản tổng hợp cho môi trường phát triển UMI. Tên và hồ sơ là hư cấu; miền @umi-demo.local không nhận thư. Không chứa mật khẩu.",
+  "accounts": [
+    {
+      "key": "ADMIN_01",
+      "role": "ADMIN",
+      "email": "admin.demo@umi-demo.local",
+      "fullName": "Quản trị viên UMI Demo",
+      "bio": "Tài khoản quản trị dùng để duyệt khóa học và vận hành môi trường demo UMI.",
+      "address": "TP. Hồ Chí Minh"
+    },
+
+    {
+      "key": "INS_01",
+      "role": "INSTRUCTOR",
+      "email": "gv.pham.quanghuy@umi-demo.local",
+      "fullName": "Phạm Quang Huy",
+      "bio": "Kỹ sư frontend 9 năm kinh nghiệm, chuyên React, TypeScript và tối ưu hiệu năng giao diện. Từng dẫn dắt đội UI cho các sản phẩm thương mại điện tử quy mô hàng triệu người dùng.",
+      "address": "TP. Hồ Chí Minh",
+      "dateOfBirth": "1990-04-12",
+      "education": [
+        { "institution": "Trường Đại học Bách khoa – ĐHQG TP.HCM", "degree": "Kỹ sư", "fieldOfStudy": "Khoa học Máy tính", "startDate": "2008-09-01", "endDate": "2013-06-30" }
+      ],
+      "work": [
+        { "company": "Công ty Công nghệ Sao Việt (hư cấu)", "position": "Trưởng nhóm Frontend", "location": "TP. Hồ Chí Minh", "startDate": "2019-03-01", "current": true, "description": "Thiết kế design system và kiến trúc micro-frontend cho nền tảng bán lẻ." },
+        { "company": "Studio Phần mềm Mây Xanh (hư cấu)", "position": "Lập trình viên Frontend", "location": "TP. Hồ Chí Minh", "startDate": "2014-07-01", "endDate": "2019-02-28", "current": false, "description": "Phát triển ứng dụng web một trang bằng Angular và React." }
+      ]
+    },
+    {
+      "key": "INS_02",
+      "role": "INSTRUCTOR",
+      "email": "gv.nguyen.lananh@umi-demo.local",
+      "fullName": "Nguyễn Thị Lan Anh",
+      "bio": "Kiến trúc sư backend, làm việc với Node.js, Java Spring và hệ thống phân tán. Quan tâm đến thiết kế API, kiểm thử tự động và vận hành dịch vụ ổn định.",
+      "address": "Hà Nội",
+      "dateOfBirth": "1988-11-03",
+      "education": [
+        { "institution": "Trường Đại học Công nghệ – ĐHQG Hà Nội", "degree": "Thạc sĩ", "fieldOfStudy": "Kỹ thuật Phần mềm", "startDate": "2011-09-01", "endDate": "2013-12-31" }
+      ],
+      "work": [
+        { "company": "Tập đoàn Thanh toán Hồng Hà (hư cấu)", "position": "Kiến trúc sư Backend", "location": "Hà Nội", "startDate": "2018-01-01", "current": true, "description": "Thiết kế dịch vụ thanh toán và hàng đợi sự kiện xử lý hàng chục nghìn giao dịch mỗi phút." },
+        { "company": "Công ty Phần mềm Trúc Xanh (hư cấu)", "position": "Kỹ sư Java", "location": "Hà Nội", "startDate": "2012-05-01", "endDate": "2017-12-31", "current": false, "description": "Xây dựng hệ thống ERP và tích hợp dịch vụ ngân hàng." }
+      ]
+    },
+    {
+      "key": "INS_03",
+      "role": "INSTRUCTOR",
+      "email": "gv.tran.minhkhoa@umi-demo.local",
+      "fullName": "Trần Minh Khoa",
+      "bio": "Chuyên gia cơ sở dữ liệu và kỹ sư dữ liệu, có kinh nghiệm với PostgreSQL, MongoDB và các pipeline ETL. Thích giải thích chỉ mục, giao dịch và mô hình hóa dữ liệu bằng ví dụ thực tế.",
+      "address": "Đà Nẵng",
+      "dateOfBirth": "1986-02-21",
+      "education": [
+        { "institution": "Trường Đại học Bách khoa – Đại học Đà Nẵng", "degree": "Kỹ sư", "fieldOfStudy": "Công nghệ Thông tin", "startDate": "2004-09-01", "endDate": "2009-06-30" }
+      ],
+      "work": [
+        { "company": "Công ty Dữ liệu Biển Đông (hư cấu)", "position": "Kỹ sư Dữ liệu chính", "location": "Đà Nẵng", "startDate": "2016-06-01", "current": true, "description": "Vận hành kho dữ liệu và tối ưu truy vấn cho hệ thống báo cáo." }
+      ]
+    },
+    {
+      "key": "INS_04",
+      "role": "INSTRUCTOR",
+      "email": "gv.le.hoangnam@umi-demo.local",
+      "fullName": "Lê Hoàng Nam",
+      "bio": "Kỹ sư DevOps/SRE, làm việc hằng ngày với Docker, Kubernetes, CI/CD và giám sát hệ thống. Từng xây dựng nền tảng triển khai nội bộ cho hơn 80 dịch vụ.",
+      "address": "TP. Hồ Chí Minh",
+      "dateOfBirth": "1991-08-09",
+      "education": [
+        { "institution": "Trường Đại học Khoa học Tự nhiên – ĐHQG TP.HCM", "degree": "Cử nhân", "fieldOfStudy": "Mạng máy tính và Truyền thông", "startDate": "2009-09-01", "endDate": "2013-06-30" }
+      ],
+      "work": [
+        { "company": "Công ty Điện toán Đám mây Phương Nam (hư cấu)", "position": "Kỹ sư SRE cao cấp", "location": "TP. Hồ Chí Minh", "startDate": "2020-02-01", "current": true, "description": "Xây dựng pipeline CI/CD, hạ tầng Kubernetes và hệ thống cảnh báo." },
+        { "company": "Công ty Viễn thông Ánh Dương (hư cấu)", "position": "Quản trị hệ thống", "location": "TP. Hồ Chí Minh", "startDate": "2013-08-01", "endDate": "2020-01-31", "current": false, "description": "Quản trị máy chủ Linux và tự động hóa bằng Ansible." }
+      ]
+    },
+    {
+      "key": "INS_05",
+      "role": "INSTRUCTOR",
+      "email": "gv.vo.thanhha@umi-demo.local",
+      "fullName": "Võ Thanh Hà",
+      "bio": "Nghiên cứu viên an toàn thông tin và học máy ứng dụng. Giảng dạy bảo mật ứng dụng web, kiểm thử xâm nhập có đạo đức và xây dựng mô hình học máy cho bài toán thực tế.",
+      "address": "Cần Thơ",
+      "dateOfBirth": "1989-05-30",
+      "education": [
+        { "institution": "Trường Đại học Cần Thơ", "degree": "Thạc sĩ", "fieldOfStudy": "Hệ thống Thông tin", "startDate": "2012-09-01", "endDate": "2014-12-31" }
+      ],
+      "work": [
+        { "company": "Trung tâm An ninh Mạng Lúa Vàng (hư cấu)", "position": "Chuyên gia kiểm thử bảo mật", "location": "Cần Thơ", "startDate": "2017-04-01", "current": true, "description": "Đánh giá bảo mật ứng dụng web và đào tạo đội phát triển về lập trình an toàn." }
+      ]
+    },
+
+    { "key": "STU_01", "role": "STUDENT", "email": "hv.nguyen.baochau@umi-demo.local", "fullName": "Nguyễn Bảo Châu", "bio": "Sinh viên năm 3 ngành Công nghệ Thông tin, muốn trở thành lập trình viên frontend.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "2004-03-15", "education": [{ "institution": "Trường Đại học Công nghiệp TP.HCM", "degree": "Cử nhân (đang học)", "fieldOfStudy": "Công nghệ Thông tin", "startDate": "2022-09-01" }] },
+    { "key": "STU_02", "role": "STUDENT", "email": "hv.tran.ducminh@umi-demo.local", "fullName": "Trần Đức Minh", "bio": "Nhân viên kế toán đang chuyển ngành sang phân tích dữ liệu.", "address": "Hà Nội", "dateOfBirth": "1996-07-22" },
+    { "key": "STU_03", "role": "STUDENT", "email": "hv.le.thuytien@umi-demo.local", "fullName": "Lê Thủy Tiên", "bio": "Lập trình viên PHP 2 năm, đang học Node.js để làm backend hiện đại hơn.", "address": "Đà Nẵng", "dateOfBirth": "1999-11-05" },
+    { "key": "STU_04", "role": "STUDENT", "email": "hv.pham.giahuy@umi-demo.local", "fullName": "Phạm Gia Huy", "bio": "Sinh viên năm cuối, đang chuẩn bị phỏng vấn vị trí DevOps intern.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "2003-01-28", "education": [{ "institution": "Trường Đại học Sư phạm Kỹ thuật TP.HCM", "degree": "Kỹ sư (đang học)", "fieldOfStudy": "Kỹ thuật Máy tính", "startDate": "2021-09-01" }] },
+    { "key": "STU_05", "role": "STUDENT", "email": "hv.hoang.minhthu@umi-demo.local", "fullName": "Hoàng Minh Thư", "bio": "Thiết kế UI muốn tự dựng giao diện bằng React.", "address": "Hà Nội", "dateOfBirth": "1998-09-17" },
+    { "key": "STU_06", "role": "STUDENT", "email": "hv.vu.quocbao@umi-demo.local", "fullName": "Vũ Quốc Bảo", "bio": "Quản trị mạng tại doanh nghiệp nhỏ, quan tâm đến an toàn thông tin.", "address": "Hải Phòng", "dateOfBirth": "1994-02-08" },
+    { "key": "STU_07", "role": "STUDENT", "email": "hv.dang.khanhlinh@umi-demo.local", "fullName": "Đặng Khánh Linh", "bio": "Sinh viên ngành Toán ứng dụng, yêu thích học máy và Python.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "2003-06-30", "education": [{ "institution": "Trường Đại học Khoa học Tự nhiên – ĐHQG TP.HCM", "degree": "Cử nhân (đang học)", "fieldOfStudy": "Toán ứng dụng", "startDate": "2021-09-01" }] },
+    { "key": "STU_08", "role": "STUDENT", "email": "hv.bui.thanhson@umi-demo.local", "fullName": "Bùi Thanh Sơn", "bio": "Tester thủ công muốn chuyển sang kiểm thử tự động và CI/CD.", "address": "Bắc Ninh", "dateOfBirth": "1997-12-11" },
+    { "key": "STU_09", "role": "STUDENT", "email": "hv.do.ngocanh@umi-demo.local", "fullName": "Đỗ Ngọc Ánh", "bio": "Lập trình viên mobile đang học thêm backend để làm sản phẩm trọn gói.", "address": "Cần Thơ", "dateOfBirth": "1998-04-02" },
+    { "key": "STU_10", "role": "STUDENT", "email": "hv.ngo.trungkien@umi-demo.local", "fullName": "Ngô Trung Kiên", "bio": "Kỹ sư điện tử tự học lập trình, mục tiêu là trở thành full-stack developer.", "address": "Nghệ An", "dateOfBirth": "1995-10-19" },
+    { "key": "STU_11", "role": "STUDENT", "email": "hv.duong.phuongthao@umi-demo.local", "fullName": "Dương Phương Thảo", "bio": "Nhân viên marketing học SQL để tự truy vấn dữ liệu chiến dịch.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "1997-03-25" },
+    { "key": "STU_12", "role": "STUDENT", "email": "hv.ly.hoangphuc@umi-demo.local", "fullName": "Lý Hoàng Phúc", "bio": "Sinh viên năm 2, đang tìm hiểu nền tảng web và Git.", "address": "Biên Hòa", "dateOfBirth": "2005-08-14", "education": [{ "institution": "Trường Đại học Lạc Hồng", "degree": "Cử nhân (đang học)", "fieldOfStudy": "Kỹ thuật Phần mềm", "startDate": "2023-09-01" }] },
+    { "key": "STU_13", "role": "STUDENT", "email": "hv.trinh.mylinh@umi-demo.local", "fullName": "Trịnh Mỹ Linh", "bio": "Chuyên viên phân tích nghiệp vụ muốn hiểu sâu hơn về kiến trúc hệ thống.", "address": "Hà Nội", "dateOfBirth": "1993-05-09" },
+    { "key": "STU_14", "role": "STUDENT", "email": "hv.mai.anhtuan@umi-demo.local", "fullName": "Mai Anh Tuấn", "bio": "Lập trình viên Java đang học Kubernetes cho dự án chuyển đổi lên cloud.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "1992-09-27" },
+    { "key": "STU_15", "role": "STUDENT", "email": "hv.cao.thuha@umi-demo.local", "fullName": "Cao Thu Hà", "bio": "Giáo viên tin học THPT, cập nhật kiến thức lập trình hiện đại để giảng dạy.", "address": "Huế", "dateOfBirth": "1990-01-16" },
+    { "key": "STU_16", "role": "STUDENT", "email": "hv.ha.vanlong@umi-demo.local", "fullName": "Hà Văn Long", "bio": "Kỹ thuật viên IT helpdesk, đang học bảo mật để thi chứng chỉ nhập môn.", "address": "Thái Nguyên", "dateOfBirth": "1996-06-04" },
+    { "key": "STU_17", "role": "STUDENT", "email": "hv.tang.kimngan@umi-demo.local", "fullName": "Tăng Kim Ngân", "bio": "Sinh viên Hệ thống Thông tin, thích trực quan hóa dữ liệu.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "2004-12-01", "education": [{ "institution": "Trường Đại học Kinh tế TP.HCM", "degree": "Cử nhân (đang học)", "fieldOfStudy": "Hệ thống Thông tin Quản lý", "startDate": "2022-09-01" }] },
+    { "key": "STU_18", "role": "STUDENT", "email": "hv.lam.chikhang@umi-demo.local", "fullName": "Lâm Chí Khang", "bio": "Freelancer làm website WordPress, muốn nâng cấp lên React và Next.js.", "address": "Vũng Tàu", "dateOfBirth": "1995-07-13" },
+    { "key": "STU_19", "role": "STUDENT", "email": "hv.phan.thaovy@umi-demo.local", "fullName": "Phan Thảo Vy", "bio": "Data analyst 1 năm kinh nghiệm, đang học xây dựng mô hình dự báo.", "address": "Đà Nẵng", "dateOfBirth": "1999-02-20" },
+    { "key": "STU_20", "role": "STUDENT", "email": "hv.huynh.tanloc@umi-demo.local", "fullName": "Huỳnh Tấn Lộc", "bio": "Sinh viên năm 3, thành viên CLB lập trình, thích thi đấu thuật toán.", "address": "Cần Thơ", "dateOfBirth": "2004-04-18", "education": [{ "institution": "Trường Đại học Cần Thơ", "degree": "Kỹ sư (đang học)", "fieldOfStudy": "Khoa học Máy tính", "startDate": "2022-09-01" }] },
+    { "key": "STU_21", "role": "STUDENT", "email": "hv.nguyen.hoaian@umi-demo.local", "fullName": "Nguyễn Hoài An", "bio": "Nhân viên vận hành hệ thống muốn học Docker và tự động hóa triển khai.", "address": "Bình Dương", "dateOfBirth": "1994-11-29" },
+    { "key": "STU_22", "role": "STUDENT", "email": "hv.tran.ngocdiep@umi-demo.local", "fullName": "Trần Ngọc Diệp", "bio": "Sinh viên năm nhất, bắt đầu từ HTML, CSS và JavaScript cơ bản.", "address": "Hà Nội", "dateOfBirth": "2006-01-07", "education": [{ "institution": "Học viện Công nghệ Bưu chính Viễn thông", "degree": "Kỹ sư (đang học)", "fieldOfStudy": "Công nghệ Thông tin", "startDate": "2024-09-01" }] },
+    { "key": "STU_23", "role": "STUDENT", "email": "hv.le.vanhieu@umi-demo.local", "fullName": "Lê Văn Hiếu", "bio": "Lập trình viên .NET đang tìm hiểu kiến trúc microservices.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "1991-03-03" },
+    { "key": "STU_24", "role": "STUDENT", "email": "hv.pham.thuytrang@umi-demo.local", "fullName": "Phạm Thùy Trang", "bio": "Chuyên viên QA quan tâm đến kiểm thử bảo mật ứng dụng web.", "address": "Hải Phòng", "dateOfBirth": "1997-08-26" },
+    { "key": "STU_25", "role": "STUDENT", "email": "hv.vo.minhquan@umi-demo.local", "fullName": "Võ Minh Quân", "bio": "Kỹ sư cơ khí học Python để tự động hóa báo cáo sản xuất.", "address": "Đồng Nai", "dateOfBirth": "1993-10-10" },
+    { "key": "STU_26", "role": "STUDENT", "email": "hv.dinh.baongoc@umi-demo.local", "fullName": "Đinh Bảo Ngọc", "bio": "Sinh viên Thiết kế đồ họa, muốn hiểu thêm về front-end để làm việc với lập trình viên.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "2003-09-23", "education": [{ "institution": "Trường Đại học Kiến trúc TP.HCM", "degree": "Cử nhân (đang học)", "fieldOfStudy": "Thiết kế Đồ họa", "startDate": "2021-09-01" }] },
+    { "key": "STU_27", "role": "STUDENT", "email": "hv.truong.quockhanh@umi-demo.local", "fullName": "Trương Quốc Khánh", "bio": "Trưởng nhóm kỹ thuật nhỏ, học thêm về thiết kế cơ sở dữ liệu và hiệu năng.", "address": "Hà Nội", "dateOfBirth": "1989-09-02" },
+    { "key": "STU_28", "role": "STUDENT", "email": "hv.kieu.thanhtam@umi-demo.local", "fullName": "Kiều Thanh Tâm", "bio": "Nhân viên ngân hàng tìm hiểu an toàn thông tin cho công việc phòng chống gian lận.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "1995-04-14" },
+    { "key": "STU_29", "role": "STUDENT", "email": "hv.quach.giaphu@umi-demo.local", "fullName": "Quách Gia Phú", "bio": "Học sinh lớp 12 yêu thích lập trình, học trước kiến thức đại học.", "address": "Long An", "dateOfBirth": "2008-02-27" },
+    { "key": "STU_30", "role": "STUDENT", "email": "hv.ton.nuhoaithuong@umi-demo.local", "fullName": "Tôn Nữ Hoài Thương", "bio": "Nghiên cứu sinh ngành ngôn ngữ học, học xử lý ngôn ngữ tự nhiên.", "address": "Huế", "dateOfBirth": "1994-12-19" },
+    { "key": "STU_31", "role": "STUDENT", "email": "hv.lu.vinhphat@umi-demo.local", "fullName": "Lư Vĩnh Phát", "bio": "Chủ cửa hàng online muốn tự xây dựng hệ thống quản lý đơn hàng.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "1990-06-08" },
+    { "key": "STU_32", "role": "STUDENT", "email": "hv.nghiem.thuylinh@umi-demo.local", "fullName": "Nghiêm Thùy Linh", "bio": "Sinh viên năm 4 ngành An toàn thông tin, chuẩn bị thực tập SOC.", "address": "Hà Nội", "dateOfBirth": "2003-05-12", "education": [{ "institution": "Học viện Kỹ thuật Mật mã", "degree": "Kỹ sư (đang học)", "fieldOfStudy": "An toàn Thông tin", "startDate": "2021-09-01" }] },
+    { "key": "STU_33", "role": "STUDENT", "email": "hv.au.ducthinh@umi-demo.local", "fullName": "Âu Đức Thịnh", "bio": "Lập trình viên game indie, học backend để làm hệ thống bảng xếp hạng.", "address": "Đà Lạt", "dateOfBirth": "1998-07-31" },
+    { "key": "STU_34", "role": "STUDENT", "email": "hv.mac.thanhvan@umi-demo.local", "fullName": "Mạc Thanh Vân", "bio": "Nhân viên hành chính học lập trình buổi tối để chuyển nghề.", "address": "Quảng Ninh", "dateOfBirth": "1996-01-24" },
+    { "key": "STU_35", "role": "STUDENT", "email": "hv.la.quanghieu@umi-demo.local", "fullName": "La Quang Hiếu", "bio": "Kỹ sư dữ liệu junior, đang củng cố kiến thức SQL nâng cao và data warehouse.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "2000-10-06" },
+    { "key": "STU_36", "role": "STUDENT", "email": "hv.thai.bichngoc@umi-demo.local", "fullName": "Thái Bích Ngọc", "bio": "Sinh viên năm 2 ngành Khoa học Dữ liệu, thích các bài toán thị giác máy tính.", "address": "Đà Nẵng", "dateOfBirth": "2005-03-09", "education": [{ "institution": "Trường Đại học Kinh tế – Đại học Đà Nẵng", "degree": "Cử nhân (đang học)", "fieldOfStudy": "Khoa học Dữ liệu", "startDate": "2023-09-01" }] },
+    { "key": "STU_37", "role": "STUDENT", "email": "hv.dam.vanthang@umi-demo.local", "fullName": "Đàm Văn Thắng", "bio": "Quản trị viên hệ thống Windows đang học Linux và scripting.", "address": "Nam Định", "dateOfBirth": "1992-08-16" },
+    { "key": "STU_38", "role": "STUDENT", "email": "hv.giang.mynhung@umi-demo.local", "fullName": "Giang Mỹ Nhung", "bio": "Product owner muốn hiểu quy trình phát triển và triển khai phần mềm.", "address": "TP. Hồ Chí Minh", "dateOfBirth": "1991-11-21" },
+    { "key": "STU_39", "role": "STUDENT", "email": "hv.ung.hoangviet@umi-demo.local", "fullName": "Ưng Hoàng Việt", "bio": "Sinh viên năm 3 thích bảo mật, thường tham gia các giải CTF dành cho sinh viên.", "address": "Hà Nội", "dateOfBirth": "2004-07-04", "education": [{ "institution": "Trường Đại học Bách khoa Hà Nội", "degree": "Kỹ sư (đang học)", "fieldOfStudy": "An toàn Không gian số", "startDate": "2022-09-01" }] },
+    { "key": "STU_40", "role": "STUDENT", "email": "hv.phung.kieuoanh@umi-demo.local", "fullName": "Phùng Kiều Oanh", "bio": "Chuyên viên nhân sự học phân tích dữ liệu để xây dựng báo cáo tuyển dụng.", "address": "Cần Thơ", "dateOfBirth": "1995-09-12" }
+  ]
+}

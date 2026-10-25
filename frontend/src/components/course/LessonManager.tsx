@@ -4,6 +4,7 @@ import { courseService, Lesson, CreateLessonData } from '../../services/course.s
 import toast from 'react-hot-toast';
 import { QuizBuilder } from './QuizBuilder';
 import { AssignmentBuilder } from './AssignmentBuilder';
+import { LessonPdfIndexButton } from './LessonPdfIndexButton';
 import { FiUploadCloud } from 'react-icons/fi';
 import axios from 'axios';
 
@@ -336,6 +337,8 @@ export const LessonManager = ({ courseId, initialLessons }: LessonManagerProps) 
                   >
                     <FiFileText size={14} /> Thêm Bài tập
                   </button>
+                  {/* RAG-PDF-02: shown only when the lesson's uploaded file is a PDF */}
+                  <LessonPdfIndexButton courseId={courseId} lessonId={lesson.id} videoUrl={lesson.videoUrl} />
                   <div className="w-px h-6 bg-slate-300 mx-1"></div>
                   <button
                     onClick={() => startEdit(lesson)}

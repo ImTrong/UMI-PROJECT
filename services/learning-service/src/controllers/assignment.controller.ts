@@ -1,6 +1,8 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { AssignmentService } from '../services/assignment.service';
+import { AssignmentService, pickAssignmentFields } from '../services/assignment.service';
+import { SubmissionAccessService, SubmissionAccessError, AssignmentScopeError } from '../services/submission-access.service';
+import { CourseAccessError } from '../services/course-access.service';
 import { HTTP_STATUS, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 
@@ -13,14 +15,24 @@ export class AssignmentController {
       }
 
       const { lessonId } = req.params;
+      const body = req.body || {};
+      if (body.lessonId !== undefined && body.lessonId !== lessonId) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'lessonId does not match the route' });
+      }
+      // FIX-INS-10: the course is derived from the lesson by the course-service and the caller must own it (ADMIN: any course);
+      // body.courseId / body.createdBy are never stored.
+      const { courseId } = await SubmissionAccessService.requireAssignmentCreator(lessonId, body.courseId, { userId: req.user.userId, role: req.user.role });
       const assignment = await AssignmentService.createAssignment({
-        ...req.body,
+        ...pickAssignmentFields(body),
+        courseId,
         lessonId,
         createdBy: req.user.userId,
-      });
+      } as any);
 
       res.status(HTTP_STATUS.CREATED).json({ message: 'Assignment created', data: assignment });
     } catch (error: any) {
+      const scoped = AssignmentController.scopeErrorResponse(error);
+      if (scoped) return res.status(scoped.status).json({ error: scoped.message });
       logger.error('Create assignment error:', error);
       res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
     }
@@ -30,12 +42,30 @@ export class AssignmentController {
     try {
       if (!req.user) return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       const { assignmentId } = req.params;
-      const assignment = await AssignmentService.updateAssignment(assignmentId, req.body, req.user.userId);
+      const existing = await SubmissionAccessService.requireAssignmentEditor(assignmentId, { userId: req.user.userId, role: req.user.role });
+      const body = req.body || {};
+      // FIX-INS-10: an assignment never moves to another course / lesson
+      if ((body.courseId !== undefined && body.courseId !== existing.courseId)
+        || (body.lessonId !== undefined && body.lessonId !== existing.lessonId)) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'courseId / lessonId cannot be changed' });
+      }
+      const assignment = await AssignmentService.updateAssignment(assignmentId, pickAssignmentFields(body));
       res.status(HTTP_STATUS.OK).json({ message: 'Assignment updated', data: assignment });
     } catch (error: any) {
+      const scoped = AssignmentController.scopeErrorResponse(error);
+      if (scoped) return res.status(scoped.status).json({ error: scoped.message });
       logger.error('Update assignment error:', error);
       res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
     }
+  }
+
+  /** FIX-INS-10: authorization / scope / course-service errors keep their own status (403 / 400 / 404 / 503). */
+  private static scopeErrorResponse(error: any): { status: number; message: string } | null {
+    if (error instanceof SubmissionAccessError) return { status: HTTP_STATUS.FORBIDDEN, message: ERROR_MESSAGES.FORBIDDEN };
+    if (error instanceof AssignmentScopeError || error instanceof CourseAccessError) {
+      return { status: error.statusCode, message: error.message };
+    }
+    return null;
   }
 
   static async getAssignmentByLesson(req: AuthRequest, res: Response) {
@@ -80,6 +110,9 @@ export class AssignmentController {
       }
 
       const { submissionId } = req.params;
+      // FIX-INS-09: per object - the owner of the course that contains this assignment's lesson, or an ADMIN (403 otherwise,
+      // also for an unknown id). Only score + feedback come from the body; the grader is the authenticated caller.
+      await SubmissionAccessService.requireAssignmentSubmissionGrader(submissionId, { userId: req.user.userId, role: req.user.role });
       const graded = await AssignmentService.gradeSubmission({
         submissionId,
         score: req.body.score,
@@ -89,6 +122,7 @@ export class AssignmentController {
 
       res.status(HTTP_STATUS.OK).json({ message: 'Submission graded', data: graded });
     } catch (error: any) {
+      if (error instanceof SubmissionAccessError) return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
       logger.error('Grade submission error:', error);
       res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
     }
@@ -101,11 +135,14 @@ export class AssignmentController {
         return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
       }
       const { assignmentId } = req.params;
+      // FIX-INS-09: only the grader of THIS assignment (course owner / ADMIN) - not every INSTRUCTOR
+      await SubmissionAccessService.requireAssignmentGrader(assignmentId, { userId: req.user.userId, role: req.user.role });
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const result = await AssignmentService.getSubmissions(assignmentId, page, limit);
       res.status(HTTP_STATUS.OK).json(result);
     } catch (error: any) {
+      if (error instanceof SubmissionAccessError) return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
       logger.error('Get submissions error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get submissions' });
     }

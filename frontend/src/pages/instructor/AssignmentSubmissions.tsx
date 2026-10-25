@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { learningService, AssignmentSubmission } from '../../services/learning.service';
 import { FiChevronLeft, FiDownload, FiCheck, FiX, FiFile } from 'react-icons/fi';
 import toast from 'react-hot-toast';
+import { withAccessToken } from '../../utils/protected-file-url';
 
 export default function AssignmentSubmissions() {
   const { assignmentId } = useParams<{ assignmentId: string }>();
@@ -174,7 +175,7 @@ export default function AssignmentSubmissions() {
 
                 {selectedSubmission.fileUrl && (
                   <div className="space-y-2">
-                    <a href={selectedSubmission.fileUrl} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 bg-primary-50 rounded-xl text-primary-700 hover:bg-primary-100 transition">
+                    <a href={withAccessToken(selectedSubmission.fileUrl)} target="_blank" rel="noreferrer" className="flex items-center justify-between p-3 bg-primary-50 rounded-xl text-primary-700 hover:bg-primary-100 transition">
                       <div className="flex items-center gap-3">
                         <FiFile />
                         <span className="font-medium text-sm">{selectedSubmission.fileName || selectedSubmission.fileUrl.split('/').pop() || 'Tệp đính kèm'}</span>

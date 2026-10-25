@@ -258,3 +258,20 @@ export function getCurrentVietnamMonthYear(date: Date = new Date()): { month: nu
 
   return { month, year };
 }
+
+export type VietnamPeriodState = 'ENDED' | 'CURRENT' | 'FUTURE';
+
+/**
+ * Where a monthly period stands at `now`, in Asia/Ho_Chi_Minh: ENDED (strictly before the current month), CURRENT or FUTURE.
+ * An administrator may finalize only an ENDED period (FIX DEMO RANKING 02C.2). The startup catch-up, the monthly cron and the
+ * reconciliation pass already select past months only and do not go through this check.
+ */
+export function getVietnamPeriodState(
+  month: number,
+  year: number,
+  now: Date = new Date()
+): { state: VietnamPeriodState; current: { month: number; year: number } } {
+  const current = getCurrentVietnamMonthYear(now);
+  const order = year !== current.year ? year - current.year : month - current.month;
+  return { state: order < 0 ? 'ENDED' : order === 0 ? 'CURRENT' : 'FUTURE', current };
+}

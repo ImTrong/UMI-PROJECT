@@ -90,6 +90,7 @@ app.get('/api/ai/rag/health', RAGController.health);                            
 app.post('/api/ai/rag/search', apiLimiter, authenticateToken, RAGController.search);                                     // Authenticated
 app.post('/api/ai/rag/index/document', apiLimiter, authenticateToken, requireAdmin, RAGController.indexDocument);         // Admin
 app.post('/api/ai/rag/index/lesson', apiLimiter, authenticateToken, requireAdmin, RAGController.indexLesson);             // Admin
+app.post('/api/ai/rag/index/lesson-file', apiLimiter, authenticateToken, requireAdmin, RAGController.indexLessonFile);    // Admin / course instructor: PDF, DOCX
 app.delete('/api/ai/rag/index/document/:id', apiLimiter, authenticateToken, requireAdmin, RAGController.deleteDocument);  // Admin
 app.get('/api/ai/rag/documents', apiLimiter, authenticateToken, requireAdmin, RAGController.listDocuments);               // Admin
 

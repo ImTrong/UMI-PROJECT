@@ -4,6 +4,16 @@ import axios from 'axios';
 import prisma from '../utils/prisma';
 import { ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+import { COURSE_WRITABLE_FIELDS, pickFields } from '../utils/course-fields';
+import { learningServiceAuthHeaders, describeCallError } from '../utils/learning-client';
+
+/** Raised by deleteCourse when the course still has learners, or when that cannot be verified (FIX-INS-02). */
+export class CourseDeletionBlockedError extends Error {
+  constructor(message: string, public readonly code: 'COURSE_HAS_LEARNERS' | 'ENROLLMENT_CHECK_UNAVAILABLE', public readonly learners?: number) {
+    super(message);
+    this.name = 'CourseDeletionBlockedError';
+  }
+}
 
 export interface CreateCourseData {
   title: string;
@@ -17,8 +27,10 @@ export interface CreateCourseData {
   whatYouWillLearn?: string;
   requirements?: string[];
   targetAudience?: string[];
+  certificateConfig?: Record<string, unknown> | null;
 }
 
+// Instructor-editable content only (COURSE_WRITABLE_FIELDS). `published` is NOT here: it changes through /publish.
 export interface UpdateCourseData {
   title?: string;
   description?: string;
@@ -30,7 +42,7 @@ export interface UpdateCourseData {
   whatYouWillLearn?: string;
   requirements?: string[];
   targetAudience?: string[];
-  published?: boolean;
+  certificateConfig?: Record<string, unknown> | null;
 }
 
 export class CourseService {
@@ -52,12 +64,20 @@ export class CourseService {
     }
   }
 
+  /**
+   * `instructorId` is the authenticated caller (set by the controller), never a body field. Every other value is filtered
+   * through COURSE_WRITABLE_FIELDS here, so `published`, `approvalStatus`, `rating`, `enrolledCount`... always start at their
+   * schema defaults (DRAFT, unpublished, 0) whatever the caller passes in.
+   */
   static async createCourse(data: CreateCourseData) {
-    const { title, instructorId, price, categoryId } = data;
+    const { instructorId } = data;
+    const fields = pickFields(data, COURSE_WRITABLE_FIELDS) as Omit<CreateCourseData, 'instructorId'>;
+    const { title, price, categoryId } = fields;
 
-    // Sanitize data
-    const sanitizedData = {
-      ...data,
+    // Sanitize data (only allowlisted content fields + the authenticated owner)
+    const sanitizedData: any = {
+      ...fields,
+      instructorId,
       price: typeof price === 'string' ? parseFloat(price) : price,
       categoryId: categoryId === '' || categoryId === 'undefined' ? undefined : categoryId,
     };
@@ -338,7 +358,8 @@ export class CourseService {
       throw new Error(ERROR_MESSAGES.FORBIDDEN);
     }
 
-    const updateData: any = { ...data };
+    // Content fields only: publication goes through /publish (admin review), moderation through /approve and /reject.
+    const updateData: any = pickFields(data, COURSE_WRITABLE_FIELDS);
     
     // Nếu đổi title, cần generate slug mới unique
     if (data.title && data.title !== course.title) {
@@ -384,12 +405,53 @@ export class CourseService {
       throw new Error(ERROR_MESSAGES.FORBIDDEN);
     }
 
+    // A course somebody learns in is never deleted, by its instructor or by an ADMIN: deleting it would also cascade its
+    // lessons and reviews and orphan the learners' progress, certificates and purchases (FIX-INS-02). Unpublishing stays
+    // possible. Nothing from the request is consulted here - only the stored counter and the learning service.
+    const learners = await this.countLearners(course.id, course.enrolledCount);
+    if (learners > 0) {
+      throw new CourseDeletionBlockedError(
+        'Không thể xóa khóa học đã có học viên ghi danh. Hãy ngừng xuất bản khóa học thay vì xóa.',
+        'COURSE_HAS_LEARNERS',
+        learners,
+      );
+    }
+
     await prisma.course.delete({
       where: { id: courseId },
     });
 
     logger.info(`Course deleted: ${course.title}`);
     return { success: true };
+  }
+
+  /**
+   * Learners of a course, from the two server-side sources this service already relies on: the stored `enrolledCount`
+   * (incremented when an order is paid) and the learning service's enrollment records (CourseProgress). The larger one
+   * wins. If the learning service cannot answer, the count cannot be trusted, so deletion is refused (fail closed).
+   */
+  private static async countLearners(courseId: string, enrolledCount: number): Promise<number> {
+    if ((enrolledCount || 0) > 0) return enrolledCount;
+
+    const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:3006';
+    let records: unknown;
+    try {
+      const response = await axios.get(`${learningServiceUrl}/api/learning/progress/course/${courseId}/students`, {
+        timeout: 5000,
+        headers: learningServiceAuthHeaders(),
+      });
+      records = response.data?.data;
+    } catch (error: any) {
+      logger.warn(`Enrollment check for course ${courseId} failed: ${describeCallError(error)}`);
+      records = undefined;
+    }
+    if (!Array.isArray(records)) {
+      throw new CourseDeletionBlockedError(
+        'Không thể xác minh số học viên của khóa học lúc này, khóa học chưa bị xóa. Vui lòng thử lại sau.',
+        'ENROLLMENT_CHECK_UNAVAILABLE',
+      );
+    }
+    return records.length;
   }
 
   static async publishCourse(courseId: string, instructorId: string) {
@@ -578,9 +640,10 @@ export class CourseService {
 
     try {
       const response = await axios.get(
-        `${learningServiceUrl}/api/learning/progress/course/${courseId}/students`
+        `${learningServiceUrl}/api/learning/progress/course/${courseId}/students`,
+        { timeout: 5000, headers: learningServiceAuthHeaders() }
       );
-      
+
       const progresses = response.data.data || [];
       
       // Now fetch user details
@@ -609,7 +672,8 @@ export class CourseService {
 
       return { course: { id: course.id, title: course.title }, students };
     } catch (error) {
-      // Fallback: return basic course info if learning-service is down
+      // Fallback: return basic course info if learning-service is down (or refuses: e.g. COURSE_LEARNING_TOKEN not configured)
+      logger.warn(`Student list for course ${courseId} unavailable: ${describeCallError(error)}`);
       return { course: { id: course.id, title: course.title, enrolledCount: course.enrolledCount }, students: [] };
     }
   }
@@ -638,10 +702,12 @@ export class CourseService {
     let progressData: any;
     try {
       const progressResponse = await axios.get(
-        `${learningServiceUrl}/api/learning/progress/course/${courseId}/students/${studentId}`
+        `${learningServiceUrl}/api/learning/progress/course/${courseId}/students/${studentId}`,
+        { timeout: 5000, headers: learningServiceAuthHeaders() }
       );
       progressData = progressResponse.data.data;
-    } catch {
+    } catch (error: any) {
+      logger.warn(`Student progress lookup for course ${courseId} failed: ${describeCallError(error)}`);
       throw new Error('Student progress not found');
     }
 

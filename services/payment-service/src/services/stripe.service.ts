@@ -48,6 +48,15 @@ export interface PaymentIntentResult {
   customerId?: string;
 }
 
+/**
+ * The error a refund call throws: the message as before, plus what Stripe said (FIX 07B-2A.2) - its error type and HTTP status -
+ * so the caller can tell a rejected request (nothing refunded) from a timeout / 5xx (outcome unknown).
+ */
+function stripeError(context: string, error: any): Error {
+  logger.error(`${context}: ${error?.type ?? 'error'} ${error?.statusCode ?? ''} ${error?.message ?? ''}`);
+  return Object.assign(new Error(`Stripe error: ${error?.message}`), { stripeType: error?.type, statusCode: error?.statusCode, stripeCode: error?.code });
+}
+
 export class StripeService {
   static isConfigured(): boolean {
     const key = process.env.STRIPE_SECRET_KEY;
@@ -123,7 +132,7 @@ export class StripeService {
     }
   }
 
-  static async refundPayment(paymentIntentId: string, amount?: number, reason?: string, currency?: string, idempotencyKey?: string) {
+  static async refundPayment(paymentIntentId: string, amount?: number, reason?: string, currency?: string, idempotencyKey?: string, metadata?: Record<string, string>) {
     try {
       let refundAmount: number | undefined;
       if (amount) {
@@ -138,6 +147,8 @@ export class StripeService {
         payment_intent: paymentIntentId,
         amount: refundAmount,
         reason: reason as Stripe.RefundCreateParams.Reason,
+        // FIX 07B-2A.2: lets the webhook find the local Refund row even if this process never stored Stripe's refund id
+        ...(metadata && { metadata }),
       };
 
       // A.4: Pass idempotency key for safe retries
@@ -157,8 +168,22 @@ export class StripeService {
         currency: refund.currency,
       };
     } catch (error: any) {
-      logger.error('Stripe refund error:', error);
-      throw new Error(`Stripe error: ${error.message}`);
+      throw stripeError('Stripe refund error', error);
+    }
+  }
+
+  /** The current state of a refund Stripe already created (FIX 07B-2A.2) - used to resume a refund whose outcome was not recorded. */
+  static async getRefund(refundId: string) {
+    try {
+      const refund = await getStripe().refunds.retrieve(refundId);
+      return {
+        id: refund.id,
+        status: refund.status,
+        amount: isZeroDecimal(refund.currency) ? refund.amount : refund.amount / 100,
+        currency: refund.currency,
+      };
+    } catch (error: any) {
+      throw stripeError('Stripe get refund error', error);
     }
   }
 

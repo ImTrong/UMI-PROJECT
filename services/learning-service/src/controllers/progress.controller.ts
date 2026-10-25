@@ -1,7 +1,8 @@
 import { Response, Request } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { ProgressService } from '../services/progress.service';
-import { CourseAccessError } from '../services/course-access.service';
+import { CourseAccessError, CourseAccessService } from '../services/course-access.service';
+import { OrderEntitlementClient, EntitlementUnavailableError } from '../services/order-entitlement.client';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 
@@ -130,18 +131,46 @@ export class ProgressController {
     }
   }
 
+  /**
+   * POST /api/learning/internal/courses/:courseId/enroll - order-service only (ORDER_LEARNING_TOKEN, checked by the route).
+   * Body: exactly { userId, orderId }. A paid enrollment is written ONLY after the order-service confirms that this order is
+   * PAID, belongs to this learner and grants this course (FIX-INS-04); a payment status, role or price in the body is refused.
+   * 201 = enrollment written now, 200 = already enrolled (idempotent retry), 403 = not entitled, 503 = could not be verified.
+   */
   static async enrollInCourseInternal(req: Request, res: Response) {
     try {
       const { courseId } = req.params;
-      const { userId } = req.body;
-      
-      if (!userId) {
+      const body = req.body;
+      const isId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-fA-F]{24}$/.test(v);
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((k) => k !== 'userId' && k !== 'orderId')) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Body must be exactly { userId, orderId }' });
+      }
+      const { userId, orderId } = body;
+      if (!isId(userId)) {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'userId is required' });
       }
+      if (!isId(orderId)) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'orderId is required' });
+      }
 
+      // Payment proof from the order-service's records, BEFORE anything is read or written here.
+      const entitlement = await OrderEntitlementClient.check(orderId, userId, courseId);
+      if (!entitlement.entitled) {
+        logger.warn(`Internal enroll refused: order ${orderId} does not entitle user ${userId} to course ${courseId} (${entitlement.reason})`);
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: 'The order does not entitle this learner to this course', code: 'NOT_ENTITLED', reason: entitlement.reason });
+      }
+
+      const existed = await CourseAccessService.findEnrollment(userId, courseId);
       const enrollment = await ProgressService.enrollInCourse(userId, courseId, true);
-      res.status(HTTP_STATUS.CREATED).json({ message: 'Successfully enrolled in course internally', data: enrollment });
+      res.status(existed ? HTTP_STATUS.OK : HTTP_STATUS.CREATED).json({
+        message: existed ? 'Already enrolled in course' : 'Successfully enrolled in course internally',
+        data: enrollment,
+      });
     } catch (error: any) {
+      if (error instanceof EntitlementUnavailableError) {
+        logger.error(`Internal enroll not verified: ${error.message}`);
+        return res.status(HTTP_STATUS.SERVICE_UNAVAILABLE).json({ error: 'Payment could not be verified; nothing was enrolled', code: 'ENTITLEMENT_UNAVAILABLE' });
+      }
       logger.error('Internal enroll in course error:', error);
       if (error instanceof CourseAccessError) {
         return res.status(error.statusCode).json({ error: error.message });

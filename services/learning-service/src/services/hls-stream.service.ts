@@ -25,6 +25,7 @@ import {
 import { STREAM_ERROR_MESSAGES } from '../utils/constants';
 import { HLS_ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+import { courseInternalHeaders } from './course-internal.client';
 
 const prisma = new PrismaClient();
 
@@ -197,7 +198,8 @@ export class HLSStreamService {
 
     try {
       const response = await axios.get<{ data: LessonFromService }>(
-        `${courseServiceUrl}/api/courses/internal/lessons/${lessonId}`
+        `${courseServiceUrl}/api/courses/internal/lessons/${lessonId}`,
+        { headers: courseInternalHeaders() }
       );
       if (response.data?.data) return response.data.data;
     } catch {
@@ -213,7 +215,8 @@ export class HLSStreamService {
     if (lessonProgress) {
       try {
         const response = await axios.get<{ data: LessonFromService[] }>(
-          `${courseServiceUrl}/api/courses/internal/${lessonProgress.courseId}/lessons`
+          `${courseServiceUrl}/api/courses/internal/${lessonProgress.courseId}/lessons`,
+          { headers: courseInternalHeaders() }
         );
         const lesson = response.data?.data?.find((l) => l.id === lessonId);
         if (lesson) return { ...lesson, courseId: lessonProgress.courseId };

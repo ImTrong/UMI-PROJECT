@@ -82,7 +82,7 @@ export class DocumentLoader {
       }
 
       // Check if lesson has any text content
-      const textContent = this.extractLessonContent(lesson);
+      const textContent = DocumentLoader.extractLessonContent(lesson);
       if (!textContent || textContent.trim().length === 0) {
         const error: any = new Error(
           `Lesson "${lesson.title || lessonId}" chưa có text content (chỉ có videoUrl). ` +
@@ -163,8 +163,10 @@ export class DocumentLoader {
    * Extract text content from a lesson object.
    * Looks for description, resources (markdown), transcript fields.
    * Returns null if only videoUrl exists.
+   * Public (RAG-P0): POST /rag/index/lesson builds the content from the lesson the course-service returned to the
+   * verified instructor / admin.
    */
-  private extractLessonContent(lesson: any): string | null {
+  static extractLessonContent(lesson: any): string | null {
     const parts: string[] = [];
 
     if (lesson.title) {

@@ -7,6 +7,7 @@ export const HTTP_STATUS = {
   NOT_FOUND: 404,
   CONFLICT: 409,
   INTERNAL_SERVER_ERROR: 500,
+  SERVICE_UNAVAILABLE: 503,
 } as const;
 
 export const ERROR_MESSAGES = {
@@ -14,6 +15,7 @@ export const ERROR_MESSAGES = {
   COURSE_ALREADY_EXISTS: 'Course with this title already exists',
   LESSON_NOT_FOUND: 'Lesson not found',
   LESSON_ALREADY_EXISTS: 'A lesson with this order already exists in this course',
+  LESSON_NOT_IN_COURSE: 'Every lesson to reorder must belong to this course',
   REVIEW_NOT_FOUND: 'Review not found',
   CATEGORY_NOT_FOUND: 'Category not found',
   CATEGORY_ALREADY_EXISTS: 'Category already exists',

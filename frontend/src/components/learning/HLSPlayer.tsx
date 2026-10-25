@@ -3,6 +3,7 @@ import Hls from 'hls.js';
 import { MdFullscreen, MdFullscreenExit } from 'react-icons/md';
 import { learningService, LessonProgress } from '../../services/learning.service';
 import { DynamicWatermark } from './DynamicWatermark';
+import { withAccessToken } from '../../utils/protected-file-url';
 
 // ============================================
 // Types
@@ -204,13 +205,13 @@ export const HLSPlayer = ({ lesson, progress, onComplete, onTimeUpdate }: HLSPla
           refreshTimerRef.current = setTimeout(fallbackToMP4, refreshMs);
         }
       } else {
-        // Fallback to the original video URL if stream endpoint fails
-        video.src = lesson.videoUrl;
+        // Fallback to the original video URL if stream endpoint fails (with the user's token - FIX-INS-07)
+        video.src = withAccessToken(lesson.videoUrl);
         setIsLoading(false);
       }
     } catch {
       const video = videoRef.current;
-      if (video) video.src = lesson.videoUrl;
+      if (video) video.src = withAccessToken(lesson.videoUrl);
       setIsLoading(false);
     }
   }, [lesson.id, lesson.videoUrl]);

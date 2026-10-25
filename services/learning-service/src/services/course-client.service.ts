@@ -1,5 +1,6 @@
 import axios from 'axios';
 import logger from '../utils/logger';
+import { courseInternalHeaders } from './course-internal.client';
 
 export interface CourseMetadata {
   id: string;
@@ -30,7 +31,7 @@ export class CourseClientService {
     try {
       const [courseRes, lessonsRes] = await Promise.all([
         axios.get(`${courseServiceUrl}/api/courses/${courseId}`, { timeout: 5000 }),
-        axios.get(`${courseServiceUrl}/api/courses/internal/${courseId}/lessons`, { timeout: 5000 }),
+        axios.get(`${courseServiceUrl}/api/courses/internal/${courseId}/lessons`, { timeout: 5000, headers: courseInternalHeaders() }),
       ]);
 
       const course = courseRes.data?.data || {};

@@ -1,6 +1,9 @@
 import { PrismaClient } from '@prisma/client';
+import { PathAccessService } from './path-access.service';
+import { PathImageService } from './path-image.service';
 import axios from 'axios';
 import logger from '../utils/logger';
+import { UserNotificationClient } from './user-notification.client';
 
 const prisma = new PrismaClient();
 
@@ -47,10 +50,11 @@ export class PathService {
       orderBy = { title: 'desc' };
     }
 
-    return prisma.learningPath.findMany({
+    const paths = await prisma.learningPath.findMany({
       where,
       orderBy,
     });
+    return paths.map((p) => PathImageService.presentPath(p));   // FIX-INS-14
   }
 
   /**
@@ -74,7 +78,8 @@ export class PathService {
       where: { id: pathId },
     });
 
-    if (!path) {
+    // FIX-INS-12: DRAFT never, ARCHIVED only for a learner already enrolled - before anything is fetched or written
+    if (!path || !(await PathAccessService.canView(path, userId))) {
       throw new Error('Learning path not found');
     }
 
@@ -261,7 +266,7 @@ export class PathService {
     // Final project was queried above
 
     return {
-      path,
+      path: PathImageService.presentPath(path),   // FIX-INS-14: signed image URL when the path is not PUBLISHED (caller already allowed)
       milestones,
       enrollment,
       progress: {
@@ -295,8 +300,13 @@ export class PathService {
       where: { userId_learningPathId: { userId, learningPathId: pathId } },
     });
 
-    if (existing) {
+    // FIX-INS-12: an existing enrollment stays valid on a PUBLISHED or ARCHIVED path (idempotent); a NEW one needs PUBLISHED.
+    // A DRAFT path - or an ARCHIVED one the caller never joined - answers like a missing path.
+    if (existing && PathAccessService.isVisibleToEnrolled(path)) {
       return existing;
+    }
+    if (!PathAccessService.canEnrollNew(path)) {
+      throw new Error('Learning path not found');
     }
 
     // Check if user already completed all courses in the path
@@ -347,8 +357,7 @@ export class PathService {
         logger.info(`Auto-generated certificate for user ${userId} completing path ${pathId} on enrollment`);
         
         // Notify user
-        const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
-        await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+        await UserNotificationClient.send({
           userId,
           title: '🎉 Lộ trình hoàn thành!',
           message: `Chúc mừng bạn đã hoàn thành lộ trình "${path.title}". Chứng chỉ lộ trình của bạn đã được tạo!`,
@@ -436,8 +445,7 @@ export class PathService {
             logger.info(`Auto-generated certificate for user ${userId} completing path ${path.id}`);
             
             // Notify user
-            const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
-            await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+            await UserNotificationClient.send({
               userId,
               title: '🎉 Lộ trình hoàn thành!',
               message: `Chúc mừng bạn đã hoàn thành lộ trình "${path.title}". Chứng chỉ lộ trình của bạn đã được tạo!`,

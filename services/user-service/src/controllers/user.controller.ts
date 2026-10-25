@@ -1,9 +1,11 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { UserService } from '../services/user.service';
+import { InstructorApplicationService, InstructorApplicationError } from '../services/instructor-application.service';
 import { HTTP_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 import { fileStorage } from '@umi/file-storage';
+import { ROLE_VALUES } from '../utils/profile-fields';
 
 export class UserController {
   // User Profile Controllers
@@ -42,7 +44,16 @@ export class UserController {
     try {
       const { userId } = req.params;
 
-      const userProfile = await UserService.getUserProfile(userId);
+      // The full profile (email, phone, address, date of birth...) goes only to its owner or an ADMIN. Everyone else who is
+      // signed in gets the same public subset as GET /api/users/public/:userId. req.user.role comes from the database
+      // (attachUserRole). Other services call this route with the user's own token for the user's own id, so they stay on
+      // the full-profile branch.
+      const isOwner = !!req.user && String(req.user.userId).toLowerCase() === String(userId).toLowerCase();
+      const isAdmin = req.user?.role === 'ADMIN';
+
+      const userProfile = isOwner || isAdmin
+        ? await UserService.getUserProfile(userId)
+        : await UserService.getPublicProfile(userId);
 
       res.status(HTTP_STATUS.OK).json({
         data: userProfile,
@@ -88,12 +99,18 @@ export class UserController {
 
   static async getBatchUsers(req: AuthRequest, res: Response) {
     try {
-      const { ids } = req.body;
-      if (!ids || !Array.isArray(ids)) {
-        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'ids array is required' });
+      // Called without credentials by the course / learning / review code to show names and avatars, so the answer is
+      // limited to what the public profile already shows: userId, fullName, avatar (FIX-INS-01).
+      const { ids } = req.body || {};
+      const valid =
+        Array.isArray(ids) &&
+        ids.length <= 1000 &&
+        ids.every((id: unknown) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id));
+      if (!valid) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'ids must be an array of at most 1000 user ids' });
       }
 
-      const users = await UserService.getBatchUserProfiles(ids);
+      const users = await UserService.getBatchUserProfiles([...new Set<string>(ids)]);
 
       res.status(HTTP_STATUS.OK).json({
         data: users,
@@ -103,6 +120,29 @@ export class UserController {
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to get batch users',
       });
+    }
+  }
+
+  /**
+   * POST /api/users/internal/eligibility  (service-to-service, X-Internal-Service-Token)
+   * Body: { ids: string[] } -> { data: [{ userId, role, isActive }] }
+   */
+  static async getEligibilityBatch(req: AuthRequest, res: Response) {
+    try {
+      const { ids } = req.body || {};
+      const valid =
+        Array.isArray(ids) &&
+        ids.length <= 1000 &&
+        ids.every((id: unknown) => typeof id === 'string' && /^[0-9a-fA-F]{24}$/.test(id));
+      if (!valid) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'ids must be an array of at most 1000 user ids' });
+      }
+
+      const users = await UserService.getEligibilityBatch([...new Set<string>(ids)]);
+      res.status(HTTP_STATUS.OK).json({ data: users });
+    } catch (error: any) {
+      logger.error('Get eligibility batch error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get eligibility' });
     }
   }
 
@@ -119,15 +159,14 @@ export class UserController {
         userProfile = await UserService.getUserProfile(req.user.userId);
       } catch (error: any) {
         if (error.message === ERROR_MESSAGES.USER_NOT_FOUND) {
-          let role = 'STUDENT';
-          if (req.user.email.includes('admin')) role = 'ADMIN';
-          else if (req.user.email.includes('instructor')) role = 'INSTRUCTOR';
-
+          // A profile created on first sign-in is ALWAYS a STUDENT. The role is never guessed from the e-mail address
+          // (FIX-INS-01): ADMIN comes only from the seed / an ADMIN (PUT /api/users/:userId), INSTRUCTOR only from the
+          // instructor registration flow (still to be replaced by the contract flow, FIX-INS-05/06).
           userProfile = await UserService.createUserProfile({
             userId: req.user.userId,
             email: req.user.email,
             fullName: req.user.fullName || 'New User',
-            role: role as any,
+            role: 'STUDENT' as any,
           });
         } else {
           throw error;
@@ -154,15 +193,30 @@ export class UserController {
 
   static async getAllUsers(req: AuthRequest, res: Response) {
     try {
-      const page = parseInt(req.query.page as string) || 1;
-      const limit = parseInt(req.query.limit as string) || 10;
+      const page = Math.max(parseInt(req.query.page as string) || 1, 1);
+      const rawLimit = parseInt(req.query.limit as string) || 10;
+      const role = typeof req.query.role === 'string' ? req.query.role : undefined;
+      const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+
+      // Anyone who is not an ADMIN only gets the instructor directory (active instructors, by display name, public fields).
+      if (req.user?.role !== 'ADMIN') {
+        if (role && role !== 'INSTRUCTOR') {
+          return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
+        }
+        const directory = await UserService.searchPublicInstructors(page, Math.min(Math.max(rawLimit, 1), 20), search);
+        return res.status(HTTP_STATUS.OK).json(directory);
+      }
+
+      if (role && !ROLE_VALUES.includes(role as any)) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Invalid role filter' });
+      }
       const filters = {
-        role: req.query.role as string,
+        role,
         isActive: req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined,
-        search: req.query.search as string,
+        search,
       };
 
-      const result = await UserService.getAllUserProfiles(page, limit, filters);
+      const result = await UserService.getAllUserProfiles(page, Math.min(Math.max(rawLimit, 1), 100), filters);
 
       res.status(HTTP_STATUS.OK).json(result);
     } catch (error: any) {
@@ -500,84 +554,113 @@ export class UserController {
     }
   }
 
+  /**
+   * POST /api/users/become-instructor - IMPLEMENT-01: files an application (PENDING); the role does NOT change. Only a STUDENT
+   * without a pending application may apply; the applicant is the authenticated caller (userId / role in the body are ignored).
+   * Contact fields of the form (phoneNumber, address) update the caller's own profile, exactly like PUT /api/users/me would.
+   */
   static async becomeInstructor(req: AuthRequest, res: Response) {
     try {
       if (!req.user) {
-        return res.status(HTTP_STATUS.UNAUTHORIZED).json({
-          error: ERROR_MESSAGES.UNAUTHORIZED,
-        });
+        return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      }
+      const input = InstructorApplicationService.validateSubmission(req.body);
+      const application = await InstructorApplicationService.submit(req.user.userId, input);
+
+      const { phoneNumber, address } = req.body || {};
+      const contact: any = {};
+      if (typeof phoneNumber === 'string' && phoneNumber.trim()) contact.phoneNumber = phoneNumber.trim();
+      if (typeof address === 'string' && address.trim()) contact.address = address.trim();
+      if (Object.keys(contact).length > 0) {
+        await UserService.updateUserProfile(req.user.userId, contact).catch((e: any) => logger.warn(`Contact details not saved: ${e?.message}`));
       }
 
-      const { bio, phoneNumber, address, expertise, dateOfBirth, education, work } = req.body;
-
-      // Check if already an instructor
-      const profile = await UserService.getUserProfile(req.user.userId);
-      if (profile.role === 'INSTRUCTOR') {
-        return res.status(HTTP_STATUS.BAD_REQUEST).json({
-          error: 'Bạn đã là giảng viên rồi',
-        });
-      }
-
-      // Update profile with new info (bio, phone, address, etc.)
-      const updateData: any = {};
-      if (bio) updateData.bio = bio;
-      if (phoneNumber) updateData.phoneNumber = phoneNumber;
-      if (address) updateData.address = address;
-      if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
-
-      if (Object.keys(updateData).length > 0) {
-        await UserService.updateUserProfile(req.user.userId, updateData);
-      }
-
-      // Add education if provided
-      if (education && Array.isArray(education)) {
-        for (const edu of education) {
-          await UserService.addEducation(req.user.userId, edu);
-        }
-      }
-
-      // Add work experience if provided
-      if (work && Array.isArray(work)) {
-        for (const w of work) {
-          await UserService.addWorkExperience(req.user.userId, w);
-        }
-      }
-
-      // Directly upgrade user to INSTRUCTOR
-      const updatedUser = await UserService.updateToInstructor(req.user.userId);
-
-      res.status(HTTP_STATUS.OK).json({
-        message: 'Đăng ký giảng viên thành công!',
-        data: updatedUser,
+      res.status(HTTP_STATUS.CREATED).json({
+        message: 'Đã gửi đơn đăng ký giảng viên. Vui lòng chờ quản trị viên xét duyệt.',
+        data: InstructorApplicationService.toApplicantView(application),
       });
     } catch (error: any) {
+      if (error instanceof InstructorApplicationError) {
+        return res.status(error.statusCode).json({ error: error.message, code: error.code });
+      }
       logger.error('Become instructor error:', error);
-      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-        error: error.message || 'Đăng ký giảng viên thất bại',
-      });
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Đăng ký giảng viên thất bại' });
     }
   }
 
+  /** GET /api/users/become-instructor/me - the caller's current role and latest application. */
+  static async getMyInstructorApplication(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user) return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+      res.status(HTTP_STATUS.OK).json({ data: await InstructorApplicationService.getMine(req.user.userId) });
+    } catch (error: any) {
+      logger.error('Get instructor application error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get application' });
+    }
+  }
+
+  /** GET /api/users/admin/instructor-applications?status=&page=&limit= (ADMIN) */
+  static async listInstructorApplications(req: AuthRequest, res: Response) {
+    try {
+      const result = await InstructorApplicationService.list(
+        req.query.status, parseInt(req.query.page as string, 10), parseInt(req.query.limit as string, 10)
+      );
+      res.status(HTTP_STATUS.OK).json(result);
+    } catch (error: any) {
+      if (error instanceof InstructorApplicationError) return res.status(error.statusCode).json({ error: error.message, code: error.code });
+      logger.error('List instructor applications error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to list applications' });
+    }
+  }
+
+  /** POST /api/users/admin/instructor-applications/:applicationId/approve (ADMIN) - the reviewer is the caller. */
+  static async approveInstructorApplication(req: AuthRequest, res: Response) {
+    try {
+      const application = await InstructorApplicationService.approve(req.params.applicationId, req.user!.userId);
+      res.status(HTTP_STATUS.OK).json({ message: 'Đã duyệt đơn đăng ký giảng viên', data: application });
+    } catch (error: any) {
+      if (error instanceof InstructorApplicationError) return res.status(error.statusCode).json({ error: error.message, code: error.code });
+      logger.error('Approve instructor application error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to approve application' });
+    }
+  }
+
+  /** POST /api/users/admin/instructor-applications/:applicationId/reject { reason } (ADMIN) */
+  static async rejectInstructorApplication(req: AuthRequest, res: Response) {
+    try {
+      const application = await InstructorApplicationService.reject(req.params.applicationId, req.user!.userId, req.body?.reason);
+      res.status(HTTP_STATUS.OK).json({ message: 'Đã từ chối đơn đăng ký giảng viên', data: application });
+    } catch (error: any) {
+      if (error instanceof InstructorApplicationError) return res.status(error.statusCode).json({ error: error.message, code: error.code });
+      logger.error('Reject instructor application error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to reject application' });
+    }
+  }
+
+  /**
+   * POST /api/users/become-instructor/confirm (payment-service, PAYMENT_USER_TOKEN) - IMPLEMENT-01: a paid registration fee no
+   * longer upgrades anyone. The learner gets (at most one) PENDING application for an ADMIN to review; the role is untouched.
+   */
   static async confirmInstructor(req: AuthRequest, res: Response) {
     try {
-      const { userId, status } = req.body;
+      const { userId, status } = req.body || {};
 
-      if (status !== 'INSTRUCTOR_REGISTRATION_SUCCESS') {
+      if (status !== 'INSTRUCTOR_REGISTRATION_SUCCESS' || typeof userId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(userId)) {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({
           error: 'Invalid status',
         });
       }
 
-      const updatedUser = await UserService.updateToInstructor(userId);
+      const result = await InstructorApplicationService.fromLegacyPayment(userId);
 
       res.status(HTTP_STATUS.OK).json({
-        message: 'User upgraded to instructor successfully',
-        data: updatedUser,
+        message: 'Instructor registration is reviewed by an administrator; no role was changed',
+        data: { upgraded: false, applicationQueued: result.queued },
       });
     } catch (error: any) {
       logger.error('Confirm instructor error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
-        error: 'Failed to confirm instructor upgrade',
+        error: 'Failed to record instructor registration',
       });
     }
   }

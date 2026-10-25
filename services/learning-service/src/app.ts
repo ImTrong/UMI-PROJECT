@@ -13,9 +13,10 @@ import { StreamController } from './controllers/stream.controller';
 import { HLSController } from './controllers/hls.controller';
 import { RecommendationController } from './controllers/recommendation.controller';
 import { AdminPathController } from './controllers/admin-path.controller';
+import { PathImageController } from './controllers/path-image.controller';
 import { AnalyticsController } from './controllers/analytics.controller';
 import { authenticateToken, authenticateOptional, requireRole } from './middleware/auth.middleware';
-import { verifyInternalService } from './middleware/internal-auth.middleware';
+import { requireServiceToken } from './middleware/service-token.middleware';
 import {
   validateLessonComplete,
   validateCourseId,
@@ -60,13 +61,19 @@ app.get('/api/learning/stats', authenticateToken, ProgressController.getLearning
 app.post('/api/learning/sync-enrollments', authenticateToken, ProgressController.syncEnrollments);
 app.get('/api/learning/courses/enrolled', authenticateToken, validatePagination, handleValidationErrors, ProgressController.getEnrolledCourses);
 app.get('/api/learning/progress/course/:courseId', authenticateToken, validateCourseId, handleValidationErrors, ProgressController.getCourseProgress);
-app.get('/api/learning/progress/course/:courseId/students', validateCourseId, handleValidationErrors, ProgressController.getCourseStudents);
-app.get('/api/learning/progress/course/:courseId/students/:userId', validateCourseId, validateUserId, handleValidationErrors, ProgressController.getStudentCourseProgress);
+// Every learner's progress in a course (FIX-INS-03): called ONLY by the course-service (instructor student list / detail, review
+// enrollment check, course-deletion guard - each of which does its own user check first). They accept only the Course -> Learning
+// credential COURSE_LEARNING_TOKEN in the internal-service header: no user token, no INTERNAL_SERVICE_TOKEN, no default; fail-closed.
+app.get('/api/learning/progress/course/:courseId/students', requireServiceToken('COURSE_LEARNING_TOKEN'), validateCourseId, handleValidationErrors, ProgressController.getCourseStudents);
+app.get('/api/learning/progress/course/:courseId/students/:userId', requireServiceToken('COURSE_LEARNING_TOKEN'), validateCourseId, validateUserId, handleValidationErrors, ProgressController.getStudentCourseProgress);
 app.post('/api/learning/progress/:courseId/:lessonId/complete', authenticateToken, validateLessonComplete, handleValidationErrors, ProgressController.markLessonComplete);
 app.post('/api/learning/courses/:courseId/enroll', authenticateToken, validateCourseId, handleValidationErrors, ProgressController.enrollInCourse);
 
 // Internal routes (Service-to-service, requires internal token)
-app.post('/api/learning/internal/courses/:courseId/enroll', verifyInternalService, validateCourseId, handleValidationErrors, ProgressController.enrollInCourseInternal);
+// Paid-course enrollment, called ONLY by the order-service (FIX-INS-04): only the Order <-> Learning credential
+// ORDER_LEARNING_TOKEN is accepted (no INTERNAL_SERVICE_TOKEN - its compose default is public -, no default; fail-closed), and
+// the controller writes nothing until the order-service confirms the order is PAID for this learner and course.
+app.post('/api/learning/internal/courses/:courseId/enroll', requireServiceToken('ORDER_LEARNING_TOKEN'), validateCourseId, handleValidationErrors, ProgressController.enrollInCourseInternal);
 
 // Certificate routes
 app.post('/api/learning/certificates/:courseId/generate', authenticateToken, validateCourseId, handleValidationErrors, CertificateController.generateCertificate);
@@ -138,14 +145,22 @@ app.post('/api/learning/paths/:pathId/enroll', authenticateToken, Recommendation
 app.delete('/api/learning/paths/:pathId/enroll', authenticateToken, RecommendationController.unenrollFromPath);
 
 // ==================== Admin Learning Paths Routes ====================
-// Note: In a real app we'd add requireRole('ADMIN') middleware, but authenticateToken is used for simplicity/current system constraints
-app.get('/api/learning/admin/paths', authenticateToken, AdminPathController.getPaths);
-app.get('/api/learning/admin/paths/:id', authenticateToken, AdminPathController.getPathById);
-app.post('/api/learning/admin/paths', authenticateToken, AdminPathController.createPath);
-app.put('/api/learning/admin/paths/:id', authenticateToken, AdminPathController.updatePath);
-app.delete('/api/learning/admin/paths/:id', authenticateToken, AdminPathController.deletePath);
-app.put('/api/learning/admin/paths/:id/status', authenticateToken, AdminPathController.updateStatus);
-app.post('/api/learning/admin/paths/:id/duplicate', authenticateToken, AdminPathController.duplicatePath);
+// FIX-INS-11: ADMIN only. requireRole reads the caller's role from the user-service (server data, FIX-INS-01) before the controller
+// reads or writes anything; a role / userId / isAdmin in the body, query or headers counts for nothing. Learners read paths through
+// /api/learning/paths* above (published paths only), which stay open to every signed-in user.
+// FIX-INS-14: learning-path images live here (bucket fixed by the server). Upload URL: ADMIN only. Read: no session (an <img> sends
+// no Authorization) - served only when a learning path references the image: PUBLISHED path -> public, otherwise a short-lived
+// HMAC-signed URL handed out with the path to a caller allowed to see it (PathImageService).
+app.post('/api/learning/admin/paths/upload-url', authenticateToken, requireRole(['ADMIN']), PathImageController.getUploadUrl);
+app.get('/api/learning/path-images/legacy/:key', PathImageController.serve('legacy'));
+app.get('/api/learning/path-images/:key', PathImageController.serve('current'));
+app.get('/api/learning/admin/paths', authenticateToken, requireRole(['ADMIN']), AdminPathController.getPaths);
+app.get('/api/learning/admin/paths/:id', authenticateToken, requireRole(['ADMIN']), AdminPathController.getPathById);
+app.post('/api/learning/admin/paths', authenticateToken, requireRole(['ADMIN']), AdminPathController.createPath);
+app.put('/api/learning/admin/paths/:id', authenticateToken, requireRole(['ADMIN']), AdminPathController.updatePath);
+app.delete('/api/learning/admin/paths/:id', authenticateToken, requireRole(['ADMIN']), AdminPathController.deletePath);
+app.put('/api/learning/admin/paths/:id/status', authenticateToken, requireRole(['ADMIN']), AdminPathController.updateStatus);
+app.post('/api/learning/admin/paths/:id/duplicate', authenticateToken, requireRole(['ADMIN']), AdminPathController.duplicatePath);
 
 // ==================== Video Streaming Routes ====================
 // Secure video streaming via presigned URLs (Udemy-style protection)
@@ -214,7 +229,9 @@ app.post('/api/learning/certificates/path/:pathId/generate', authenticateToken, 
 app.get('/api/learning/skill-profile/me', authenticateToken, FinalProjectController.getMySkillProfile);
 app.get('/api/learning/skill-profile/me/summary', authenticateToken, FinalProjectController.getMySkillSummary);
 app.post('/api/learning/skill-profile/me/gap-analysis', authenticateToken, FinalProjectController.getSkillGapAnalysis);
-app.get('/api/learning/internal/skill-profile/:userId', FinalProjectController.getSkillProfileInternal); // Internal — no auth
+// Internal (FIX-INS-05): a learner's skill profile, called ONLY by the ai-service (learning context of the signed-in user). It
+// accepts only the AI -> Learning credential AI_LEARNING_TOKEN - no user token, no INTERNAL_SERVICE_TOKEN, no default; fail-closed.
+app.get('/api/learning/internal/skill-profile/:userId', requireServiceToken('AI_LEARNING_TOKEN'), validateUserId, handleValidationErrors, FinalProjectController.getSkillProfileInternal);
 
 // ==================== Monthly Leaderboard & Reward Points Routes ====================
 import { LeaderboardController } from './controllers/leaderboard.controller';
@@ -235,6 +252,7 @@ app.post('/api/learning/reward-points/redeem', authenticateToken, LeaderboardCon
 // Admin Leaderboard management endpoints (ADMIN only)
 app.get('/api/learning/admin/leaderboard/overview', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getOverview);
 app.post('/api/learning/admin/leaderboard/finalize', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.manualFinalize);
+app.post('/api/learning/admin/leaderboard/retry-notifications', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.retryNotifications);
 app.post('/api/learning/admin/leaderboard/sync-completions', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.syncCompletions);
 app.get('/api/learning/admin/leaderboard/student-detail/:userId', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getStudentAudit);
 app.post('/api/learning/admin/leaderboard/flag-record', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.flagRecord);
@@ -245,6 +263,7 @@ app.get('/api/learning/admin/leaderboard/reward-transactions', authenticateToken
 // Admin route aliases under /api/learning/leaderboard/admin/*
 app.get('/api/learning/leaderboard/admin/overview', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getOverview);
 app.post('/api/learning/leaderboard/admin/finalize', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.manualFinalize);
+app.post('/api/learning/leaderboard/admin/retry-notifications', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.retryNotifications);
 app.post('/api/learning/leaderboard/admin/sync-completions', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.syncCompletions);
 app.get('/api/learning/leaderboard/admin/student-detail/:userId', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.getStudentAudit);
 app.post('/api/learning/leaderboard/admin/flag-record', authenticateToken, requireRole(['ADMIN']), AdminLeaderboardController.flagRecord);
@@ -258,8 +277,11 @@ app.get('/api/learning/learner-analysis/me', authenticateToken, LearnerAnalysisC
 app.get('/api/learning/learner-analysis/me/career-fit', authenticateToken, LearnerAnalysisController.getMyCareerFit);
 app.get('/api/learning/learner-analysis/me/skills', authenticateToken, LearnerAnalysisController.getMySkillsSummary);
 app.post('/api/learning/learner-analysis/me/refresh', authenticateToken, LearnerAnalysisController.refreshMyProfile);
-app.get('/api/learning/internal/learner-analysis/:userId', LearnerAnalysisController.getProfileInternal); // Internal — no auth
-app.post('/api/learning/internal/learner-analysis/:userId/invalidate', LearnerAnalysisController.invalidateCacheInternal); // Internal — no auth
+// Internal (FIX-INS-05): a learner's competency profile (built and CACHED on a miss - it writes) and its cache invalidation.
+// The ai-service is the only HTTP caller of the read; nothing calls /invalidate over HTTP today (the learning-service invalidates
+// in-process). Both accept only AI_LEARNING_TOKEN - no user token, no INTERNAL_SERVICE_TOKEN, no default; fail-closed.
+app.get('/api/learning/internal/learner-analysis/:userId', requireServiceToken('AI_LEARNING_TOKEN'), validateUserId, handleValidationErrors, LearnerAnalysisController.getProfileInternal);
+app.post('/api/learning/internal/learner-analysis/:userId/invalidate', requireServiceToken('AI_LEARNING_TOKEN'), validateUserId, handleValidationErrors, LearnerAnalysisController.invalidateCacheInternal);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' });

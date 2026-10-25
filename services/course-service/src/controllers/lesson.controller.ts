@@ -1,11 +1,23 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { LessonService } from '../services/lesson.service';
+import { LessonService, CreateLessonData } from '../services/lesson.service';
+import { LESSON_WRITABLE_FIELDS, pickFields } from '../utils/course-fields';
 import { HTTP_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 import { FileStorageService } from '@umi/file-storage';
 
 export class LessonController {
+  static async getLessonOwnerInternal(req: AuthRequest, res: Response) {
+    try {
+      const owner = await LessonService.getLessonOwnerInternal(req.params.lessonId);
+      if (!owner) return res.status(HTTP_STATUS.NOT_FOUND).json({ error: ERROR_MESSAGES.LESSON_NOT_FOUND });
+      res.status(HTTP_STATUS.OK).json({ data: owner });
+    } catch (error: any) {
+      logger.error('Get internal lesson owner error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get lesson owner' });
+    }
+  }
+
   static async getCourseLessonsInternal(req: AuthRequest, res: Response) {
     try {
       const { courseId } = req.params;
@@ -57,6 +69,10 @@ export class LessonController {
         });
       }
 
+      // Only the course's instructor gets an upload URL for it (same rule as creating / editing its lessons).
+      // Checked BEFORE the storage client is even created, so a refused caller causes no side effect (FIX-INS-02).
+      await LessonService.assertCourseOwner(courseId, req.user.userId);
+
       const fileStorage = new FileStorageService();
       const bucketName = 'courses';
 
@@ -72,8 +88,15 @@ export class LessonController {
           fileUrl: `/api/courses/files/download?bucket=${bucketName}&key=${fileKey}`,
         },
       });
-    } catch (error) {
-      logger.error('Generate upload URL error:', error);
+    } catch (error: any) {
+      if (error?.message === ERROR_MESSAGES.COURSE_NOT_FOUND) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      if (error?.message === ERROR_MESSAGES.FORBIDDEN) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: error.message });
+      }
+      // message only: never the error object, which could carry the signed URL or storage credentials
+      logger.error(`Generate upload URL error: ${error?.code || error?.message || 'unknown error'}`);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to generate upload URL',
       });
@@ -87,11 +110,12 @@ export class LessonController {
         });
       }
 
+      // The course comes from the URL and the owner check uses the authenticated caller - nothing from the body.
       const { courseId } = req.params;
-      const lesson = await LessonService.createLesson({
-        ...req.body,
+      const lesson = await LessonService.createLesson(req.user.userId, {
+        ...pickFields(req.body, LESSON_WRITABLE_FIELDS),
         courseId,
-      });
+      } as CreateLessonData);
 
       res.status(HTTP_STATUS.CREATED).json({
         message: SUCCESS_MESSAGES.LESSON_CREATED,
@@ -102,6 +126,12 @@ export class LessonController {
 
       if (error.message === ERROR_MESSAGES.COURSE_NOT_FOUND) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({
+          error: error.message,
+        });
+      }
+
+      if (error.message === ERROR_MESSAGES.FORBIDDEN) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({
           error: error.message,
         });
       }
@@ -121,7 +151,9 @@ export class LessonController {
   static async getCourseLessons(req: AuthRequest, res: Response) {
     try {
       const { courseId } = req.params;
-      const includeUnpublished = req.user?.role === 'INSTRUCTOR' || req.user?.role === 'ADMIN';
+      // FIX-INS-06: the full lesson list (every videoUrl) only for an ADMIN here; the course OWNER is recognised in the service.
+      // It used to be ANY instructor - and anyone can register as one - so a paid course's videos were readable without buying it.
+      const includeUnpublished = req.user?.role === 'ADMIN';
 
       const authHeader = req.headers.authorization;
       const token = authHeader && authHeader.split(' ')[1];
@@ -288,6 +320,12 @@ export class LessonController {
 
       if (error.message === ERROR_MESSAGES.FORBIDDEN) {
         return res.status(HTTP_STATUS.FORBIDDEN).json({
+          error: error.message,
+        });
+      }
+
+      if (error.message === ERROR_MESSAGES.LESSON_NOT_IN_COURSE) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
           error: error.message,
         });
       }

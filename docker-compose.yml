@@ -124,7 +124,9 @@ services:
     networks:
       - elearning-network
     restart: unless-stopped
-    command: sh -c "npx prisma db push && node dist-seed/prisma/seed.js && node dist/src/index.js"
+    # DEPLOY-PRE-01: the container only starts the app. Schema sync (prisma db push) and seeds are manual, separate steps -
+    # see docs/database-maintenance.md. Nothing writes to the database at startup.
+    command: sh -c "node dist/src/index.js"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/api/auth/health"]
       interval: 10s
@@ -150,6 +152,10 @@ services:
       JWT_SECRET: "your-super-secret-jwt-key-change-in-production"
       AUTH_SERVICE_URL: "http://auth-service:3001"
       AUTO_SEED: "true"
+      INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN:-internal_secret_token_umi}"
+      # Payment -> User credential for /api/users/become-instructor/confirm (FIX 07B-1). No default on purpose:
+      # unset = the route refuses every call. Generate a long random value (see services/user-service/.env.example).
+      PAYMENT_USER_TOKEN: "${PAYMENT_USER_TOKEN}"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -158,7 +164,9 @@ services:
     networks:
       - elearning-network
     restart: unless-stopped
-    command: sh -c "sleep 5 && npx prisma db push && node dist-seed/prisma/seed.js && node dist/src/index.js"
+    # DEPLOY-PRE-01: the container only starts the app. Schema sync (prisma db push) and seeds are manual, separate steps -
+    # see docs/database-maintenance.md. Nothing writes to the database at startup.
+    command: sh -c "sleep 5 && node dist/src/index.js"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/api/users/health"]
       interval: 10s
@@ -189,13 +197,21 @@ services:
       MINIO_SECRET_KEY: minioadmin123
       MINIO_PUBLIC_URL: "http://localhost:9000"
       LEARNING_SERVICE_URL: "http://learning-service:3006"
+      # FIX-INS-03, no default on purpose (unset / short / a public default = the protected calls are refused, fail-closed):
+      # Course <-> Learning credential, the SAME value as in learning-service: sent to the per-course student-progress routes
+      # (FIX-INS-03) AND checked on /api/courses/internal/:id/lessons[/:lessonId] and /recommendations/batch (FIX-INS-06)
+      COURSE_LEARNING_TOKEN: "${COURSE_LEARNING_TOKEN}"
+      # Order -> Course credential, the SAME value as in order-service (checked on POST /api/courses/:id/increment-enrollment)
+      ORDER_COURSE_TOKEN: "${ORDER_COURSE_TOKEN}"
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
       - elearning-network
     restart: unless-stopped
-    command: sh -c "npx prisma db push && node dist-seed/prisma/seed.js && node dist/index.js"
+    # DEPLOY-PRE-01: the container only starts the app. Schema sync (prisma db push) and seeds are manual, separate steps -
+    # see docs/database-maintenance.md. Nothing writes to the database at startup.
+    command: sh -c "node dist/index.js"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3003/api/courses/health"]
       interval: 10s
@@ -224,6 +240,15 @@ services:
       PAYMENT_SERVICE_URL: "http://payment-service:3005"
       LEARNING_SERVICE_URL: "http://learning-service:3006"
       INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN:-internal_secret_token_umi}"
+      # Order <-> Payment credential (FIX 07B-2A), the SAME value in order-service and payment-service. No default on purpose:
+      # unset / short / a public default = the service refuses to start. See services/order-service/.env.example.
+      ORDER_PAYMENT_TOKEN: "${ORDER_PAYMENT_TOKEN}"
+      # Order -> Course credential (FIX-INS-03), the SAME value as in course-service. No default on purpose: without a usable
+      # value the enrolledCount increment is not sent (the enrollment itself is unaffected).
+      ORDER_COURSE_TOKEN: "${ORDER_COURSE_TOKEN}"
+      # Order <-> Learning credential (FIX-INS-04), the SAME value as in learning-service: sent with every paid-course enrollment
+      # and checked on the learning-service's entitlement callback. No default on purpose: without it no course is granted.
+      ORDER_LEARNING_TOKEN: "${ORDER_LEARNING_TOKEN}"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -258,6 +283,13 @@ services:
       PAYOS_API_KEY: "${PAYOS_API_KEY:-}"
       PAYOS_CHECKSUM_KEY: "${PAYOS_CHECKSUM_KEY:-}"
       INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN:-internal_secret_token_umi}"
+      # Order <-> Payment credential (FIX 07B-2A), the SAME value in order-service and payment-service. No default on purpose:
+      # unset / short / a public default = the service refuses to start. See services/payment-service/.env.example.
+      ORDER_PAYMENT_TOKEN: "${ORDER_PAYMENT_TOKEN}"
+      # Payment -> User credential (FIX 07B-1); no default: unset = the role upgrade call is not sent.
+      PAYMENT_USER_TOKEN: "${PAYMENT_USER_TOKEN}"
+      # Demo payment completion: OFF unless exactly "true", and always off when NODE_ENV=production.
+      PAYMENT_MOCK_ENABLED: "${PAYMENT_MOCK_ENABLED:-false}"
       AUTH_SERVICE_URL: "http://auth-service:3001"
       USER_SERVICE_URL: "http://user-service:3002"
       ORDER_SERVICE_URL: "http://order-service:3004"
@@ -267,7 +299,9 @@ services:
     networks:
       - elearning-network
     restart: unless-stopped
-    command: sh -c "npx prisma db push && node dist/index.js"
+    # DEPLOY-PRE-01: the container only starts the app. Schema sync (prisma db push) and seeds are manual, separate steps -
+    # see docs/database-maintenance.md. Nothing writes to the database at startup.
+    command: sh -c "node dist/index.js"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3005/api/payments/health"]
       interval: 10s
@@ -293,8 +327,23 @@ services:
       AUTH_SERVICE_URL: "http://auth-service:3001"
       USER_SERVICE_URL: "http://user-service:3002"
       COURSE_SERVICE_URL: "http://course-service:3003"
+      ORDER_SERVICE_URL: "http://order-service:3004"
       AI_SERVICE_URL: "http://ai-service:3007"
       INTERNAL_SERVICE_TOKEN: "${INTERNAL_SERVICE_TOKEN:-internal_secret_token_umi}"
+      # Course <-> Learning credential (FIX-INS-03/06), the SAME value as in course-service. No default on purpose: unset / short /
+      # a public default = GET /api/learning/progress/course/:id/students[/:userId] refuse every call (fail-closed), and this
+      # service cannot read lessons / recommendations from the course-service's internal routes (FIX-INS-06).
+      COURSE_LEARNING_TOKEN: "${COURSE_LEARNING_TOKEN}"
+      # Order <-> Learning credential (FIX-INS-04), the SAME value as in order-service. No default on purpose: unset / short / a
+      # public default = POST /api/learning/internal/courses/:id/enroll refuses every call (fail-closed).
+      ORDER_LEARNING_TOKEN: "${ORDER_LEARNING_TOKEN}"
+      # AI -> Learning credential (FIX-INS-05), the SAME value as in ai-service. No default on purpose: unset / short / a public
+      # default = /api/learning/internal/skill-profile/:userId and /internal/learner-analysis/:userId[/invalidate] refuse every call.
+      AI_LEARNING_TOKEN: "${AI_LEARNING_TOKEN}"
+      # HMAC key of the short-lived learning-path image URLs (FIX-INS-14). The SAME value for every learning-service instance and
+      # across restarts. No default on purpose: unset / shorter than 32 characters / equal to a service credential = no image
+      # upload (500) and images of non-published paths are not displayed (published ones still are); the reason is logged.
+      PATH_IMAGE_SIGNING_SECRET: "${PATH_IMAGE_SIGNING_SECRET}"
       MINIO_ENDPOINT: minio
       MINIO_PORT: "9000"
       MINIO_ACCESS_KEY: minioadmin
@@ -318,7 +367,11 @@ services:
     networks:
       - elearning-network
     restart: unless-stopped
-    command: sh -c "npx prisma db push && node -e \"const { PrismaClient } = require('@prisma/client'); const p = new PrismaClient(); p.learningPath.count().then(c => { if(c === 0) { console.log('No paths found, seeding...'); process.exit(0); } else { console.log(c + ' paths exist, skipping seed.'); process.exit(1); } }).catch(() => process.exit(0))\" && node dist-seed/prisma/seed-paths.js; node dist/index.js"
+    # DEPLOY-PRE-01: the container only starts the app. Schema sync (prisma db push) and seeds are manual, separate steps -
+    # see docs/database-maintenance.md. Nothing writes to the database at startup.
+    # (The learning-path demo seed used to run here behind a check that seeded on a failed query and wiped every path + final
+    # project; it is now manual and empty-database-only, see prisma/seed-paths.ts.)
+    command: sh -c "node dist/index.js"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3006/api/learning/health"]
       interval: 10s
@@ -349,6 +402,9 @@ services:
       LEARNING_SERVICE_URL: "http://learning-service:3006"
       COURSE_SERVICE_URL: "http://course-service:3003"
       USER_SERVICE_URL: "http://user-service:3002"
+      # AI -> Learning credential (FIX-INS-05), the SAME value as in learning-service: sent to the learning-service's internal
+      # skill-profile / learner-analysis routes. No default on purpose: without it those calls are not sent (the AI degrades to null).
+      AI_LEARNING_TOKEN: "${AI_LEARNING_TOKEN}"
       # RAG Foundation
       EMBEDDING_PROVIDER: "gemini"
       EMBEDDING_MODEL: "gemini-embedding-001"
@@ -358,7 +414,9 @@ services:
       CHUNK_SIZE: "600"
       CHUNK_OVERLAP: "100"
       RETRIEVAL_TOP_K: "5"
-      RETRIEVAL_SCORE_THRESHOLD: "0.0"
+      # RAG-P0: RelevanceGate threshold (cosine). 0.56 = the validated gap between relevant and out-of-knowledge queries
+      # (RAG evaluation baseline-v1). 0.0 disabled the gate: every query got top-K chunks and an answer "from the course".
+      RETRIEVAL_SCORE_THRESHOLD: "0.56"
       MAX_CONTEXT_TOKENS: "4000"
     depends_on:
       mongodb:
@@ -370,7 +428,9 @@ services:
     networks:
       - elearning-network
     restart: unless-stopped
-    command: sh -c "npx prisma db push && node dist/index.js"
+    # DEPLOY-PRE-01: the container only starts the app. Schema sync (prisma db push) and seeds are manual, separate steps -
+    # see docs/database-maintenance.md. Nothing writes to the database at startup.
+    command: sh -c "node dist/index.js"
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3007/api/ai/health"]
       interval: 10s

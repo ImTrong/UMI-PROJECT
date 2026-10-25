@@ -1,9 +1,34 @@
 import { Response } from 'express';
-import { RAGChatService } from './rag-chat.service';
+import { RAGChatService, RAGChatResult } from './rag-chat.service';
 import { AuthRequest } from '../../../middleware/auth.middleware';
-import logger from '../../../utils/logger';
+import { resolveReadScope } from '../access/rag-access.service';
+import { requesterFrom, sendRAGError } from '../http';
 
-const ragChatService = new RAGChatService();
+export const ragChatService = new RAGChatService();
+
+const MAX_MESSAGE_LENGTH = 4000;
+
+function readMessage(body: any): string | null {
+  const message = body?.message;
+  if (typeof message !== 'string') return null;
+  const trimmed = message.trim();
+  return trimmed.length > 0 && trimmed.length <= MAX_MESSAGE_LENGTH ? trimmed : null;
+}
+
+function toResponse(result: RAGChatResult) {
+  return {
+    success: true,
+    data: {
+      message: result.message,
+      messageId: result.messageId,
+      conversationId: result.conversationId,
+      conversationTitle: result.conversationTitle,
+      grounded: result.grounded,
+      sources: result.sources,
+      retrievalStats: result.retrievalStats,
+    },
+  };
+}
 
 /**
  * RAG Chat Controller — REST endpoint for RAG-powered chat.
@@ -18,54 +43,42 @@ export class RAGChatController {
    * Body:
    *   - conversationId (required): conversation ID
    *   - message (required): user's question
-   *   - filter (optional): { courseId?, lessonId?, sourceType?, learningPathId?, skills? }
+   *   - courseId (required, or filter.courseId): the course whose documents are searched — access is verified
+   *   - lessonId (optional, or filter.lessonId): a lesson of that course
    */
   static async chat(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
-      if (!userId) {
+      const requester = requesterFrom(req);
+      if (!requester) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
 
-      const { conversationId, message, filter } = req.body;
+      const { conversationId } = req.body || {};
+      const message = readMessage(req.body);
 
-      if (!conversationId || !message) {
+      if (!conversationId || typeof conversationId !== 'string' || !message) {
         res.status(400).json({ error: 'conversationId and message are required' });
         return;
       }
 
+      const scope = await resolveReadScope(requester, req.body);
+
       const result = await ragChatService.chat(
-        userId,
+        requester.userId,
         conversationId,
         message,
-        filter,
+        scope,
         req.user?.email?.split('@')[0], // Use email prefix as learner name
       );
 
-      res.json({
-        success: true,
-        data: {
-          message: result.message,
-          messageId: result.messageId,
-          conversationId: result.conversationId,
-          conversationTitle: result.conversationTitle,
-          sources: result.sources,
-          retrievalStats: result.retrievalStats,
-        },
-      });
+      res.json(toResponse(result));
     } catch (error: any) {
-      logger.error('[RAGChat] Chat error:', error);
-
-      if (error.message === 'CONVERSATION_NOT_FOUND') {
+      if (error?.message === 'CONVERSATION_NOT_FOUND') {
         res.status(404).json({ error: 'Conversation not found' });
         return;
       }
-
-      res.status(500).json({
-        error: 'Failed to process RAG chat',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      });
+      sendRAGError(res, error, 'RAGChat', 'RAG_CHAT_FAILED');
     }
   }
 
@@ -74,47 +87,35 @@ export class RAGChatController {
    *
    * Body:
    *   - message (required): user's question
-   *   - filter (optional): metadata filter
+   *   - courseId (required, or filter.courseId) / lessonId (optional): see chat()
    */
   static async createAndChat(req: AuthRequest, res: Response): Promise<void> {
     try {
-      const userId = req.user?.userId;
-      if (!userId) {
+      const requester = requesterFrom(req);
+      if (!requester) {
         res.status(401).json({ error: 'Unauthorized' });
         return;
       }
 
-      const { message, filter } = req.body;
+      const message = readMessage(req.body);
 
       if (!message) {
         res.status(400).json({ error: 'message is required' });
         return;
       }
 
+      const scope = await resolveReadScope(requester, req.body);
+
       const result = await ragChatService.createAndChat(
-        userId,
+        requester.userId,
         message,
-        filter,
+        scope,
         req.user?.email?.split('@')[0],
       );
 
-      res.json({
-        success: true,
-        data: {
-          message: result.message,
-          messageId: result.messageId,
-          conversationId: result.conversationId,
-          conversationTitle: result.conversationTitle,
-          sources: result.sources,
-          retrievalStats: result.retrievalStats,
-        },
-      });
+      res.json(toResponse(result));
     } catch (error: any) {
-      logger.error('[RAGChat] CreateAndChat error:', error);
-      res.status(500).json({
-        error: 'Failed to create RAG chat',
-        details: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      });
+      sendRAGError(res, error, 'RAGChat', 'RAG_CHAT_FAILED');
     }
   }
 }

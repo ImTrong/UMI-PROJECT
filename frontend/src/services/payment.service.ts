@@ -1,4 +1,10 @@
 import { paymentApi } from './api';
+import {
+  PaymentConfirmationResult,
+  readConfirmAnswer,
+  readMockCompleteAnswer,
+  resultFromError,
+} from './payment-confirmation';
 
 export interface PaymentIntent {
   id: string;
@@ -106,9 +112,14 @@ export const paymentService = {
     return response.data.data;
   },
 
-  async confirmPayment(data: ConfirmPaymentData): Promise<Payment> {
-    const response = await paymentApi.post('/api/payments/confirm', data);
-    return response.data.data;
+  /** Never throws for an HTTP / network error: the outcome says what happened (FIX 07B-1.3). */
+  async confirmPayment(data: ConfirmPaymentData): Promise<PaymentConfirmationResult> {
+    try {
+      const response = await paymentApi.post('/api/payments/confirm', data);
+      return readConfirmAnswer(response.data, response.status);
+    } catch (error) {
+      return resultFromError(error);
+    }
   },
 
   async getPaymentById(paymentId: string): Promise<Payment> {
@@ -131,9 +142,14 @@ export const paymentService = {
     return response.data.data;
   },
 
-  async simulateMockPayment(orderId: string): Promise<any> {
-    const response = await paymentApi.post('/api/payments/mock-complete', { orderId });
-    return response.data;
+  /** Demo payment (development only). Never throws for an HTTP / network error: the outcome says what happened (FIX 07B-1.3). */
+  async simulateMockPayment(orderId: string): Promise<PaymentConfirmationResult> {
+    try {
+      const response = await paymentApi.post('/api/payments/mock-complete', { orderId });
+      return readMockCompleteAnswer(response.data, response.status);
+    } catch (error) {
+      return resultFromError(error);
+    }
   },
 
   // Payment Methods

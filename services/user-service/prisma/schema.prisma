@@ -73,6 +73,36 @@ enum Role {
   ADMIN
 }
 
+/// IMPLEMENT-01: a learner's request to become an instructor. Submitting it changes nothing on the profile's role; only an ADMIN
+/// approving it turns a STUDENT into an INSTRUCTOR (a rejection keeps the STUDENT, who may apply again).
+/// pendingKey enforces "at most ONE pending application per user" in the database: it is the userId while PENDING and
+/// "closed:<application id>" once reviewed (MongoDB unique indexes also count null/missing values, so it is never left empty).
+model InstructorApplication {
+  id              String                      @id @default(auto()) @map("_id") @db.ObjectId
+  userId          String                      @db.ObjectId
+  expertise       String
+  motivation      String?
+  status          InstructorApplicationStatus @default(PENDING)
+  source          String                      @default("FORM") // "FORM" | "LEGACY_PAYMENT" (a registration fee paid before the review existed)
+  pendingKey      String                      @unique
+  submittedAt     DateTime                    @default(now())
+  reviewedBy      String?                     @db.ObjectId // the ADMIN who decided (always the authenticated caller)
+  reviewedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime                    @default(now())
+  updatedAt       DateTime                    @updatedAt
+
+  @@index([userId, submittedAt])
+  @@index([status, submittedAt])
+  @@map("instructor_applications")
+}
+
+enum InstructorApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 model Notification {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
@@ -82,6 +112,10 @@ model Notification {
   isRead    Boolean  @default(false)
   link      String?
   createdAt DateTime @default(now())
+  /// X-Idempotency-Key of the request that created this notification (FIX 06C-4B2B1), kept ONLY for audit / debugging.
+  /// Deduplication does NOT rely on it: such a notification's _id is derived from the key (see notification-idempotency.ts)
+  /// and MongoDB's unique _id decides. No @unique and no index on purpose: older notifications do not have the field.
+  idempotencyKey String?
 
   user UserProfile @relation(fields: [userId], references: [id], onDelete: Cascade)
 

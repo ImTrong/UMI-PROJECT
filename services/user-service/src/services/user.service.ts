@@ -1,6 +1,7 @@
 import { PrismaClient, Role } from '@prisma/client';
 import { ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+import { SELF_PROFILE_FIELDS, ADMIN_PROFILE_FIELDS, pickFields } from '../utils/profile-fields';
 
 const prisma = new PrismaClient();
 
@@ -19,6 +20,10 @@ export interface UpdateUserData {
   address?: string;
   dateOfBirth?: Date;
   preferences?: any;
+}
+
+// Fields only an ADMIN may write, in addition to UpdateUserData.
+export interface AdminUpdateUserData extends UpdateUserData {
   role?: 'STUDENT' | 'INSTRUCTOR' | 'ADMIN';
   isActive?: boolean;
 }
@@ -168,6 +173,11 @@ export class UserService {
     return userProfile;
   }
 
+  /**
+   * Display info for many users at once (POST /api/users/batch, called without credentials by the course, learning and
+   * review code to show names and avatars). Returns ONLY userId, fullName and avatar - the same facts as the public profile.
+   * No email, role or any other personal field (FIX-INS-01).
+   */
   static async getBatchUserProfiles(userIds: string[]) {
     if (!userIds || userIds.length === 0) {
       return [];
@@ -180,13 +190,50 @@ export class UserService {
       select: {
         userId: true,
         fullName: true,
-        email: true,
         avatar: true,
-        role: true,
       },
     });
 
     return users;
+  }
+
+  /**
+   * Eligibility facts for internal callers (leaderboard): ONLY userId, role and isActive.
+   * Users without a profile are simply absent from the result - the caller must not treat absence as
+   * "eligible". Nothing personal (email, name, avatar) is returned.
+   */
+  static async getEligibilityBatch(userIds: string[]) {
+    if (!userIds || userIds.length === 0) return [];
+    return prisma.userProfile.findMany({
+      where: { userId: { in: userIds } },
+      select: { userId: true, role: true, isActive: true },
+    });
+  }
+
+  /**
+   * Instructor directory for ordinary signed-in users (GET /api/users without ADMIN): only active INSTRUCTORs, matched on the
+   * display name only (never on email), and only public fields.
+   */
+  static async searchPublicInstructors(page: number = 1, limit: number = 10, search?: string) {
+    const skip = (page - 1) * limit;
+    const where: any = { role: 'INSTRUCTOR', isActive: true };
+    if (search) where.fullName = { contains: search, mode: 'insensitive' };
+
+    const [users, total] = await Promise.all([
+      prisma.userProfile.findMany({
+        where,
+        skip,
+        take: limit,
+        select: { id: true, userId: true, fullName: true, avatar: true, bio: true, role: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.userProfile.count({ where }),
+    ]);
+
+    return {
+      users,
+      pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
+    };
   }
 
   static async getAllUserProfiles(page: number = 1, limit: number = 10, filters?: any) {
@@ -227,7 +274,20 @@ export class UserService {
     };
   }
 
+  /**
+   * Self-service profile update. `data` is filtered through the allowlist HERE (not only in the route), so no caller can write
+   * `role`, `isActive`, `email`, `userId`, `badges`... through this method even by passing them in.
+   */
   static async updateUserProfile(userId: string, data: UpdateUserData) {
+    return this.applyProfileUpdate(userId, pickFields(data, SELF_PROFILE_FIELDS));
+  }
+
+  /** Admin update (PUT /api/users/:userId): the self-service fields plus `role` and `isActive`, still an allowlist. */
+  static async adminUpdateUserProfile(userId: string, data: AdminUpdateUserData) {
+    return this.applyProfileUpdate(userId, pickFields(data, ADMIN_PROFILE_FIELDS));
+  }
+
+  private static async applyProfileUpdate(userId: string, data: Record<string, any>) {
     // Check if user exists
     const existingUser = await prisma.userProfile.findUnique({
       where: { userId },
@@ -543,42 +603,6 @@ export class UserService {
       active,
       newThisMonth,
     };
-  }
-
-  static async updateToInstructor(userId: string) {
-    const user = await prisma.userProfile.findUnique({
-      where: { userId },
-    });
-
-    if (!user) {
-      throw new Error(ERROR_MESSAGES.USER_NOT_FOUND);
-    }
-
-    const updatedUser = await prisma.userProfile.update({
-      where: { userId },
-      data: {
-        role: 'INSTRUCTOR',
-        updatedAt: new Date(),
-      },
-      include: {
-        education: true,
-        work: true,
-      },
-    });
-
-    // Create a notification for the user
-    await prisma.notification.create({
-      data: {
-        userId: updatedUser.id,
-        title: 'Chào mừng bạn gia nhập đội ngũ Giảng viên UMI!',
-        message: 'Đăng ký trở thành giảng viên thành công. Bạn có thể bắt đầu tạo khóa học ngay bây giờ.',
-        type: 'SUCCESS',
-        link: '/instructor/dashboard',
-      },
-    });
-
-    logger.info(`User ${userId} upgraded to INSTRUCTOR`);
-    return updatedUser;
   }
 
   static async healthCheck() {

@@ -600,6 +600,15 @@ model MonthlyLeaderboard {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  // ---- Distributed lock for finalization (see src/services/leaderboard-lock.service.ts) ----
+  // All optional: rows written before the lock existed simply have none of these fields.
+  lockOwner          String?   // human-readable identity of the holder (host:pid:...) - informational only
+  lockToken          String?   // random per-acquisition secret (>=128 bit); the holder proves ownership with it
+  lockExpiresAt      DateTime? // lease end, always computed from the MongoDB server clock
+  fencingToken       Int?      // monotonic: +1 on every acquire / take-over; absent == 0
+  lockHeartbeatAt    DateTime? // last renew / fenced write (informational; never used to decide expiry)
+  fenceSeq           Int?      // bumped by every fenced transaction so the fence is always a REAL write (a no-op update takes no conflict)
+
   entries     LeaderboardEntry[]
 
   @@unique([month, year])
@@ -619,6 +628,12 @@ model LeaderboardEntry {
   rewardBadgeId     String?  @db.ObjectId      // Reference to Badge if rewarded
   scoreBreakdown    Json     @default("[]")    // Chi tiết điểm từng khóa học đóng góp
   isTie             Boolean  @default(false)   // Đánh dấu nếu đồng hạng
+  rewardNotifiedAt  DateTime?                  // Thông báo thưởng đã gửi thành công (chỉ để chống gửi lặp khi retry)
+  rewardNotifyError String?                    // Lỗi gửi thông báo gần nhất (null khi đã gửi); dùng để gửi lại sau
+  // Claim so that only ONE process sends a given notification at a time (see LeaderboardService.claimNotification).
+  // A claim lapses at rewardNotifyClaimExpiresAt, so a crashed sender never blocks a retry for ever.
+  rewardNotifyClaimToken     String?           // random token of the process that currently owns the right to send
+  rewardNotifyClaimExpiresAt DateTime?         // when that claim lapses
 
   leaderboard       MonthlyLeaderboard @relation(fields: [leaderboardId], references: [id], onDelete: Cascade)
 
@@ -686,6 +701,29 @@ model RewardPointTransaction {
   @@index([userId, createdAt])
   @@index([type])
   @@map("reward_point_transactions")
+}
+
+/// One row per (user, course) point redemption. It is the business-level claim that
+/// guarantees a course can be paid for with points only once at a time, and it makes
+/// unfinished redemptions queryable for crash recovery.
+/// status: PENDING_ENROLLMENT | COMPLETED | REFUNDED
+model CourseRedemption {
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  userId              String    @db.ObjectId
+  courseId            String    @db.ObjectId
+  status              String
+  pointsCharged       Int
+  transactionId       String    @db.ObjectId // ledger entry of the debit
+  refundTransactionId String?   @db.ObjectId // ledger entry of the refund (if any)
+  attempts            Int       @default(0)
+  lastError           String?
+  leaseUntil          DateTime? // processing lease: only the holder may enroll / refund
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([userId, courseId])
+  @@index([status, updatedAt])
+  @@map("course_redemptions")
 }
 
 // ==================== Leaderboard Admin Audit Logs ====================

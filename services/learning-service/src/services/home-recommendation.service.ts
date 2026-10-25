@@ -1,6 +1,8 @@
 import { PrismaClient } from '@prisma/client';
+import { PathAccessService } from './path-access.service';
 import axios from 'axios';
 import logger from '../utils/logger';
+import { courseInternalHeaders } from './course-internal.client';
 
 const prisma = new PrismaClient();
 
@@ -57,7 +59,7 @@ export class HomeRecommendationService {
       const response = await axios.post(`${this.courseServiceUrl}/api/courses/recommendations/batch`, {
         excludeIds: [],
         limit: ids.length,
-      });
+      }, { headers: courseInternalHeaders() });
       const allCourses: any[] = response.data.data || [];
       // Filter to only requested IDs
       return allCourses.filter((c: any) => ids.includes(c.id));
@@ -87,7 +89,8 @@ export class HomeRecommendationService {
     try {
       const response = await axios.post(
         `${this.courseServiceUrl}/api/courses/recommendations/batch`,
-        params
+        params,
+        { headers: courseInternalHeaders() }
       );
       return response.data.data || [];
     } catch (err) {
@@ -313,7 +316,7 @@ export class HomeRecommendationService {
 
       for (const enrollment of enrollments) {
         const path = enrollment.learningPath;
-        if (!path.courseIds.length) continue;
+        if (!PathAccessService.isVisibleToEnrolled(path) || !path.courseIds.length) continue;   // FIX-INS-12
 
         // Find courses in this path that user hasn't completed
         const pathProgresses = await prisma.courseProgress.findMany({

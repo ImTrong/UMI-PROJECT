@@ -69,6 +69,7 @@ model Refund {
   status            RefundStatus @default(PENDING)
   stripeRefundId    String?
   idempotencyKey    String?      @unique // Stripe idempotency key for safe retries
+  processingUntil   DateTime?    // FIX 07B-2A.2: lease of the instance talking to the provider for this refund (null = free)
   transferReference String?      // Mã tham chiếu giao dịch chuyển khoản ngân hàng (FT... / mã GD)
   confirmedBy       String?      // ID của admin đã xác nhận hoàn tiền thủ công
   confirmedAt       DateTime?    // Thời điểm admin xác nhận

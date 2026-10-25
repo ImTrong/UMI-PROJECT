@@ -1,4 +1,5 @@
 import express from 'express';
+import { requireMockPaymentEnabled } from './utils/mock-payment';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
@@ -6,6 +7,9 @@ import { PaymentController } from './controllers/payment.controller';
 import { StripeWebhook } from './webhooks/stripe.webhook';
 import { authenticateToken, requireRole } from './middleware/auth.middleware';
 import { verifyInternalService } from './middleware/internal-auth.middleware';
+import { requireServiceToken } from './middleware/service-token.middleware';
+import { OrderRefundRejectedError, parseOrderRefundRequest, parsePaymentEvidenceRequest } from './utils/order-refund';
+import { ERROR_MESSAGES } from './utils/constants';
 import { verifyStripeWebhook } from './middleware/webhook.middleware';
 import {
   validateCreatePaymentIntent,
@@ -101,9 +105,11 @@ app.post(
   PaymentController.confirmPayment
 );
 
-// Complete mock/sandbox payment
+// Complete mock/sandbox payment - development / test only (FIX 07B-1): OFF unless PAYMENT_MOCK_ENABLED=true, never in production.
+// The flag is checked first (404 when off) and again inside PaymentService.completeMockPayment.
 app.post(
   '/api/payments/mock-complete',
+  requireMockPaymentEnabled,
   authenticateToken,
   PaymentController.completeMockPayment
 );
@@ -129,9 +135,12 @@ app.get(
   PaymentController.getPaymentById
 );
 
+// SCOPE-RESET-01: only an ADMIN starts a refund (role read from the user-service by requireRole). A learner refunding their own
+// payment kept the course; the order-service keeps its own internal refund route (ORDER_PAYMENT_TOKEN).
 app.post(
   '/api/payments/:paymentId/refund',
   authenticateToken,
+  requireRole(['ADMIN']),
   validateRefundPayment,
   handleValidationErrors,
   PaymentController.refundPayment
@@ -239,11 +248,14 @@ app.get(
   PaymentController.getPaymentById
 );
 // ==================== Internal Service-to-Service Routes ====================
-// These routes are called by other microservices (require internal service token)
+// The four routes called by the order-service (PaymentClient) accept only the Order <-> Payment credential ORDER_PAYMENT_TOKEN
+// (FIX 07B-2A) - never INTERNAL_SERVICE_TOKEN or a public default; fail-closed. The operations routes further down (no service
+// calls them) keep the shared INTERNAL_SERVICE_TOKEN until their own FIX.
+const orderPaymentAuth = requireServiceToken('ORDER_PAYMENT_TOKEN');
 
 app.post(
   '/api/payments/internal/create-intent',
-  verifyInternalService,
+  orderPaymentAuth,
   validateCreatePaymentIntent,
   handleValidationErrors,
   PaymentController.createPaymentIntentInternal
@@ -251,7 +263,7 @@ app.post(
 
 app.post(
   '/api/payments/internal/confirm',
-  verifyInternalService,
+  orderPaymentAuth,
   validateConfirmPayment,
   handleValidationErrors,
   PaymentController.confirmPaymentInternal
@@ -260,7 +272,7 @@ app.post(
 // PayOS internal payment creation
 app.post(
   '/api/payments/internal/create-payos',
-  verifyInternalService,
+  orderPaymentAuth,
   async (req, res) => {
     try {
       const { orderId, orderNumber, orderCode, userId, amount, description, items, regenerate } = req.body;
@@ -277,10 +289,71 @@ app.post(
   }
 );
 
+// Payment status for the order-service (FIX 07B-2A.1): ORDER_PAYMENT_TOKEN only, the payment must belong to ?orderId=,
+// minimal fields, database state (no provider call). Missing payment and payment of another order: the same 404.
+app.get(
+  '/api/payments/internal/payment-status/:paymentId',
+  orderPaymentAuth,
+  async (req, res) => {
+    try {
+      const data = await PaymentService.getPaymentStatusForOrder(req.params.paymentId, String(req.query.orderId ?? ''));
+      res.status(200).json({ data });
+    } catch (error: any) {
+      if (error.message === ERROR_MESSAGES.PAYMENT_NOT_FOUND) return res.status(404).json({ error: ERROR_MESSAGES.PAYMENT_NOT_FOUND });
+      logger.error(`Internal payment status error: ${error?.message}`);
+      res.status(500).json({ error: 'Failed to get payment status' });
+    }
+  }
+);
+
+// Payment evidence for the order-service's sales statistics (ADMIN-DASHBOARD-01): ORDER_PAYMENT_TOKEN only, read-only, a bounded list of
+// order ids, minimal fields, database state (no provider call). The order-service - not this route - decides what counts as a sale.
+app.post(
+  '/api/payments/internal/payment-evidence',
+  orderPaymentAuth,
+  async (req, res) => {
+    try {
+      const data = await PaymentService.getPaymentEvidenceForOrders(parsePaymentEvidenceRequest(req.body));
+      res.status(200).json({ data });
+    } catch (error: any) {
+      if (error instanceof OrderRefundRejectedError) return res.status(error.httpStatus).json({ error: error.message, code: error.code });
+      logger.error(`Internal payment evidence error: ${error?.message}`);
+      res.status(500).json({ error: 'Failed to get payment evidence' });
+    }
+  }
+);
+
+// Refund for the order-service (FIX 07B-2A.1): ORDER_PAYMENT_TOKEN only; runs the existing refund process. `outcome` is what the
+// payment-service could verify: SUCCEEDED / PENDING as recorded, UNVERIFIED (502) when the provider call failed - never a guess.
+app.post(
+  '/api/payments/internal/create-refund',
+  orderPaymentAuth,
+  async (req, res) => {
+    try {
+      const result = await PaymentService.refundForOrder(parseOrderRefundRequest(req.body));
+      if (result.outcome === 'UNVERIFIED') {
+        // the reservation is kept; a retry with the same key continues this refund (FIX 07B-2A.2)
+        return res.status(502).json({ error: 'Refund not verified', code: 'REFUND_NOT_VERIFIED', data: result });
+      }
+      res.status(result.replayed ? 200 : 201).json({ data: result });
+    } catch (error: any) {
+      if (error instanceof OrderRefundRejectedError) return res.status(error.httpStatus).json({ error: error.message, code: error.code });
+      if (error.message === ERROR_MESSAGES.PAYMENT_NOT_FOUND) return res.status(404).json({ error: ERROR_MESSAGES.PAYMENT_NOT_FOUND });
+      if (error.message === ERROR_MESSAGES.PAYMENT_ALREADY_PROCESSED || error.message === ERROR_MESSAGES.REFUND_ALREADY_PROCESSED
+        || /exceeds remaining refundable amount/.test(error.message || '') || error.message === ERROR_MESSAGES.INVALID_PAYMENT_AMOUNT) {
+        return res.status(422).json({ error: error.message, code: 'REFUND_NOT_ALLOWED' });
+      }
+      // an unexpected error (e.g. database) after the request was accepted: the state is not known to this answer
+      logger.error(`Internal refund not verified: ${error?.message}`);
+      res.status(502).json({ error: 'Refund not verified', code: 'REFUND_NOT_VERIFIED', data: { outcome: 'UNVERIFIED' } });
+    }
+  }
+);
+
 // PayOS internal payment cancellation
 app.post(
   '/api/payments/internal/cancel-payos',
-  verifyInternalService,
+  orderPaymentAuth,
   async (req, res) => {
     try {
       const { orderCode, reason } = req.body;

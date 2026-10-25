@@ -5,9 +5,8 @@ import {
   useStripe,
   useElements,
 } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
-import { orderService } from '../../services/order.service';
-import { paymentService } from '../../services/payment.service';
+import { loadStripe, type PaymentIntent, type StripeError } from '@stripe/stripe-js';
+import { runDemoPayment, syncCardPayment } from './payment-flow';
 import { FiCreditCard, FiLock, FiCheck } from 'react-icons/fi';
 import { formatVND } from '../../utils/currency';
 
@@ -20,6 +19,12 @@ const isStripeConfigured =
 
 const stripePromise = isStripeConfigured ? loadStripe(publishableKey) : null;
 
+/** Stripe.js refuses to confirm an intent that already succeeded and hands it back: that intent, else null. */
+export function alreadyChargedIntent(error: StripeError | undefined): PaymentIntent | null {
+  const intent = error?.code === 'payment_intent_unexpected_state' ? error.payment_intent : undefined;
+  return intent && intent.status === 'succeeded' ? intent : null;
+}
+
 interface StripePaymentFormProps {
   orderId: string;
   orderNumber: string;
@@ -27,6 +32,8 @@ interface StripePaymentFormProps {
   clientSecret: string;
   stripePaymentIntentId: string;
   onSuccess: (paymentId: string) => void;
+  /** still processing, or the answer could not be verified (FIX 07B-1.3): never shown as a success */
+  onPending: (message: string) => void;
   onError: (error: string) => void;
 }
 
@@ -34,6 +41,7 @@ const MockPaymentForm = ({
   orderId,
   amount,
   onSuccess,
+  onPending,
   onError,
 }: StripePaymentFormProps) => {
   const [processing, setProcessing] = useState(false);
@@ -42,10 +50,8 @@ const MockPaymentForm = ({
     e.preventDefault();
     setProcessing(true);
     try {
-      await paymentService.simulateMockPayment(orderId);
-      onSuccess(orderId);
-    } catch (err: any) {
-      onError(err.response?.data?.error || 'Thanh toán demo thất bại');
+      // success only if the demo answered a SUCCEEDED payment; a refused demo (404 when disabled) or an error is not
+      await runDemoPayment(orderId, { onSuccess, onPending, onError });
     } finally {
       setProcessing(false);
     }
@@ -134,6 +140,7 @@ const PaymentForm = ({
   clientSecret,
   stripePaymentIntentId: _stripePaymentIntentId,
   onSuccess,
+  onPending,
   onError,
 }: StripePaymentFormProps) => {
   const stripe = useStripe();
@@ -168,29 +175,20 @@ const PaymentForm = ({
         }
       );
 
-      if (error) {
+      // This intent was already charged by an earlier attempt whose backend sync failed: sync it now instead of an error.
+      const alreadyCharged = alreadyChargedIntent(error);
+      if (error && !alreadyCharged) {
         onError(error.message || 'Thanh toán thất bại');
         setProcessing(false);
         return;
       }
 
-      if (confirmedIntent && confirmedIntent.status === 'succeeded') {
-        try {
-          const response = await orderService.processPayment(
-            _orderId,
-            confirmedIntent.payment_method as string
-          );
-          
-          if (response.success) {
-            onSuccess(response.payment.id || confirmedIntent.id);
-          } else {
-            console.warn('Backend returned success=false but Stripe was fully processed');
-            onSuccess(confirmedIntent.id);
-          }
-        } catch (err) {
-          console.warn('Backend sync failed, webhook will handle:', err);
-          onSuccess(confirmedIntent.id);
-        }
+      const intent = alreadyCharged || confirmedIntent;
+      if (intent && intent.status === 'succeeded') {
+        // Stripe.js accepted the card; what the backend verified decides the screen (FIX 07B-1.3): success only for SUCCEEDED,
+        // "processing" when it is not verified yet (the webhook will update the order) - never success after an error.
+        const paymentMethodId = typeof intent.payment_method === 'string' ? intent.payment_method : intent.payment_method?.id || '';
+        await syncCardPayment(_orderId, paymentMethodId, intent.id, { onSuccess, onPending, onError });
       } else if (confirmedIntent && confirmedIntent.status === 'requires_action') {
         onError('Yêu cầu xác thực thêm. Vui lòng thử lại.');
       } else {

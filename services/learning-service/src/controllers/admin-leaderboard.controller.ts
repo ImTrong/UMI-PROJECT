@@ -1,15 +1,28 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { LeaderboardService } from '../services/leaderboard.service';
+import {
+  LeaderboardService,
+  LeaderboardRewardIncompleteError,
+  LeaderboardStateError,
+} from '../services/leaderboard.service';
+import { LockLostError, LockStoreError } from '../services/leaderboard-lock.service';
 import { AchievementService } from '../services/achievement.service';
 import { RewardPointService } from '../services/reward-point.service';
+import { UserEligibilityError } from '../services/user-eligibility.service';
 import { enrichEntriesWithUserInfo } from './leaderboard.controller';
-import { getCurrentVietnamMonthYear } from '../config/scoring-policy';
+import { getCurrentVietnamMonthYear, getVietnamPeriodState } from '../config/scoring-policy';
 import { HTTP_STATUS } from '../utils/constants';
 import logger from '../utils/logger';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
+
+/** A whole number given as a number or as a string of digits; anything else (9.5, "9abc", "", null) is null. */
+const wholeNumber = (v: unknown): number | null => {
+  if (typeof v === 'number') return Number.isInteger(v) ? v : null;
+  if (typeof v === 'string' && /^\d{1,4}$/.test(v.trim())) return Number(v.trim());
+  return null;
+};
 
 export class AdminLeaderboardController {
   /**
@@ -80,22 +93,57 @@ export class AdminLeaderboardController {
    */
   static async manualFinalize(req: AuthRequest, res: Response) {
     try {
-      const { month, year, force = false, reason = 'Chốt thủ công bởi Quản trị viên' } = req.body;
+      const { month, year, force, reason = 'Chốt thủ công bởi Quản trị viên' } = req.body;
+      // `force` is accepted ONLY so that existing clients keep working. Since FIX 06B2 it has NO effect at all: it
+      // cannot take over a period that a live process is working on (only an expired lease can be taken over, by the
+      // same plain acquire everybody uses), cannot reopen a FINALIZED period, cannot rebuild a frozen snapshot and
+      // cannot re-issue rewards.
+      if (force !== undefined && typeof force !== 'boolean') {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'force must be a boolean' });
+      }
       const adminId = (req.user?.userId && req.user.userId.length === 24) ? req.user.userId : '000000000000000000000001';
       const adminEmail = (req.user as any)?.email || 'admin@elearning.local';
 
-      if (!month || !year || month < 1 || month > 12) {
+      // Whole numbers only (a number or a string of digits): "9abc" or 9.5 are refused, not read as 9
+      const monthNum = wholeNumber(month);
+      const yearNum = wholeNumber(year);
+      if (monthNum === null || yearNum === null || monthNum < 1 || monthNum > 12 || yearNum < 2020 || yearNum > 2100) {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Invalid month or year' });
       }
 
-      logger.info(`🏆 Admin ${adminEmail} (${adminId}) requested manual finalization of ${month}/${year}`);
+      // Only a period that has ENDED in Asia/Ho_Chi_Minh may be finalized from the API (FIX DEMO RANKING 02C.2): the running or a
+      // future month is refused before anything is read or written. Automatic finalization (startup catch-up, cron, reconcile)
+      // calls the service directly with past months only and is not affected.
+      const period = getVietnamPeriodState(monthNum, yearNum);
+      if (period.state !== 'ENDED') {
+        const message =
+          period.state === 'CURRENT'
+            ? `Tháng ${monthNum}/${yearNum} đang diễn ra; chỉ có thể chốt kỳ đã kết thúc (theo giờ Việt Nam).`
+            : `Tháng ${monthNum}/${yearNum} chưa bắt đầu; chỉ có thể chốt kỳ đã kết thúc (theo giờ Việt Nam).`;
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+          error: message,
+          message,
+          code: 'LEADERBOARD_PERIOD_NOT_ENDED',
+          details: {
+            month: monthNum,
+            year: yearNum,
+            state: period.state,
+            currentMonth: period.current.month,
+            currentYear: period.current.year,
+            timeZone: 'Asia/Ho_Chi_Minh',
+          },
+        });
+      }
 
-      const result = await LeaderboardService.finalizeMonth(
-        parseInt(month, 10),
-        parseInt(year, 10),
-        `ADMIN:${adminEmail}`,
-        Boolean(force)
-      );
+      logger.info(`🏆 Admin ${adminEmail} (${adminId}) requested manual finalization of ${month}/${year}${force === true ? ' (force has no effect)' : ''}`);
+
+      const result = await LeaderboardService.finalizeMonth(monthNum, yearNum, `ADMIN:${adminEmail}`);
+
+      if (result.status === 'BUSY') {
+        // Another live process owns the period. Nothing was touched; the same request can be repeated later.
+        const message = `Tháng ${month}/${year} đang được xử lý bởi một tiến trình khác. Vui lòng thử lại sau.`;
+        return res.status(HTTP_STATUS.CONFLICT).json({ error: message, message, code: 'LEADERBOARD_BUSY', data: result });
+      }
 
       // Record audit log
       await prisma.leaderboardAuditLog.create({
@@ -103,20 +151,94 @@ export class AdminLeaderboardController {
           adminId,
           adminEmail,
           action: 'MANUAL_FINALIZE',
-          month: parseInt(month, 10),
-          year: parseInt(year, 10),
+          month: monthNum,
+          year: yearNum,
           reason,
-          details: { ...result, force },
+          details: { ...result, forceIgnored: force === true },
+        },
+      });
+
+      const message =
+        result.status === 'ALREADY_FINALIZED'
+          ? `Tháng ${month}/${year} đã được chốt trước đó. Dữ liệu lịch sử được giữ nguyên, không chốt lại.`
+          : `Chốt sổ tháng ${month}/${year} thành công!`;
+      res.status(HTTP_STATUS.OK).json({ message, data: result });
+    } catch (error: any) {
+      logger.error('Admin manual finalize error:', error);
+      if (error instanceof LeaderboardRewardIncompleteError) {
+        // Not an internal error: the period is intact in REWARDING and the same request can be repeated safely
+        return res.status(HTTP_STATUS.CONFLICT).json({
+          error: error.message,
+          message: error.message,
+          details: {
+            failures: error.failures,
+            verifiedPoints: error.verifiedPoints,
+            expectedPoints: error.expectedPoints,
+          },
+        });
+      }
+      if (error instanceof UserEligibilityError) {
+        // Nothing was written: the period stays as it was and the same request can be repeated later
+        return res.status(HTTP_STATUS.SERVICE_UNAVAILABLE).json({ error: error.message, message: error.message });
+      }
+      if (error instanceof LeaderboardStateError) {
+        return res.status(HTTP_STATUS.CONFLICT).json({ error: error.message, message: error.message, status: error.status });
+      }
+      if (error instanceof LockLostError) {
+        // This request lost ownership of the period part-way (lease lapsed / taken over). It stopped and wrote nothing
+        // more; the current owner continues from the stored state, so the request can simply be repeated later.
+        return res.status(HTTP_STATUS.CONFLICT).json({
+          error: 'Quyền xử lý kỳ bảng xếp hạng đã chuyển sang tiến trình khác; yêu cầu này đã dừng. Vui lòng kiểm tra trạng thái và thử lại sau.',
+          message: error.message,
+          code: 'LEADERBOARD_LOCK_LOST',
+          reason: error.reason,
+        });
+      }
+      if (error instanceof LockStoreError) {
+        // The lock could not be checked at all: nothing was written
+        return res.status(HTTP_STATUS.SERVICE_UNAVAILABLE).json({ error: 'Không thể kiểm tra khóa xử lý bảng xếp hạng. Vui lòng thử lại sau.', message: error.message, code: 'LEADERBOARD_LOCK_UNAVAILABLE' });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: error.message || 'Failed to finalize month' });
+    }
+  }
+
+  /**
+   * POST /api/learning/admin/leaderboard/retry-notifications
+   * Re-sends reward notifications that FAILED for a period. This is deliberately not a finalize:
+   * it never recomputes rankings, never touches points, badges or totals - it only re-sends messages
+   * whose delivery failure was recorded on the snapshot entry.
+   */
+  static async retryNotifications(req: AuthRequest, res: Response) {
+    try {
+      const month = Number(req.body?.month);
+      const year = Number(req.body?.year);
+      if (!Number.isInteger(month) || month < 1 || month > 12 || !Number.isInteger(year) || year < 2020 || year > 2100) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Invalid month or year' });
+      }
+      const adminId = (req.user?.userId && req.user.userId.length === 24) ? req.user.userId : '000000000000000000000001';
+      const adminEmail = (req.user as any)?.email || 'admin@elearning.local';
+
+      const stillPending = await LeaderboardService.retryFailedNotifications(month, year);
+
+      await prisma.leaderboardAuditLog.create({
+        data: {
+          adminId,
+          adminEmail,
+          action: 'RETRY_NOTIFICATIONS',
+          month,
+          year,
+          reason: req.body?.reason || 'Gửi lại thông báo thưởng bị lỗi',
+          details: { stillPending },
         },
       });
 
       res.status(HTTP_STATUS.OK).json({
-        message: `Chốt sổ tháng ${month}/${year} thành công!`,
-        data: result,
+        message: stillPending === 0 ? 'Đã gửi lại các thông báo bị lỗi.' : `Còn ${stillPending} thông báo chưa gửi được.`,
+        data: { month, year, stillPending },
       });
     } catch (error: any) {
-      logger.error('Admin manual finalize error:', error);
-      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: error.message || 'Failed to finalize month' });
+      logger.error('Admin retry notifications error:', error);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: error.message || 'Failed to retry notifications' });
     }
   }
 

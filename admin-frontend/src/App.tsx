@@ -8,6 +8,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import AdminPayments from './pages/AdminPayments';
 import AdminOrders from './pages/AdminOrders';
 import AdminUsers from './pages/AdminUsers';
+import AdminInstructorApplications from './pages/AdminInstructorApplications';
 import AdminCategories from './pages/AdminCategories';
 import AdminCourses from './pages/AdminCourses';
 import AdminLearningPaths from './pages/admin/AdminLearningPaths';
@@ -68,6 +69,12 @@ function App() {
           </ProtectedRoute>
         } />
         
+        <Route path="/admin/instructor-applications" element={
+          <ProtectedRoute requiredRole="ADMIN">
+            <AdminInstructorApplications />
+          </ProtectedRoute>
+        } />
+
         <Route path="/admin/categories" element={
           <ProtectedRoute requiredRole="ADMIN">
             <AdminCategories />

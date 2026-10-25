@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import app from './app';
 import logger from './utils/logger';
+import { startupConfigProblems } from './utils/startup-config';
 import { startOrderSyncJob } from './jobs/order-sync.job';
 import { processUnfinishedStripeEvents } from './jobs/stripe-event.job';
 
@@ -11,6 +12,13 @@ const PORT = process.env.PORT || 3005;
 
 const startServer = async () => {
   try {
+    // fail fast (FIX 07B-2A): never serve - nor start the outbox worker - with a missing / weak ORDER_PAYMENT_TOKEN
+    const problems = startupConfigProblems();
+    if (problems.length > 0) {
+      for (const problem of problems) logger.error(`Refusing to start: ${problem}`);
+      process.exit(1);
+    }
+
     app.listen(PORT, () => {
       logger.info(`Payment service running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV}`);

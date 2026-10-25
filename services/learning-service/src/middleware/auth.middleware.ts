@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import axios, { AxiosResponse } from 'axios';
 import { HTTP_STATUS, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+import { describeHttpError } from '../utils/log-redaction';
 
 export interface AuthRequest extends Request {
   user?: {
@@ -58,8 +59,14 @@ export const authenticateToken = async (
     }
 
     next();
-  } catch (error) {
-    logger.error('Authentication error:', error);
+  } catch (error: any) {
+    // RAG-SEC-LOG-01: never the axios error itself - its config carries the token (request body) being verified
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      logger.info(`Authentication refused by auth-service (HTTP ${status})`);
+    } else {
+      logger.error(`Authentication error: ${describeHttpError(error)}`);
+    }
     res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
   }
 };

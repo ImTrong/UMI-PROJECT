@@ -2,6 +2,7 @@ import prisma from '../utils/prisma';
 import { ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 import axios from 'axios';
+import { learningServiceAuthHeaders, describeCallError } from '../utils/learning-client';
 
 export interface CreateReviewData {
   courseId: string;
@@ -31,12 +32,16 @@ export class ReviewService {
     // Check if user is enrolled
     try {
       const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:3006';
-      await axios.get(`${learningServiceUrl}/api/learning/progress/course/${courseId}/students/${userId}`);
+      // userId is the authenticated reviewer (ReviewController); the route needs the Course -> Learning credential (FIX-INS-03)
+      await axios.get(`${learningServiceUrl}/api/learning/progress/course/${courseId}/students/${userId}`, {
+        timeout: 5000,
+        headers: learningServiceAuthHeaders(),
+      });
     } catch (error: any) {
       if (error.response && error.response.status === 404) {
         throw new Error('Bạn phải tham gia khóa học này mới có thể đánh giá.');
       }
-      logger.error(`Failed to check enrollment for review: ${error.message}`);
+      logger.error(`Failed to check enrollment for review: ${describeCallError(error)}`);
       throw new Error('Không thể kiểm tra trạng thái tham gia khóa học. Vui lòng thử lại sau.');
     }
 

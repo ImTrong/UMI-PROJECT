@@ -1,4 +1,6 @@
 import { Request, Response } from 'express';
+import { MockPaymentDisabledError } from '../utils/mock-payment';
+import { PaymentConfirmationRejectedError } from '../utils/payment-confirmation';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { PaymentService } from '../services/payment.service';
 import { HTTP_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from '../utils/constants';
@@ -36,6 +38,9 @@ export class PaymentController {
         return res.status(HTTP_STATUS.CONFLICT).json({
           error: error.message,
         });
+      }
+      if (error.message === ERROR_MESSAGES.UNSUPPORTED_PAYMENT_TYPE) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
       }
 
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
@@ -77,6 +82,9 @@ export class PaymentController {
           error: error.message,
         });
       }
+      if (error.message === ERROR_MESSAGES.UNSUPPORTED_PAYMENT_TYPE) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
+      }
 
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to create payment intent',
@@ -94,16 +102,28 @@ export class PaymentController {
 
       const { paymentIntentId, paymentMethodId } = req.body;
 
-      const payment = await PaymentService.confirmPayment({
-        paymentIntentId,
-        paymentMethodId,
-      });
+      // the caller is the authenticated user (req.user, set by authenticateToken) - a userId in the body is ignored (FIX 07B-1.1)
+      const payment = await PaymentService.confirmPayment(
+        { paymentIntentId, paymentMethodId },
+        { kind: 'user', userId: req.user.userId }
+      );
 
       res.status(HTTP_STATUS.OK).json({
         message: SUCCESS_MESSAGES.PAYMENT_CONFIRMED,
         data: payment,
       });
     } catch (error: any) {
+      if (error instanceof MockPaymentDisabledError) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: error.message });
+      }
+      // not a Stripe payment, or its provider is unclear: refused before any write (FIX 07B-1.2)
+      if (error instanceof PaymentConfirmationRejectedError) {
+        return res.status(HTTP_STATUS.CONFLICT).json({ error: error.message, code: error.code });
+      }
+      // someone else's payment and a missing one get the same answer (as GET /api/payments/:paymentId)
+      if (error.message === ERROR_MESSAGES.PAYMENT_NOT_FOUND) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: ERROR_MESSAGES.PAYMENT_NOT_FOUND });
+      }
       logger.error('Confirm payment error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: error.message || 'Failed to confirm payment',
@@ -115,16 +135,21 @@ export class PaymentController {
     try {
       const { paymentIntentId, paymentMethodId } = req.body;
 
-      const payment = await PaymentService.confirmPayment({
-        paymentIntentId,
-        paymentMethodId,
-      });
+      // ORDER_PAYMENT_TOKEN checked (FIX 07B-2A): the order-service, which checks the order owner before calling
+      const payment = await PaymentService.confirmPayment({ paymentIntentId, paymentMethodId }, { kind: 'internal' });
 
       res.status(HTTP_STATUS.OK).json({
         message: SUCCESS_MESSAGES.PAYMENT_CONFIRMED,
         data: payment,
       });
     } catch (error: any) {
+      if (error instanceof MockPaymentDisabledError) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: error.message });
+      }
+      // not a Stripe payment, or its provider is unclear: refused before any write (FIX 07B-1.2)
+      if (error instanceof PaymentConfirmationRejectedError) {
+        return res.status(HTTP_STATUS.CONFLICT).json({ error: error.message, code: error.code });
+      }
       logger.error('Internal confirm payment error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: error.message || 'Failed to confirm payment internally',
@@ -245,17 +270,27 @@ export class PaymentController {
         });
       }
 
+      // SCOPE-RESET-01: ADMIN only (also enforced by requireRole on the route) - never the payment owner
+      if (req.user.role !== 'ADMIN') {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
+      }
+
       const { paymentId } = req.params;
       const { amount, reason } = req.body;
       const isAdmin = req.user.role === 'ADMIN';
 
-      const refund = await PaymentService.refundPayment(
+      const { refund, outcome } = await PaymentService.refundPayment(
         paymentId,
         req.user.userId,
         amount,
         reason,
         isAdmin
       );
+      // same answer as before when the provider call did not end in a refund (FIX 07B-2A.2 keeps this route's contract)
+      if (outcome === 'FAILED' || outcome === 'UNVERIFIED') {
+        logger.error(`Refund ${refund?.id} for payment ${paymentId}: ${outcome}`);
+        return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to refund payment' });
+      }
 
       const isPending = refund.status === 'PENDING';
       res.status(HTTP_STATUS.OK).json({
@@ -503,6 +538,9 @@ export class PaymentController {
       const result = await PaymentService.completeMockPayment(orderId, req.user.userId);
       res.status(HTTP_STATUS.OK).json(result);
     } catch (error: any) {
+      if (error instanceof MockPaymentDisabledError) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: 'Route not found' });
+      }
       logger.error('Complete mock payment error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: error.message || 'Failed to complete mock payment',

@@ -13,6 +13,7 @@ import {
   FiUserX,
 } from 'react-icons/fi';
 import { formatVND } from '../utils/currency';
+import SalesPerformanceSection from '../components/dashboard/SalesPerformanceSection';
 import { 
   Chart as ChartJS, 
   ArcElement, 
@@ -186,14 +187,6 @@ export default function AdminDashboard() {
     ],
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-6">
@@ -220,8 +213,17 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* Sales and performance (ADMIN-DASHBOARD-01): loads on its own, so it does not wait for the rest of the dashboard */}
+      <SalesPerformanceSection />
+
+      {loading ? (
+        <div className="flex justify-center items-center min-h-[400px]">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      ) : (
+      <>
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="card">
           <div className="flex items-center justify-between">
             <div>
@@ -257,24 +259,12 @@ export default function AdminDashboard() {
             <div>
               <p className="text-sm text-gray-500">Tổng số Đơn hàng</p>
               <p className="text-2xl font-bold">{stats?.orders.total || 0}</p>
-              <p className="text-xs text-green-600 mt-1">{formatVND(stats?.orders.monthlyRevenue || 0)} trong tháng này</p>
             </div>
             <FiShoppingCart className="text-3xl text-primary-500" />
           </div>
           <div className="mt-2 flex space-x-2 text-xs">
             <span className="text-yellow-600">{stats?.orders.pending || 0} Chờ xử lý</span>
             <span className="text-green-600">{stats?.orders.completed || 0} Hoàn thành</span>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Tổng Doanh thu</p>
-              <p className="text-2xl font-bold">{formatVND(stats?.orders.revenue || 0)}</p>
-              <p className="text-xs text-green-600 mt-1">Từ {stats?.payments.succeeded || 0} khoản thanh toán</p>
-            </div>
-            <FiDollarSign className="text-3xl text-primary-500" />
           </div>
         </div>
       </div>
@@ -412,6 +402,8 @@ export default function AdminDashboard() {
           <span className="font-medium">Xem Thanh toán</span>
         </Link>
       </div>
+      </>
+      )}
     </div>
   );
 }

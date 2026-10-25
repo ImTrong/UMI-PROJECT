@@ -1,4 +1,5 @@
 import { learningApi } from './api';
+import { RewardHistoryPage, parseRewardHistory } from '../utils/leaderboard-view';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,8 @@ export interface UserRewardPoints {
   balance: number;
   totalEarned: number;
   totalSpent: number;
+  /** Official redemption price decided by the backend (display only, never sent back) */
+  courseRedemptionPoints?: number;
 }
 
 export interface RewardTransaction {
@@ -114,14 +117,16 @@ export const leaderboardService = {
     return response.data.data;
   },
 
-  async getRewardTransactions(page: number = 1, limit: number = 20) {
+  // The learner's own ledger, newest first (balance / totals / pagination come with it)
+  async getRewardTransactions(page: number = 1, limit: number = 20): Promise<RewardHistoryPage> {
     const response = await learningApi.get('/api/learning/reward-points/transactions', {
       params: { page, limit },
     });
-    return response.data.data;
+    return parseRewardHistory(response.data?.data);
   },
 
-  async redeemCourse(courseId: string, pointsRequired: number = 500, clientRequestId?: string) {
+  // The price is decided by the backend; the client only sends the course and an idempotency key.
+  async redeemCourse(courseId: string, clientRequestId?: string) {
     const finalRequestId =
       clientRequestId ||
       `redeem_req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
@@ -129,7 +134,6 @@ export const leaderboardService = {
       '/api/learning/reward-points/redeem',
       {
         courseId,
-        pointsRequired,
         clientRequestId: finalRequestId,
         requestId: finalRequestId,
       },

@@ -6,7 +6,7 @@ import {
   useElements,
 } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
-import { paymentService } from '../../services/payment.service';
+import { confirmInstructorPayment } from './payment-flow';
 import { FiCreditCard, FiLock } from 'react-icons/fi';
 import { formatVND } from '../../utils/currency';
 
@@ -17,10 +17,12 @@ interface InstructorPaymentFormProps {
   amount: number;
   paymentIntent: any; // Add this
   onSuccess: (paymentId: string) => void;
+  /** still processing, or the answer could not be verified (FIX 07B-1.3): never shown as a success */
+  onPending: (message: string) => void;
   onError: (error: string) => void;
 }
 
-const PaymentForm = ({ amount, paymentIntent, onSuccess, onError }: InstructorPaymentFormProps) => {
+const PaymentForm = ({ amount, paymentIntent, onSuccess, onPending, onError }: InstructorPaymentFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
   const [processing, setProcessing] = useState(false);
@@ -53,15 +55,8 @@ const PaymentForm = ({ amount, paymentIntent, onSuccess, onError }: InstructorPa
       onError(error.message || 'Payment failed');
       setProcessing(false);
     } else if (confirmedIntent && confirmedIntent.status === 'succeeded') {
-      try {
-        const payment = await paymentService.confirmPayment({
-          paymentIntentId: confirmedIntent.id,
-          paymentMethodId: confirmedIntent.payment_method as string,
-        });
-        onSuccess(payment.id);
-      } catch (err) {
-        onError('Thanh toán thành công nhưng có lỗi khi cập nhật tài khoản. Vui lòng liên hệ hỗ trợ.');
-      }
+      // success only if the backend answers a SUCCEEDED payment (FIX 07B-1.3)
+      await confirmInstructorPayment(confirmedIntent.id, confirmedIntent.payment_method as string, { onSuccess, onPending, onError });
       setProcessing(false);
     }
   };

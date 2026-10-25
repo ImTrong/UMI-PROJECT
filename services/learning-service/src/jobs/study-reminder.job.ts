@@ -1,10 +1,9 @@
 import cron from 'node-cron';
 import { PrismaClient } from '@prisma/client';
-import axios from 'axios';
 import logger from '../utils/logger';
+import { UserNotificationClient } from '../services/user-notification.client';
 
 const prisma = new PrismaClient();
-const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
 
 // Run every minute to check for precise start times
 export function startStudyReminderJob() {
@@ -40,7 +39,7 @@ export function startStudyReminderJob() {
             const startStr = `${slot.startHour}:${(slot.startMinute || 0).toString().padStart(2, '0')}`;
             const endStr = `${slot.endHour}:${(slot.endMinute || 0).toString().padStart(2, '0')}`;
             
-            await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+            await UserNotificationClient.send({
               userId: schedule.userId,
               title: 'Đến giờ học rồi! ⏰',
               message: `Bạn có một lịch học: ${slot.activityLabel || 'Học tập'} lúc ${startStr} - ${endStr}`,

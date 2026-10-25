@@ -1,5 +1,8 @@
 import logger from '../../utils/logger';
 
+/** Validated RelevanceGate threshold (RAG evaluation baseline-v1, gemini-embedding-001 768d Cosine). */
+export const DEFAULT_RETRIEVAL_SCORE_THRESHOLD = 0.56;
+
 // ==================== RAG Configuration ====================
 
 /**
@@ -83,7 +86,8 @@ export function loadRAGConfig(): RAGConfig {
 
     // Retrieval (Baseline v1)
     retrievalTopK: parseInt(process.env.RETRIEVAL_TOP_K || '5', 10),
-    retrievalScoreThreshold: parseFloat(process.env.RETRIEVAL_SCORE_THRESHOLD || '0.0'),
+    // RAG-P0: an unset value keeps the gate ON at the validated threshold (it used to default to 0.0 = gate off)
+    retrievalScoreThreshold: parseFloat(process.env.RETRIEVAL_SCORE_THRESHOLD || String(DEFAULT_RETRIEVAL_SCORE_THRESHOLD)),
 
     // Context Builder
     maxContextTokens: parseInt(process.env.MAX_CONTEXT_TOKENS || '4000', 10),
@@ -116,6 +120,12 @@ export function loadRAGConfig(): RAGConfig {
   }
   if (config.retrievalTopK <= 0) {
     throw new Error('RETRIEVAL_TOP_K must be a positive integer');
+  }
+  if (!Number.isFinite(config.retrievalScoreThreshold) || config.retrievalScoreThreshold < 0 || config.retrievalScoreThreshold > 1) {
+    throw new Error('RETRIEVAL_SCORE_THRESHOLD must be a number between 0 and 1');
+  }
+  if (config.retrievalScoreThreshold === 0) {
+    logger.warn('[RAG Config] RETRIEVAL_SCORE_THRESHOLD=0 disables the RelevanceGate: out-of-knowledge questions will reach the LLM');
   }
 
   logger.info('[RAG Config] Loaded:', {

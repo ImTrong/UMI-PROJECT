@@ -4,6 +4,7 @@ import logger from './utils/logger';
 import fs from 'fs';
 import { startStudyReminderJob } from './jobs/study-reminder.job';
 import { startLeaderboardFinalizeJob } from './jobs/leaderboard-finalize.job';
+import { startRedemptionRecoveryJob } from './jobs/redemption-recovery.job';
 
 dotenv.config();
 
@@ -21,5 +22,6 @@ app.listen(PORT, () => {
   // Start background jobs
   startStudyReminderJob();
   startLeaderboardFinalizeJob();
+  startRedemptionRecoveryJob();
 });
 

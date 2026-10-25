@@ -125,6 +125,17 @@ export interface InstructorPublicProfile {
   }[];
 }
 
+export interface InstructorApplicationView {
+  id: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  expertise: string;
+  motivation: string | null;
+  source: string;
+  submittedAt: string;
+  reviewedAt: string | null;
+  rejectionReason: string | null;
+}
+
 export const userService = {
   // === Profile ===
   async getProfile(): Promise<UserProfile> {
@@ -234,5 +245,11 @@ export const userService = {
   }): Promise<any> {
     const response = await api.post('/api/users/become-instructor', data);
     return response.data;
+  },
+
+  // IMPLEMENT-01: the caller's current role and latest instructor application (PENDING / APPROVED / REJECTED)
+  async getMyInstructorApplication(): Promise<{ role: string; application: InstructorApplicationView | null }> {
+    const response = await api.get('/api/users/become-instructor/me');
+    return response.data.data;
   },
 };

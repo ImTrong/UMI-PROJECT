@@ -9,6 +9,7 @@ export type SourceType =
   | 'COURSE'
   | 'TRANSCRIPT'
   | 'PDF'
+  | 'DOCX'
   | 'MARKDOWN'
   | 'DOCUMENT'
   | 'CODE';

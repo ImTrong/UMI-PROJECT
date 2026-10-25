@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { orderService, Order } from '../services/order.service';
 import { paymentService, PaymentIntent } from '../services/payment.service';
 import { StripePaymentForm } from '../components/payment/StripePaymentForm';
+import { PaymentPendingNotice } from '../components/payment/PaymentPendingNotice';
+import { runDemoPayment } from '../components/payment/payment-flow';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import {
@@ -33,6 +35,7 @@ export default function Checkout() {
   const [order, setOrder] = useState<Order | null>(null);
   const [activeMethod, setActiveMethod] = useState<'payos' | 'stripe'>('payos');
   const [paymentIntent, setPaymentIntent] = useState<PaymentIntent | null>(null);
+  const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [payosData, setPayosData] = useState<PayosPaymentData | null>(null);
   const [loading, setLoading] = useState(true);
   const [qrLoading, setQrLoading] = useState(false);
@@ -48,13 +51,17 @@ export default function Checkout() {
     if (!orderId) return;
     try {
       setSimulating(true);
-      await paymentService.simulateMockPayment(orderId);
-      toast.success('Mô phỏng thanh toán thành công! Đang kích hoạt đơn hàng...');
-      setTimeout(() => {
-        navigate(`/checkout/success/${orderId}`);
-      }, 1200);
-    } catch (err: any) {
-      toast.error(err.response?.data?.error || 'Mô phỏng thanh toán thất bại');
+      // success only if the demo answered a SUCCEEDED payment (FIX 07B-1.3)
+      await runDemoPayment(orderId, {
+        onSuccess: () => {
+          toast.success('Mô phỏng thanh toán thành công! Đang kích hoạt đơn hàng...');
+          setTimeout(() => {
+            navigate(`/checkout/success/${orderId}`);
+          }, 1200);
+        },
+        onPending: handlePaymentPending,
+        onError: handlePaymentError,
+      });
     } finally {
       setSimulating(false);
     }
@@ -233,8 +240,14 @@ export default function Checkout() {
   };
 
   const handlePaymentError = (errorMsg: string) => {
+    setPendingMessage(null);
     toast.error(errorMsg);
   };
+
+  // not a success: show it and keep polling the order, which only the payment webhook / outbox moves to PAID (FIX 07B-1.3)
+  function handlePaymentPending(message: string) {
+    setPendingMessage(message);
+  }
 
   const formatTimer = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -327,6 +340,8 @@ export default function Checkout() {
                 <span className="text-sm">{error}</span>
               </div>
             )}
+
+            {pendingMessage && <PaymentPendingNotice message={pendingMessage} />}
 
             {/* PayOS VietQR Content */}
             {activeMethod === 'payos' && (
@@ -500,6 +515,7 @@ export default function Checkout() {
                     clientSecret={paymentIntent.clientSecret}
                     stripePaymentIntentId={paymentIntent.stripePaymentIntentId || ''}
                     onSuccess={handlePaymentSuccess}
+                    onPending={handlePaymentPending}
                     onError={handlePaymentError}
                   />
                 ) : (
