@@ -6,6 +6,7 @@ import { AssignmentPlayer } from '../components/learning/AssignmentPlayer';
 import { useAuth } from '../hooks/useAuth';
 import { useFileProtection } from '../hooks/useFileProtection';
 import { SecurePDFViewer } from '../components/learning/SecurePDFViewer';
+import { withAccessToken } from '../utils/protected-file-url';
 import {
   FiArrowLeft,
   FiBookOpen,
@@ -158,8 +159,9 @@ export default function AssignmentPage() {
     );
   }
 
-  const videoUrl = getLessonVideoUrl();
-  const pdfUrl = getLessonPdfUrl();
+  // a paid lesson's file is served only to its learner: <video> / the PDF viewer carry the user's token (FIX-INS-07)
+  const videoUrl = withAccessToken(getLessonVideoUrl());
+  const pdfUrl = withAccessToken(getLessonPdfUrl());
 
   return (
     <div className="min-h-screen bg-slate-50 select-none">

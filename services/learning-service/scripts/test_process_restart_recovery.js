@@ -116,7 +116,7 @@ async function setupPreCrashState() {
   // Run finalizeMonth with simulated crash after 1st reward
   console.log('\nRunning finalizeMonth up to REWARDING state (halting after User 1)...');
   try {
-    await LeaderboardService.finalizeMonth(testMonth, testYear, 'CRASH_SIMULATION', true, {
+    await LeaderboardService.finalizeMonth(testMonth, testYear, 'CRASH_SIMULATION', {
       simulateFailureAt: 'AFTER_FIRST_REWARD',
     });
   } catch (err) {

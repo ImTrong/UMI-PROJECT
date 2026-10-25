@@ -12,7 +12,12 @@ import { useSocket } from '../contexts/SocketContext';
 import toast from 'react-hot-toast';
 import { FiCheckCircle, FiClock, FiFileText, FiCheckSquare, FiVideo, FiMessageCircle } from 'react-icons/fi';
 import { DynamicWatermark } from '../components/learning/DynamicWatermark';
-import { SecurePDFViewer } from '../components/learning/SecurePDFViewer';
+import { SecurePDFViewer, PdfJumpOutcome, PdfJumpTarget } from '../components/learning/SecurePDFViewer';
+import { LessonChatPanel } from '../components/learning/LessonChatPanel';
+import { LessonMarkdown } from '../components/learning/MarkdownContent';
+import { clearSourceHighlight, jumpToSource, SourceJump } from '../utils/source-highlight';
+import type { RagSource } from '../services/rag-chat.service';
+import { lessonFileUrlForKey, pdfCitationOf } from '../utils/pdf-source-locator';
 
 interface LessonResource {
   title?: string;
@@ -46,8 +51,19 @@ export default function Learning() {
   const [lessonType, setLessonType] = useState<'VIDEO' | 'QUIZ' | 'ASSIGNMENT' | 'PDF' | 'TEXT'>('VIDEO');
   const [tasks, setTasks] = useState<Record<string, Array<'QUIZ' | 'ASSIGNMENT'>>>({});
   const [hasTaskAttached, setHasTaskAttached] = useState<Array<'QUIZ' | 'ASSIGNMENT'>>([]);
+  // RAG-MVP-05A: right sidebar shows the lesson list or the lesson assistant (kept mounted so each lesson keeps its thread)
+  const [sidebarTab, setSidebarTab] = useState<'lessons' | 'assistant'>('lessons');
+  // RAG-MVP-05D: the displayed lesson text containers a citation is searched in (text view first, then "Thông tin bài học")
+  const lessonTextRef = useRef<HTMLDivElement>(null);
+  const lessonInfoRef = useRef<HTMLDivElement>(null);
 
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string | null>(null);
+  // RAG-PDF-05: the lesson PDF a citation asked for (null = the lesson's own PDF) and the passage to show in it
+  const [citedPdfKey, setCitedPdfKey] = useState<string | null>(null);
+  const [pdfTarget, setPdfTarget] = useState<PdfJumpTarget | null>(null);
+  const pdfJump = useRef<{ id: number; resolve: (jump: SourceJump) => void } | null>(null);
+  const pdfJumpSeq = useRef(0);
+  const pdfRegionRef = useRef<HTMLDivElement>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
   const { socket } = useSocket();
   const lessonStartTimeRef = useRef<number>(Date.now());
@@ -140,6 +156,79 @@ export default function Learning() {
     }
   };
 
+  // RAG-MVP-05D: a highlight belongs to one lesson and one rendering of it
+  useEffect(() => {
+    clearSourceHighlight();
+  }, [currentLesson?.id, lessonType]);
+  // RAG-PDF-05: a PDF jump belongs to one lesson and to the PDF view
+  const endPdfJump = () => {
+    setPdfTarget(null);
+    pdfJump.current?.resolve({ status: 'pdf-unavailable', reason: 'closed' });
+    pdfJump.current = null;
+  };
+  useEffect(() => {
+    setCitedPdfKey(null);
+    endPdfJump();
+  }, [currentLesson?.id]);
+  useEffect(() => {
+    if (lessonType !== 'PDF') endPdfJump();
+  }, [lessonType]);
+  // small screens: the PDF sits above the assistant - bring it into view when a citation opens it
+  useEffect(() => {
+    if (pdfTarget) pdfRegionRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+  }, [pdfTarget]);
+  useEffect(() => () => clearSourceHighlight(), []);
+
+  // RAG-MVP-05D: while the lesson assistant is open, the floating messaging button moves off the chat composer (index.css)
+  useEffect(() => {
+    if (sidebarTab !== 'assistant') return;
+    document.body.dataset.lessonChat = 'open';
+    return () => {
+      delete document.body.dataset.lessonChat;
+    };
+  }, [sidebarTab]);
+
+  /**
+   * Citation clicked in the lesson assistant: only a source of THIS lesson is searched for. A PDF source (RAG-PDF-05) opens
+   * that lesson file - one the lesson itself lists, matched by the key the backend indexed - at the cited page; any other
+   * source is searched for in the lesson text on screen.
+   */
+  const handleSourceSelect = (source: RagSource): SourceJump | Promise<SourceJump> => {
+    if (!currentLesson || !course || source.lessonId !== currentLesson.id || (source.courseId && source.courseId !== course.id)) {
+      clearSourceHighlight();
+      return { status: 'other-lesson' };
+    }
+    const pdf = pdfCitationOf(source);
+    if (!pdf) return jumpToSource([lessonTextRef.current, lessonInfoRef.current], source.snippet);
+
+    clearSourceHighlight();
+    if (!lessonFileUrlForKey(lessonFileUrls(currentLesson), pdf.fileKey)) return { status: 'pdf-unavailable', reason: 'not-a-lesson-file' };
+    const id = ++pdfJumpSeq.current;
+    const done = new Promise<SourceJump>((resolve) => {
+      pdfJump.current = { id, resolve };
+    });
+    setCitedPdfKey(pdf.fileKey);
+    setLessonType('PDF');
+    setPdfTarget({ id, page: pdf.page, snippet: pdf.snippet });
+    return done;
+  };
+
+  const handlePdfJumpResult = (id: number, outcome: PdfJumpOutcome) => {
+    const pending = pdfJump.current;
+    if (!pending || pending.id !== id) return;
+    pdfJump.current = null;
+    switch (outcome.status) {
+      case 'highlighted':
+        return pending.resolve({ status: 'pdf-highlighted', page: outcome.page, matched: outcome.matched });
+      case 'scrolled-only':
+        return pending.resolve({ status: 'pdf-scrolled-only', page: outcome.page, matched: outcome.matched });
+      case 'page-only':
+        return pending.resolve({ status: 'pdf-page-only', page: outcome.page, reason: outcome.reason });
+      default:
+        return pending.resolve({ status: 'pdf-unavailable', reason: outcome.reason });
+    }
+  };
+
   const handleLessonSelect = (lesson: Lesson) => {
     setCurrentLesson(lesson);
     setSelectedLessonId(lesson.id);
@@ -183,41 +272,6 @@ export default function Learning() {
 
     detectLessonType();
   }, [currentLesson, tasks]);
-
-  useEffect(() => {
-    if (lessonType === 'PDF' && currentLesson) {
-      const url = getLessonPdfUrl(currentLesson);
-      if (url) {
-        setLoadingPdf(true);
-        let fetchUrl = url;
-        if (url.startsWith('/api/')) {
-          fetchUrl = url.includes('?') 
-            ? `${url}&token=${localStorage.getItem('accessToken')}`
-            : `${url}?token=${localStorage.getItem('accessToken')}`;
-        }
-        
-        fetch(fetchUrl)
-          .then(res => res.blob())
-          .then(blob => {
-            const blobUrl = URL.createObjectURL(blob);
-            setPdfBlobUrl(blobUrl);
-            setLoadingPdf(false);
-          })
-          .catch(err => {
-            console.error('Failed to load PDF as blob', err);
-            // fallback to original url if blob fails
-            setPdfBlobUrl(fetchUrl);
-            setLoadingPdf(false);
-          });
-      }
-    }
-
-    return () => {
-      if (pdfBlobUrl && pdfBlobUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(pdfBlobUrl);
-      }
-    };
-  }, [currentLesson, lessonType]);
 
   const handleLessonComplete = async () => {
     if (!currentLesson || !progress) return;
@@ -308,6 +362,16 @@ export default function Learning() {
     return (pdfResource?.fileUrl || pdfResource?.url || null) as string | null;
   };
 
+  /** RAG-PDF-05: every file URL the lesson refers to (main file, resources) - a citation may only open one of these. */
+  const lessonFileUrls = (lesson: Lesson): unknown[] => [
+    lesson.videoUrl,
+    ...parseLessonResources(lesson).flatMap((res: any) => [res?.fileUrl, res?.url]),
+  ];
+
+  /** The PDF on screen: the one a citation opened, else the lesson's own PDF. */
+  const displayedPdfUrl = (lesson: Lesson): string | null =>
+    (citedPdfKey && lessonFileUrlForKey(lessonFileUrls(lesson), citedPdfKey)) || getLessonPdfUrl(lesson);
+
   const getLessonTextContent = (lesson: Lesson): string | null => {
     const resources = parseLessonResources(lesson);
     const textResource = resources.find((res) => {
@@ -321,6 +385,43 @@ export default function Learning() {
 
     return lesson.description || null;
   };
+
+  // the lesson PDF is fetched once per file shown (RAG-PDF-05: placed after the helpers it uses; same effect as before)
+  const shownPdfUrl = currentLesson && lessonType === 'PDF' ? displayedPdfUrl(currentLesson) : null;
+  useEffect(() => {
+    if (lessonType === 'PDF' && currentLesson) {
+      const url = displayedPdfUrl(currentLesson);
+      if (url) {
+        setLoadingPdf(true);
+        let fetchUrl = url;
+        if (url.startsWith('/api/')) {
+          fetchUrl = url.includes('?') 
+            ? `${url}&token=${localStorage.getItem('accessToken')}`
+            : `${url}?token=${localStorage.getItem('accessToken')}`;
+        }
+        
+        fetch(fetchUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const blobUrl = URL.createObjectURL(blob);
+            setPdfBlobUrl(blobUrl);
+            setLoadingPdf(false);
+          })
+          .catch(err => {
+            console.error('Failed to load PDF as blob', err);
+            // fallback to original url if blob fails
+            setPdfBlobUrl(fetchUrl);
+            setLoadingPdf(false);
+          });
+      }
+    }
+
+    return () => {
+      if (pdfBlobUrl && pdfBlobUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(pdfBlobUrl);
+      }
+    };
+  }, [currentLesson, lessonType, shownPdfUrl]);
 
   if (loading) {
     return (
@@ -358,20 +459,22 @@ export default function Learning() {
   if (!course) return null;
 
   return (
-    <div className="flex h-screen bg-slate-100 select-none">
+    // RAG-MVP-05D layout: on large screens the page fills the window under the 64px (+1px border) header - the lesson column
+    // and the sidebar scroll on their own, so the assistant's composer stays visible; on small screens they stack (no side scroll).
+    <div className="flex flex-col lg:flex-row lg:h-[calc(100dvh-65px)] bg-slate-100 select-none">
       {/* Main Content - Left Side */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 min-w-0 flex flex-col lg:overflow-y-auto">
         {currentLesson ? (
           <>
             {lessonType === 'QUIZ' ? (
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 shrink-0 min-h-[60vh] overflow-y-auto">
                 <QuizPlayer
                   lessonId={currentLesson.id}
                   onComplete={handleLessonComplete}
                 />
               </div>
             ) : lessonType === 'ASSIGNMENT' ? (
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 shrink-0 min-h-[60vh] overflow-y-auto">
                 <AssignmentPlayer
                   lessonId={currentLesson.id}
                   courseId={courseId!}
@@ -379,15 +482,19 @@ export default function Learning() {
                 />
               </div>
             ) : lessonType === 'VIDEO' ? (
-              <HLSPlayer
-                key={currentLesson.id}
-                lesson={currentLesson}
-                progress={progress?.lessons?.find(l => l.lessonId === currentLesson.id)}
-                onComplete={handleLessonComplete}
-                onTimeUpdate={handleTimeUpdate}
-              />
+              // shrink-0: the video keeps its own size above a long lesson text (it used to be squeezed to a thin bar)
+              <div className="shrink-0">
+                <HLSPlayer
+                  key={currentLesson.id}
+                  lesson={currentLesson}
+                  progress={progress?.lessons?.find(l => l.lessonId === currentLesson.id)}
+                  onComplete={handleLessonComplete}
+                  onTimeUpdate={handleTimeUpdate}
+                />
+              </div>
             ) : lessonType === 'PDF' ? (
-              <div className="flex-1 bg-white p-4 overflow-hidden flex flex-col" onContextMenu={(e) => e.preventDefault()}>
+              // fixed height when stacked (small screens), otherwise the viewer grows to the full height of every page
+              <div ref={pdfRegionRef} className="h-[75dvh] lg:h-auto lg:flex-1 shrink-0 lg:min-h-[70vh] bg-white p-4 overflow-hidden flex flex-col" onContextMenu={(e) => e.preventDefault()}>
                 <div className="flex items-center justify-between px-4 py-2 bg-slate-50 border rounded-t-lg select-none">
                   <span className="text-xs text-slate-500 font-medium">Bảo mật tài liệu (Không thể nhấp chuột phải)</span>
                 </div>
@@ -398,7 +505,7 @@ export default function Learning() {
                       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
                     </div>
                   ) : pdfBlobUrl ? (
-                    <SecurePDFViewer url={pdfBlobUrl} />
+                    <SecurePDFViewer key={pdfBlobUrl} url={pdfBlobUrl} target={pdfTarget} onTargetResult={handlePdfJumpResult} />
                   ) : (
                     <div className="flex items-center justify-center h-full text-slate-500">
                       Không thể tải tài liệu
@@ -407,16 +514,18 @@ export default function Learning() {
                 </div>
               </div>
             ) : (
-              <div className="flex-1 bg-white p-6 overflow-y-auto">
+              <div className="flex-1 shrink-0 min-h-[60vh] bg-white p-6 overflow-y-auto">
                 <div className="max-w-4xl mx-auto">
                   <div className="inline-flex items-center text-sm text-primary-700 bg-primary-50 px-3 py-1 rounded-full mb-4">
                     <FiFileText className="mr-2" />
                     Nội dung bài học
                   </div>
                   <h2 className="text-2xl font-bold text-slate-900 mb-4">{currentLesson.title}</h2>
-                  <p className="text-slate-700 whitespace-pre-wrap leading-7">
-                    {getLessonTextContent(currentLesson) || 'Bài học này hiện chưa có video hoặc tài liệu bổ sung.'}
-                  </p>
+                  {getLessonTextContent(currentLesson) ? (
+                    <LessonMarkdown ref={lessonTextRef} content={getLessonTextContent(currentLesson)!} />
+                  ) : (
+                    <p className="text-slate-700 leading-7">Bài học này hiện chưa có video hoặc tài liệu bổ sung.</p>
+                  )}
                 </div>
               </div>
             )}
@@ -496,7 +605,11 @@ export default function Learning() {
 
             <div className="p-6 bg-white border-t">
               <h3 className="font-semibold text-lg mb-2">Thông tin bài học</h3>
-              <p className="text-slate-600">{currentLesson.description || 'Không có thông tin mô tả chi tiết.'}</p>
+              {currentLesson.description ? (
+                <LessonMarkdown ref={lessonInfoRef} content={currentLesson.description} />
+              ) : (
+                <p className="text-slate-600">Không có thông tin mô tả chi tiết.</p>
+              )}
               
               <div className="flex flex-wrap items-center gap-3 mt-4">
                 {!progress?.lessons?.find(l => l.lessonId === currentLesson.id)?.completed && (
@@ -537,7 +650,7 @@ export default function Learning() {
       </div>
 
       {/* Sidebar - Right Side */}
-      <div className="w-96 bg-white border-l flex flex-col">
+      <div className="w-full lg:w-96 h-[85dvh] lg:h-auto min-h-0 flex-shrink-0 bg-white border-t lg:border-t-0 lg:border-l flex flex-col">
         <div className="p-4 border-b">
           <h2 className="font-semibold text-lg">{course.title}</h2>
           {progress && (
@@ -548,9 +661,37 @@ export default function Learning() {
               </p>
             </div>
           )}
+          <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 text-sm font-medium" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sidebarTab === 'lessons'}
+              onClick={() => setSidebarTab('lessons')}
+              className={`rounded-lg py-1.5 ${sidebarTab === 'lessons' ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-600'}`}
+            >
+              Nội dung khóa học
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={sidebarTab === 'assistant'}
+              onClick={() => setSidebarTab('assistant')}
+              className={`rounded-lg py-1.5 ${sidebarTab === 'assistant' ? 'bg-white text-primary-700 shadow-sm' : 'text-slate-600'}`}
+            >
+              Hỏi về bài học
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className={`flex-1 min-h-0 overflow-hidden ${sidebarTab === 'assistant' ? 'flex flex-col' : 'hidden'}`}>
+          {currentLesson ? (
+            <LessonChatPanel courseId={course.id} lessonId={currentLesson.id} lessonTitle={currentLesson.title} onSourceSelect={handleSourceSelect} />
+          ) : (
+            <p className="p-4 text-sm text-slate-500">Chọn một bài học để đặt câu hỏi.</p>
+          )}
+        </div>
+
+        <div className={`flex-1 min-h-0 overflow-y-auto ${sidebarTab === 'lessons' ? '' : 'hidden'}`}>
           {lessonSections.map((section, sectionIndex) => (
             <div key={section.id} className="border-b border-slate-100 last:border-b-0">
               <div className="px-4 py-3 bg-slate-50">

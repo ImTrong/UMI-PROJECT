@@ -40,23 +40,6 @@ export default function Payments() {
     }
   }, [isAuthenticated]);
 
-  const handleRefund = async (paymentId: string) => {
-    const amount = prompt('Nhập số tiền hoàn lại (để trống để hoàn toàn bộ):');
-    const reason = prompt('Lý do hoàn tiền:');
-    
-    try {
-      await paymentService.refundPayment(
-        paymentId,
-        amount ? parseFloat(amount) : undefined,
-        reason || undefined
-      );
-      toast.success('Hoàn tiền thành công');
-      loadPayments(pagination.page);
-    } catch (error: any) {
-      toast.error(error.response?.data?.error || 'Hoàn tiền thất bại');
-    }
-  };
-
   if (loading && payments.length === 0) {
     return (
       <div className="flex justify-center items-center min-h-[400px]">
@@ -109,10 +92,10 @@ export default function Payments() {
             {payments
               .filter(p => !statusFilter || p.status === statusFilter)
               .map((payment) => (
+                // SCOPE-RESET-01: refunds are started by an administrator only - no self-refund button here
                 <PaymentCard
                   key={payment.id}
                   payment={payment}
-                  onRefund={payment.status === 'SUCCEEDED' ? handleRefund : undefined}
                 />
               ))}
           </div>

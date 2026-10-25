@@ -333,8 +333,8 @@ async function runTestSuite() {
     const clientReqA = `concurrent_reqA_${Date.now()}`;
     const clientReqB = `concurrent_reqB_${Date.now()}`;
     const [resA, resB] = await Promise.allSettled([
-      RewardPointService.redeemCourseWithPoints(concurrentUser, courseA, 500, clientReqA),
-      RewardPointService.redeemCourseWithPoints(concurrentUser, courseB, 500, clientReqB),
+      RewardPointService.redeemCourseWithPoints(concurrentUser, courseA, clientReqA),
+      RewardPointService.redeemCourseWithPoints(concurrentUser, courseB, clientReqB),
     ]);
 
     const reqASucceededDeduct = resA.status === 'fulfilled' || (resA.status === 'rejected' && resA.reason.message.includes('Điểm đã được hoàn lại'));
@@ -390,7 +390,7 @@ async function runTestSuite() {
     // 9.1: First attempt fails enrollment (dummy course ID) -> auto-rollback
     let firstAttemptFailed = false;
     try {
-      await RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, 500, clientRequestId1);
+      await RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, clientRequestId1);
     } catch (e) {
       firstAttemptFailed = e.message.includes('Điểm đã được hoàn lại');
     }
@@ -410,7 +410,7 @@ async function runTestSuite() {
     assert(refundTx1 !== null && refundTx1.amount === 500, 'Refund transaction created with exactly +500 points');
 
     // 9.2: Replay with the EXACT SAME failed requestId (e.g. client retry after timeout)
-    const replayResult = await RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, 500, clientRequestId1);
+    const replayResult = await RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, clientRequestId1);
     assert(replayResult.isIdempotentReplay === true, 'Replay of failed request detected as idempotent replay');
     assert(replayResult.status === 'ALREADY_REFUNDED', 'Replay returns ALREADY_REFUNDED status without deducting points again');
 
@@ -426,7 +426,7 @@ async function runTestSuite() {
     let conflictDetected = false;
     try {
       // Re-using clientRequestId1 with different course or different points
-      await RewardPointService.redeemCourseWithPoints(highBalanceUser, fakeObjectId(), 500, clientRequestId1);
+      await RewardPointService.redeemCourseWithPoints(highBalanceUser, fakeObjectId(), clientRequestId1);
     } catch (e) {
       conflictDetected = e.message.includes('Xung đột khóa idempotency');
     }
@@ -436,7 +436,7 @@ async function runTestSuite() {
     const clientRequestId2 = `client_new_order_${fakeObjectId()}`;
     let newAttemptHandled = false;
     try {
-      await RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, 500, clientRequestId2);
+      await RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, clientRequestId2);
     } catch (e) {
       // Dummy course triggers rollback again, but the new request was processed cleanly
       newAttemptHandled = e.message.includes('Điểm đã được hoàn lại');
@@ -468,7 +468,7 @@ async function runTestSuite() {
     });
 
     // Replay of COMPLETED transaction
-    const successReplay = await RewardPointService.redeemCourseWithPoints(successUser, courseSuccess, 500, successfulReqId);
+    const successReplay = await RewardPointService.redeemCourseWithPoints(successUser, courseSuccess, successfulReqId);
     assert(successReplay.isIdempotentReplay === true, 'Completed transaction replay detected as idempotent replay');
     assert(successReplay.status === 'ALREADY_COMPLETED', 'Replay returns ALREADY_COMPLETED status without charging again');
     const successWallet = await RewardPointService.getUserPoints(successUser);
@@ -478,7 +478,7 @@ async function runTestSuite() {
     let missingReqIdRejected = false;
     let missingReqIdErrorMsg = '';
     try {
-      await RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, 500, '');
+      await RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, '');
     } catch (e) {
       missingReqIdRejected = true;
       missingReqIdErrorMsg = e.message;
@@ -488,7 +488,7 @@ async function runTestSuite() {
 
     let undefinedReqIdRejected = false;
     try {
-      await RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, 500, undefined);
+      await RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, undefined);
     } catch (e) {
       undefinedReqIdRejected = true;
     }
@@ -497,8 +497,8 @@ async function runTestSuite() {
     // 9.7: Two simultaneous requests with IDENTICAL clientRequestId (concurrency deduplication)
     const identicalReqId = `concurrent_identical_${Date.now()}`;
     const [dupRes1, dupRes2] = await Promise.allSettled([
-      RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, 500, identicalReqId),
-      RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, 500, identicalReqId),
+      RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, identicalReqId),
+      RewardPointService.redeemCourseWithPoints(highBalanceUser, courseX, identicalReqId),
     ]);
 
     // Both requests should terminate safely without unhandled crashes
@@ -599,7 +599,7 @@ async function runTestSuite() {
     // 10.2: Trigger finalizeMonth with simulated crash after 1st reward
     let crashCaught = false;
     try {
-      await LeaderboardService.finalizeMonth(crashMonth, crashYear, 'CRASH_TEST_HARNESS', true, {
+      await LeaderboardService.finalizeMonth(crashMonth, crashYear, 'CRASH_TEST_HARNESS', {
         simulateFailureAt: 'AFTER_FIRST_REWARD',
       });
     } catch (err) {
@@ -647,7 +647,7 @@ async function runTestSuite() {
 
     // 10.4: RESUME FINALIZATION (Restart & Retry)
     console.log('  🔄 Resuming Finalization After Crash...');
-    const resumeRes = await LeaderboardService.finalizeMonth(crashMonth, crashYear, 'CRASH_RECOVERY_HARNESS', true);
+    const resumeRes = await LeaderboardService.finalizeMonth(crashMonth, crashYear, 'CRASH_RECOVERY_HARNESS');
     assert(resumeRes.status === 'FINALIZED', 'Resume run completed successfully with status FINALIZED');
 
     // 10.5: VERIFY DATABASE STATE AFTER RECOVERY
@@ -780,10 +780,10 @@ async function runTestSuite() {
       }
     });
 
-    // 11.1: Trigger simulated crash BEFORE snapshot confirmation (partial write of 1 row)
+    // 11.1: Trigger simulated crash BEFORE snapshot confirmation (the transaction is rolled back)
     let partialCrashCaught = false;
     try {
-      await LeaderboardService.finalizeMonth(partialMonth, partialYear, 'PARTIAL_TEST_HARNESS', true, {
+      await LeaderboardService.finalizeMonth(partialMonth, partialYear, 'PARTIAL_TEST_HARNESS', {
         simulateFailureAt: 'BEFORE_SNAPSHOT_CONFIRM',
       });
     } catch (err) {
@@ -800,7 +800,8 @@ async function runTestSuite() {
 
     assert(lbPartialCrash !== null, 'Leaderboard record created in SNAPSHOT_BUILDING state');
     assert(lbPartialCrash.status === 'SNAPSHOT_BUILDING', `Status is SNAPSHOT_BUILDING (got ${lbPartialCrash.status})`);
-    assert(lbPartialCrash.entries.length === 1, `Partial snapshot has only 1 entry recorded (expected 3, got ${lbPartialCrash.entries.length})`);
+    // Since FIX 06B2 the snapshot is written in ONE fenced transaction: a crash half-way rolls the whole write back, so no partial snapshot is ever visible
+    assert(lbPartialCrash.entries.length === 0, `No partial snapshot is left behind by an interrupted write (got ${lbPartialCrash.entries.length})`);
 
     // Verify ZERO rewards disbursed when snapshot is partial
     const p1WalletCrash = await RewardPointService.getUserPoints(pUser1);
@@ -810,9 +811,9 @@ async function runTestSuite() {
     assert(p2WalletCrash.balance === 0, 'ZERO rewards disbursed to pUser2 during partial snapshot build');
     assert(p3WalletCrash.balance === 0, 'ZERO rewards disbursed to pUser3 during partial snapshot build');
 
-    // 11.3: RESUME FINALIZATION (Should wipe partial entry and rebuild full 3 entries)
+    // 11.3: RESUME FINALIZATION (Should build the full 3 entries)
     console.log('  🔄 Resuming Finalization to Purge Partial Snapshot & Rebuild...');
-    const partialRecoveryRes = await LeaderboardService.finalizeMonth(partialMonth, partialYear, 'PARTIAL_RECOVERY_HARNESS', true);
+    const partialRecoveryRes = await LeaderboardService.finalizeMonth(partialMonth, partialYear, 'PARTIAL_RECOVERY_HARNESS');
     assert(partialRecoveryRes.status === 'FINALIZED', 'Resume succeeded and finalized leaderboard');
 
     const lbPartialRecovered = await prisma.monthlyLeaderboard.findUnique({
@@ -821,7 +822,7 @@ async function runTestSuite() {
     });
 
     assert(lbPartialRecovered.status === 'FINALIZED', 'Status advanced to FINALIZED');
-    assert(lbPartialRecovered.entries.length === 3, 'Partial entry was discarded and complete snapshot of 3 entries created');
+    assert(lbPartialRecovered.entries.length === 3, 'Complete snapshot of 3 entries created');
     assert(lbPartialRecovered.entries[0].userId === pUser1 && lbPartialRecovered.entries[0].rank === 1, 'pUser1 properly ranked #1');
     assert(lbPartialRecovered.entries[1].userId === pUser2 && lbPartialRecovered.entries[1].rank === 2, 'pUser2 properly ranked #2');
     assert(lbPartialRecovered.entries[2].userId === pUser3 && lbPartialRecovered.entries[2].rank === 3, 'pUser3 properly ranked #3');

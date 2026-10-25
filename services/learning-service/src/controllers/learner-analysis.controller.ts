@@ -1,6 +1,13 @@
 import { Request, Response } from 'express';
 import { LearnerAnalysisService } from '../services/learner-analysis.service';
 import logger from '../utils/logger';
+import type { InvalidationEvent } from '../types/learner-analysis.types';
+
+// every value of InvalidationEvent (types/learner-analysis.types.ts) - the internal /invalidate route accepts only these
+const INVALIDATION_EVENTS: readonly unknown[] = [
+  'PROJECT_EVALUATION_COMPLETED', 'SKILL_PROFILE_UPDATED', 'COURSE_COMPLETED', 'QUIZ_COMPLETED',
+  'PATH_ENROLLMENT_CHANGED', 'CAREER_GOAL_CHANGED', 'MANUAL_REFRESH',
+] satisfies readonly InvalidationEvent[];
 
 /**
  * LearnerAnalysisController — API endpoints cho Learner Competency Profile
@@ -10,7 +17,7 @@ import logger from '../utils/logger';
  * - GET  /api/learning/learner-analysis/me/career-fit  → Career Fit only
  * - GET  /api/learning/learner-analysis/me/skills      → Extended skills summary
  * - POST /api/learning/learner-analysis/me/refresh     → Force refresh
- * - GET  /api/learning/internal/learner-analysis/:userId → Internal (no auth)
+ * - GET  /api/learning/internal/learner-analysis/:userId → Internal (AI_LEARNING_TOKEN, FIX-INS-05)
  */
 export class LearnerAnalysisController {
 
@@ -125,7 +132,7 @@ export class LearnerAnalysisController {
 
   /**
    * GET /api/learning/internal/learner-analysis/:userId
-   * Internal endpoint for ai-service — no authentication
+   * Internal endpoint for ai-service — AI_LEARNING_TOKEN checked by the route (FIX-INS-05)
    */
   static async getProfileInternal(req: Request, res: Response): Promise<void> {
     try {
@@ -157,10 +164,15 @@ export class LearnerAnalysisController {
   static async invalidateCacheInternal(req: Request, res: Response): Promise<void> {
     try {
       const { userId } = req.params;
-      const { event } = req.body;
+      const { event } = req.body || {};
 
       if (!userId) {
         res.status(400).json({ error: 'userId is required' });
+        return;
+      }
+      // only the known events (the value is logged: no free text from the caller - FIX-INS-05)
+      if (event !== undefined && !INVALIDATION_EVENTS.includes(event)) {
+        res.status(400).json({ error: 'Unknown invalidation event' });
         return;
       }
 

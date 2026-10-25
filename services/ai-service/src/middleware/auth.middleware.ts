@@ -64,8 +64,14 @@ export const authenticateToken = async (
     }
 
     next();
-  } catch (error) {
-    logger.error('Authentication error:', error);
+  } catch (error: any) {
+    // RAG-P0: never log the axios error itself - its config carries the token (request body) being verified
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      logger.info(`Authentication refused by auth-service (HTTP ${status})`);
+    } else {
+      logger.error(`Authentication error: ${status ? `HTTP ${status}` : error?.code || error?.name || 'error'}`);
+    }
     res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
   }
 };

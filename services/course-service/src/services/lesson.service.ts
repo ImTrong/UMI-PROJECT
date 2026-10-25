@@ -2,6 +2,7 @@ import axios from 'axios';
 import prisma from '../utils/prisma';
 import { ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+import { LESSON_WRITABLE_FIELDS, pickFields } from '../utils/course-fields';
 
 export interface CreateLessonData {
   courseId: string;
@@ -25,6 +26,15 @@ export interface UpdateLessonData {
 }
 
 export class LessonService {
+  /** FIX-INS-10: the lesson's course and that course's owner, from the database only - null when either is missing. */
+  static async getLessonOwnerInternal(lessonId: string) {
+    const lesson = await prisma.lesson.findUnique({ where: { id: lessonId }, select: { id: true, courseId: true } });
+    if (!lesson) return null;
+    const course = await prisma.course.findUnique({ where: { id: lesson.courseId }, select: { id: true, instructorId: true } });
+    if (!course) return null;
+    return { lessonId: lesson.id, courseId: course.id, instructorId: course.instructorId };
+  }
+
   static async getCourseLessonsInternal(courseId: string) {
     const course = await prisma.course.findUnique({
       where: { id: courseId },
@@ -55,10 +65,13 @@ export class LessonService {
     return lesson;
   }
 
-  static async createLesson(data: CreateLessonData) {
-    const { courseId, order } = data;
-
-    // Check if course exists
+  /**
+   * The single ownership rule for writing a course's content (FIX-INS-02): the course must exist (else COURSE_NOT_FOUND)
+   * and the caller must be its instructor (else FORBIDDEN). Same rule as updateLesson / deleteLesson / reorderLessons and
+   * CourseService.updateCourse / publishCourse: an ADMIN moderates through /approve, /reject and course deletion, and does
+   * not edit another instructor's content.
+   */
+  static async assertCourseOwner(courseId: string, userId: string) {
     const course = await prisma.course.findUnique({
       where: { id: courseId },
     });
@@ -66,6 +79,21 @@ export class LessonService {
     if (!course) {
       throw new Error(ERROR_MESSAGES.COURSE_NOT_FOUND);
     }
+
+    if (!userId || course.instructorId !== userId) {
+      throw new Error(ERROR_MESSAGES.FORBIDDEN);
+    }
+
+    return course;
+  }
+
+  static async createLesson(instructorId: string, input: CreateLessonData) {
+    const { courseId } = input;
+    // Ownership BEFORE anything else is read or written; the caller comes from the token, the course from the URL.
+    await this.assertCourseOwner(courseId, instructorId);
+
+    const data = { ...pickFields(input, LESSON_WRITABLE_FIELDS), courseId } as CreateLessonData;
+    const { order } = data;
 
     // If order specified, check if it already exists
     if (order !== undefined) {
@@ -185,6 +213,9 @@ export class LessonService {
       throw new Error(ERROR_MESSAGES.COURSE_NOT_FOUND);
     }
 
+    // the course's own instructor sees every lesson of it (FIX-INS-06: owner check here, not "any INSTRUCTOR")
+    if (userId && course.instructorId === userId) includeUnpublished = true;
+
     let isEnrolled = false;
     if (userId && authToken && !includeUnpublished) {
       try {
@@ -247,9 +278,10 @@ export class LessonService {
       throw new Error(ERROR_MESSAGES.LESSON_NOT_FOUND);
     }
 
+    // Content fields only: `courseId` (moving the lesson into another instructor's course), `id` and timestamps are dropped.
     const updatedLesson = await prisma.lesson.update({
       where: { id: lessonId },
-      data,
+      data: pickFields(data, LESSON_WRITABLE_FIELDS),
     });
 
     logger.info(`Lesson updated: ${updatedLesson.title}`);
@@ -312,6 +344,13 @@ export class LessonService {
 
     if (!course) {
       throw new Error(ERROR_MESSAGES.FORBIDDEN);
+    }
+
+    // Owning THIS course must not let the caller reorder lessons of another course: every id has to belong to it.
+    const ids = [...new Set(lessonOrders.map(({ id }) => id))];
+    const owned = await prisma.lesson.count({ where: { id: { in: ids }, courseId } });
+    if (ids.length !== lessonOrders.length || owned !== ids.length) {
+      throw new Error(ERROR_MESSAGES.LESSON_NOT_IN_COURSE);
     }
 
     const updates = lessonOrders.map(({ id, order }) =>

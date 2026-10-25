@@ -1,6 +1,8 @@
 import { Response, Request } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { CourseService } from '../services/course.service';
+import { CourseService, CourseDeletionBlockedError, CreateCourseData } from '../services/course.service';
+import { COURSE_WRITABLE_FIELDS, pickFields } from '../utils/course-fields';
+import prisma from '../utils/prisma';
 import { HTTP_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 
@@ -13,10 +15,12 @@ export class CourseController {
         });
       }
 
+      // The owner is the authenticated caller. The body was checked against COURSE_WRITABLE_FIELDS by the route and is
+      // filtered again by CourseService.createCourse, so it cannot carry instructorId, published, approvalStatus...
       const course = await CourseService.createCourse({
-        ...req.body,
+        ...pickFields(req.body, COURSE_WRITABLE_FIELDS),
         instructorId: req.user.userId,
-      });
+      } as CreateCourseData);
 
       res.status(HTTP_STATUS.CREATED).json({
         message: SUCCESS_MESSAGES.COURSE_CREATED,
@@ -203,6 +207,15 @@ export class CourseController {
         message: SUCCESS_MESSAGES.COURSE_DELETED,
       });
     } catch (error: any) {
+      if (error instanceof CourseDeletionBlockedError) {
+        logger.warn(`Delete course ${req.params.courseId} refused: ${error.code}`);
+        return res.status(error.code === 'COURSE_HAS_LEARNERS' ? HTTP_STATUS.CONFLICT : HTTP_STATUS.SERVICE_UNAVAILABLE).json({
+          error: error.message,
+          code: error.code,
+          ...(error.learners !== undefined ? { learners: error.learners } : {}),
+        });
+      }
+
       logger.error('Delete course error:', error);
 
       if (error.message === ERROR_MESSAGES.COURSE_NOT_FOUND) {
@@ -431,9 +444,7 @@ export class CourseController {
       else if (sortBy === 'enrolledCount') orderBy.enrolledCount = 'desc';
       else orderBy.createdAt = 'desc';
 
-      const { PrismaClient } = require('@prisma/client');
-      const prisma = new PrismaClient();
-
+      // the service's shared client (was: a new PrismaClient per request); limit is bounded by validateRecommendationBatch
       const courses = await prisma.course.findMany({
         where,
         orderBy,
@@ -442,8 +453,6 @@ export class CourseController {
           category: true,
         },
       });
-
-      await prisma.$disconnect();
 
       res.status(HTTP_STATUS.OK).json({ data: courses });
     } catch (error: any) {

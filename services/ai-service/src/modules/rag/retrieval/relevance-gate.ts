@@ -13,7 +13,7 @@ import logger from '../../../utils/logger';
  *   Relevant queries:        0.585 – 0.883  (lowest observed: 0.585)
  *   Out-of-knowledge:        0.490 – 0.509  (highest observed: 0.509)
  *   Gap:                     0.076
- *   Selected threshold:      0.55  (midpoint of gap, safe margin both ways)
+ *   Selected threshold:      0.56  (inside the gap; the value used by the evaluation reports and RAG-P0 defaults)
  *
  * This module is the ONLY place where score threshold logic lives.
  * Threshold value comes from RAGConfig.retrievalScoreThreshold (env: RETRIEVAL_SCORE_THRESHOLD).

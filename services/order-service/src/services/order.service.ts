@@ -1,7 +1,10 @@
 import { PrismaClient, OrderStatus, PaymentStatus } from '@prisma/client';
+import { classifyConfirmationStatus } from '../utils/payment-status';
 import axios from 'axios';
 import { ERROR_MESSAGES } from '../utils/constants';
 import { PaymentClient } from './payment.client';
+import { readServiceToken, SERVICE_TOKEN_HEADER } from '../utils/service-token';
+import { LearningEnrollmentClient } from './learning.client';
 import logger from '../utils/logger';
 import crypto from 'crypto';
 
@@ -439,13 +442,19 @@ export class OrderService {
     };
   }
 
-  static async processPayment(orderId: string, paymentMethodId: string) {
+  static async processPayment(orderId: string, userId: string, paymentMethodId: string) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
     });
 
     if (!order) {
       throw new Error(ERROR_MESSAGES.ORDER_NOT_FOUND);
+    }
+
+    // Only the owner of the order may pay for it (FIX 07B-1.1): the payment-service trusts this service's internal confirm call,
+    // so the ownership check for that path happens here, before anything is sent. Same answers as initiatePayosPayment.
+    if (order.userId !== userId) {
+      throw new Error(ERROR_MESSAGES.FORBIDDEN);
     }
 
     if (!order.paymentId) {
@@ -455,13 +464,16 @@ export class OrderService {
     // Confirm payment with Stripe
     const payment = await PaymentClient.confirmPayment(order.paymentId, paymentMethodId);
 
-    if (payment.status === 'succeeded') {
-      await this.updatePaymentStatus(order.id, PaymentStatus.PAID);
-      await this.updateOrderStatus(order.id, OrderStatus.PROCESSING, order.userId, true);
-      return { success: true, payment };
+    // The answer is only REPORTED here (FIX 07B-1.2). The order is moved to PAID / COMPLETED and the courses granted by the payment
+    // webhook the payment-service sends while confirming (and by its outbox if that call fails) - the single writer of that
+    // transition, idempotent for a COMPLETED order. Writing it again here moved a COMPLETED order back to PROCESSING (and an order in
+    // PROCESSING makes the webhook see its own courses as "already purchased"). An unknown or missing status is never a success.
+    const status = classifyConfirmationStatus(payment?.status);
+    if (status === 'UNKNOWN') {
+      logger.warn(`Order ${order.id}: payment confirmation answered an unknown status ${JSON.stringify(payment?.status)}; order left unchanged`);
     }
 
-    return { success: false, payment };
+    return { success: status === 'SUCCEEDED', status, payment };
   }
 
   static async getOrderById(orderId: string, userId: string, isAdmin: boolean = false) {
@@ -634,8 +646,12 @@ export class OrderService {
       updateData.completedAt = new Date();
       updateData.paymentStatus = PaymentStatus.PAID;
 
+      // FIX-INS-04: the learning-service grants a course only after confirming with THIS service that the order is PAID
+      // (GET /api/orders/internal/:orderId/entitlement), so the admin's confirmation is stored before the enrollment request.
+      await prisma.order.update({ where: { id: orderId }, data: { paymentStatus: PaymentStatus.PAID } });
+
       // Enroll user (idempotent - learning service kiểm tra trùng)
-      await this.enrollUserInCourses(order.userId, (order.items as any) || []);
+      await this.enrollUserInCourses(order.userId, (order.items as any) || [], order.id);
 
       // Xóa chỉ các khóa thuộc đơn hàng này khỏi giỏ
       await this.removeOrderItemsFromCart(order.userId, (order.items as any) || []);
@@ -737,22 +753,12 @@ export class OrderService {
     }
   }
 
-  private static async enrollUserInCourses(userId: string, items: any[]) {
-    const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://learning-service:3006';
-    const internalToken = process.env.INTERNAL_SERVICE_TOKEN || '';
-
+  private static async enrollUserInCourses(userId: string, items: any[], orderId: string) {
     for (const item of items) {
-      try {
-        await axios.post(
-          `${learningServiceUrl}/api/learning/internal/courses/${item.courseId}/enroll`,
-          { userId },
-          { headers: { 'X-Internal-Service-Token': internalToken } }
-        );
-        logger.info(`User ${userId} enrolled in course ${item.courseId}`);
-      } catch (error) {
-        logger.error(`Failed to enroll user in course ${item.courseId}:`, error);
-        // TODO: Queue for retry/reconciliation
-      }
+      // ORDER_LEARNING_TOKEN + the order id the learning-service verifies against (FIX-INS-04); failures are logged by the client
+      const result = await LearningEnrollmentClient.enroll(item.courseId, userId, orderId);
+      if (result.ok) logger.info(`User ${userId} enrolled in course ${item.courseId}`);
+      // TODO: Queue for retry/reconciliation
     }
   }
 
@@ -760,11 +766,23 @@ export class OrderService {
    * Increment enrollment count trên course-service.
    */
   private static async incrementEnrollmentCount(courseId: string) {
+    // The course-service accepts this call only with the Order -> Course credential ORDER_COURSE_TOKEN (FIX-INS-03). Without a
+    // usable value nothing is sent (no fallback to INTERNAL_SERVICE_TOKEN, a default or ""); the enrollment itself is unaffected.
+    const token = readServiceToken('ORDER_COURSE_TOKEN');
+    if (!token.ok) {
+      logger.error(`Not incrementing enrollment for course ${courseId}: ${token.reason}`);
+      return;
+    }
     try {
       const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://localhost:3003';
-      await axios.post(`${courseServiceUrl}/api/courses/${courseId}/increment-enrollment`);
-    } catch (error) {
-      logger.error(`Failed to increment enrollment for course ${courseId}:`, error);
+      await axios.post(`${courseServiceUrl}/api/courses/${courseId}/increment-enrollment`, {}, {
+        timeout: 5000,
+        headers: { [SERVICE_TOKEN_HEADER]: token.value },
+      });
+    } catch (error: any) {
+      // never the error object itself: an axios error carries the request headers, i.e. the token
+      const status = error?.response?.status;
+      logger.error(`Failed to increment enrollment for course ${courseId}: ${status ? `HTTP ${status}` : String(error?.code || error?.message || 'unknown error').split(token.value).join('[redacted]')}`);
     }
   }
 
@@ -1011,22 +1029,18 @@ export class OrderService {
         }
 
         // Trường hợp 2: Có khóa học cần cấp quyền (Toàn bộ hoặc Một phần)
-        for (const item of coursesToFulfill) {
-          try {
-            const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:3006';
-            const internalToken = process.env.INTERNAL_SERVICE_TOKEN || '';
-            await axios.post(
-              `${learningServiceUrl}/api/learning/internal/courses/${item.courseId}/enroll`,
-              { userId: order.userId },
-              { headers: { 'X-Internal-Service-Token': internalToken } }
-            );
+        // FIX-INS-04: record the payment the payment-service just confirmed (this webhook is authenticated with ORDER_PAYMENT_TOKEN)
+        // BEFORE asking for the enrollments: the learning-service grants a course only after checking this order record
+        // (paymentStatus PAID, same learner, the course FULFILLED). The order status itself is finalised below, as before, so a
+        // retried webhook still sees its own courses as "to fulfill" and not as "already purchased".
+        await prisma.order.update({ where: { id: order.id }, data: { paymentStatus: PaymentStatus.PAID } });
 
-            // Increment enrollment count
-            await this.incrementEnrollmentCount(item.courseId);
-            logger.info(`Enrolled user ${order.userId} in course ${item.courseId}`);
-          } catch (error) {
-            logger.error(`Failed to enroll user in course ${item.courseId}:`, error);
-          }
+        for (const item of coursesToFulfill) {
+          const result = await LearningEnrollmentClient.enroll(item.courseId, order.userId, order.id);
+          if (!result.ok) continue; // logged by the client; the course is not granted on this run
+          // Increment enrollment count - only for an enrollment written NOW, so a retried webhook does not count a learner twice
+          if (result.created) await this.incrementEnrollmentCount(item.courseId);
+          logger.info(`Enrolled user ${order.userId} in course ${item.courseId}${result.created ? '' : ' (already enrolled)'}`);
         }
 
         // Xóa các khóa đã cấp quyền khỏi giỏ hàng
@@ -1102,6 +1116,30 @@ export class OrderService {
 
     logger.info(`Order ${orderId} updated: status=${newOrderStatus}, payment=${newPaymentStatus}`);
     return updatedOrder;
+  }
+
+  /**
+   * FIX-INS-04 - may `userId` be enrolled in `courseId` because of order `orderId`? Read-only; called by the learning-service
+   * (GET /api/orders/internal/:orderId/entitlement, ORDER_LEARNING_TOKEN) before it writes an enrollment for a paid course.
+   * Entitled only when, in THIS service's records: the order exists, belongs to the learner, its payment is confirmed
+   * (paymentStatus PAID - written only by the authenticated payment webhook or an ADMIN completing the order), and the course is
+   * an item of the order that was not set aside as an already-owned duplicate or refunded. Nothing from the caller but the three
+   * ids is consulted.
+   */
+  static async getEnrollmentEntitlement(orderId: string, userId: string, courseId: string): Promise<{ entitled: boolean; reason: string }> {
+    const order = await prisma.order.findUnique({ where: { id: orderId }, include: { orderItems: true } });
+    if (!order) return { entitled: false, reason: 'ORDER_NOT_FOUND' };
+    if (order.userId !== userId) return { entitled: false, reason: 'ORDER_OF_ANOTHER_USER' };
+    if (order.paymentStatus !== PaymentStatus.PAID) return { entitled: false, reason: 'PAYMENT_NOT_CONFIRMED' };
+
+    const relationItems = (order.orderItems || []) as any[];
+    const items: any[] = relationItems.length > 0 ? relationItems : (Array.isArray(order.items) ? (order.items as any[]) : []);
+    const item = items.find((i: any) => i && i.courseId === courseId);
+    if (!item) return { entitled: false, reason: 'COURSE_NOT_IN_ORDER' };
+    const itemStatus = item.status ?? item.fulfillmentStatus;
+    if (itemStatus === 'ALREADY_OWNED_DUPLICATE' || itemStatus === 'REFUNDED') return { entitled: false, reason: `ITEM_${itemStatus}` };
+
+    return { entitled: true, reason: 'PAID' };
   }
 
   /**

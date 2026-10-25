@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import {
   leaderboardService,
@@ -10,6 +10,13 @@ import {
   UserRewardPoints,
 } from '../services/leaderboard.service'
 import toast from 'react-hot-toast'
+import {
+  LeaderboardLoadError,
+  MyStatusCard,
+  RewardHistoryPanel,
+  ScoringPolicyContent,
+} from '../components/leaderboard/LeaderboardPanels'
+import { RewardColumnMode, RewardHistoryItem, readApiError, rewardColumnMode } from '../utils/leaderboard-view'
 
 const MONTH_NAMES = [
   '', 'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
@@ -39,7 +46,6 @@ export default function Leaderboard() {
   // Redemption modal state
   const [showRedeemModal, setShowRedeemModal] = useState(false)
   const [redeemCourseId, setRedeemCourseId] = useState('')
-  const [redeemPoints, setRedeemPoints] = useState(500)
   const [redeemRequestId, setRedeemRequestId] = useState('')
   const [isRedeeming, setIsRedeeming] = useState(false)
   const [redeemError, setRedeemError] = useState<string | null>(null)
@@ -50,7 +56,6 @@ export default function Leaderboard() {
     const newKey = `redeem_req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
     setRedeemRequestId(newKey)
     setRedeemCourseId('')
-    setRedeemPoints(500)
     setRedeemError(null)
     setRedeemSuccess(null)
     setCanRetrySameKey(false)
@@ -77,7 +82,7 @@ export default function Leaderboard() {
     setRedeemSuccess(null)
 
     try {
-      const res = await leaderboardService.redeemCourse(redeemCourseId.trim(), redeemPoints, currentKey)
+      const res = await leaderboardService.redeemCourse(redeemCourseId.trim(), currentKey)
       if (res.data?.status === 'ALREADY_COMPLETED' || res.data?.isIdempotentReplay) {
         setRedeemSuccess(`Khóa học đã được đổi thành công trước đó (Giao dịch cũ: ${res.data.transaction?.id}). Số dư ví: ${res.data.remainingBalance} điểm.`)
         toast.success('Giao dịch đã hoàn tất trước đó!')
@@ -117,51 +122,104 @@ export default function Leaderboard() {
     setCanRetrySameKey(false)
   }
 
-  const now = new Date()
-  const currentMonth = now.getMonth() + 1
-  const currentYear = now.getFullYear()
+  // The running period is the one the backend reports (Asia/Ho_Chi_Minh), never the browser clock
+  const [currentPeriod, setCurrentPeriod] = useState<{ month: number; year: number } | null>(null)
+  const [leaderboardError, setLeaderboardError] = useState<string | null>(null)
+  const leaderboardRequest = useRef(0)
 
-  const fetchLeaderboard = useCallback(async (month?: number, year?: number) => {
+  // The learner's own status (rank of the running period + wallet), loaded independently of the ranking table
+  const [rankError, setRankError] = useState<string | null>(null)
+  const [pointsError, setPointsError] = useState<string | null>(null)
+  const [statusLoading, setStatusLoading] = useState(false)
+
+  // Reward point history (loaded when the dialog is opened)
+  const [showHistory, setShowHistory] = useState(false)
+  const [historyItems, setHistoryItems] = useState<RewardHistoryItem[] | null>(null)
+  const [historySummary, setHistorySummary] = useState<{ balance: number | null; totalEarned: number | null; totalSpent: number | null } | null>(null)
+  const [historyPage, setHistoryPage] = useState<{ page: number; totalPages: number | null }>({ page: 0, totalPages: null })
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+
+  /** null = the running period (/current); otherwise a finalized month from the history list (/history) */
+  const fetchLeaderboard = useCallback(async (period: { month: number; year: number } | null) => {
+    const request = ++leaderboardRequest.current
     setLoading(true)
+    setLeaderboardError(null)
     try {
-      let data: LeaderboardData
-      if (!month || !year || (month === currentMonth && year === currentYear)) {
-        data = await leaderboardService.getCurrentLeaderboard()
-        setIsCurrentMonth(true)
-      } else {
-        data = await leaderboardService.getHistoryLeaderboard(month, year)
-        setIsCurrentMonth(false)
-      }
+      const data: LeaderboardData = period
+        ? await leaderboardService.getHistoryLeaderboard(period.month, period.year)
+        : await leaderboardService.getCurrentLeaderboard()
+      if (request !== leaderboardRequest.current) return
+      if (!period) setCurrentPeriod({ month: data.month, year: data.year })
+      setIsCurrentMonth(!period)
       setLeaderboard(data)
     } catch (err: any) {
-      toast.error('Không thể tải bảng xếp hạng')
+      if (request !== leaderboardRequest.current) return
+      setLeaderboard(null)
+      setLeaderboardError(readApiError(err, 'Không thể tải bảng xếp hạng. Vui lòng thử lại.'))
     } finally {
-      setLoading(false)
+      if (request === leaderboardRequest.current) setLoading(false)
     }
-  }, [currentMonth, currentYear])
+  }, [])
+
+  const loadMyStatus = useCallback(async () => {
+    setStatusLoading(true)
+    setRankError(null)
+    setPointsError(null)
+    await Promise.all([
+      leaderboardService.getMyRank().then(setMyRank).catch((err) => { setMyRank(null); setRankError(readApiError(err, 'Vui lòng thử lại.')) }),
+      leaderboardService.getMyRewardPoints().then(setMyPoints).catch((err) => { setMyPoints(null); setPointsError(readApiError(err, 'Vui lòng thử lại.')) }),
+    ])
+    setStatusLoading(false)
+  }, [])
+
+  const loadHistory = useCallback(async (page: number) => {
+    setHistoryLoading(true)
+    setHistoryError(null)
+    try {
+      const res = await leaderboardService.getRewardTransactions(page, 20)
+      setHistoryItems((prev) => (page === 1 || !prev ? res.transactions : [...prev, ...res.transactions]))
+      setHistorySummary({ balance: res.balance, totalEarned: res.totalEarned, totalSpent: res.totalSpent })
+      setHistoryPage({ page, totalPages: res.totalPages })
+    } catch (err: any) {
+      setHistoryError(readApiError(err, 'Vui lòng thử lại.'))
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [])
+
+  const openHistory = () => {
+    setShowHistory(true)
+    loadHistory(1)
+  }
 
   useEffect(() => {
-    fetchLeaderboard()
-
+    fetchLeaderboard(null)
     leaderboardService.getAvailableMonths().then(setAvailableMonths).catch(() => {})
+  }, [fetchLeaderboard])
 
-    if (isAuthenticated) {
-      leaderboardService.getMyRank().then(setMyRank).catch(() => {})
-      leaderboardService.getMyRewardPoints().then(setMyPoints).catch(() => {})
-    }
-  }, [fetchLeaderboard, isAuthenticated])
+  useEffect(() => {
+    if (isAuthenticated) loadMyStatus()
+  }, [isAuthenticated, loadMyStatus])
 
   const handleMonthChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const val = e.target.value
     if (val === 'current') {
       setSelectedMonth(null)
-      fetchLeaderboard()
+      fetchLeaderboard(null)
     } else {
       const [m, y] = val.split('-').map(Number)
       setSelectedMonth({ month: m, year: y })
-      fetchLeaderboard(m, y)
+      fetchLeaderboard({ month: m, year: y })
     }
   }
+
+  const retryLeaderboard = () => fetchLeaderboard(selectedMonth)
+  const rewardMode = rewardColumnMode(leaderboard?.status)
+  // A finalized month equal to the running one would otherwise be listed twice
+  const historyOptions = availableMonths.filter(
+    (m) => !(currentPeriod && m.month === currentPeriod.month && m.year === currentPeriod.year)
+  )
 
   const top3 = leaderboard?.entries.slice(0, 3) ?? []
 
@@ -171,7 +229,7 @@ export default function Leaderboard() {
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold mb-3 shadow-sm">
-            <span>✨ Chu kỳ xếp hạng tháng {selectedMonth ? `${selectedMonth.month}/${selectedMonth.year}` : `${currentMonth}/${currentYear}`}</span>
+            <span>✨ Chu kỳ xếp hạng {selectedMonth ? `tháng ${selectedMonth.month}/${selectedMonth.year}` : currentPeriod ? `tháng ${currentPeriod.month}/${currentPeriod.year}` : 'hiện tại'}</span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
             🏆 Bảng Xếp Hạng Học Viên
@@ -204,15 +262,15 @@ export default function Leaderboard() {
                        shadow-sm cursor-pointer transition-all"
           >
             <option value="current">
-              {MONTH_NAMES[currentMonth]} {currentYear} (Đang diễn ra)
+              {currentPeriod ? `${MONTH_NAMES[currentPeriod.month]} ${currentPeriod.year}` : 'Kỳ hiện tại'} (Đang diễn ra)
             </option>
-            {availableMonths.map((m) => (
+            {historyOptions.map((m) => (
               <option key={`${m.month}-${m.year}`} value={`${m.month}-${m.year}`}>
                 {MONTH_NAMES[m.month]} {m.year}
               </option>
             ))}
           </select>
-          {leaderboard?.status === 'FINALIZED' ? (
+          {!leaderboard ? null : leaderboard.status === 'FINALIZED' ? (
             <span className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-bold border border-emerald-200 shadow-sm">
               ✓ Đã chốt kết quả
             </span>
@@ -223,12 +281,43 @@ export default function Leaderboard() {
           )}
         </div>
 
+        {/* The learner's own status: shown whatever happens to the ranking table (wallet and rank have their own requests) */}
+        {isAuthenticated && (
+          <div className="mb-8">
+            <MyStatusCard
+              myRank={myRank}
+              rankError={rankError}
+              myPoints={myPoints}
+              pointsError={pointsError}
+              loading={statusLoading}
+              onRetry={loadMyStatus}
+              onRedeem={openRedeemModal}
+              onShowHistory={openHistory}
+              onShowBreakdown={() =>
+                myRank &&
+                setSelectedBreakdown({
+                  userName: 'Bạn',
+                  points: myRank.points,
+                  items: myRank.scoreBreakdown,
+                })
+              }
+            />
+          </div>
+        )}
+
         {/* Loading state */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600"></div>
           </div>
-        ) : leaderboard && leaderboard.entries.length === 0 ? (
+        ) : leaderboardError || !leaderboard ? (
+          /* Error state: a failed request is never shown as an empty ranking */
+          <LeaderboardLoadError
+            message={leaderboardError ?? 'Không thể tải bảng xếp hạng. Vui lòng thử lại.'}
+            onRetry={retryLeaderboard}
+            retrying={loading}
+          />
+        ) : leaderboard.entries.length === 0 ? (
           /* Empty state */
           <div className="text-center py-20 bg-white rounded-2xl border border-slate-100 p-8 shadow-sm">
             <div className="text-6xl mb-4">📭</div>
@@ -289,118 +378,55 @@ export default function Leaderboard() {
               </div>
             )}
 
-            {/* Current User Rank & Wallet Card */}
-            {isAuthenticated && myRank && (
-              <div className="mb-8">
-                <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 rounded-2xl p-5 sm:p-6 text-white shadow-xl shadow-emerald-200/50">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur border border-white/30 flex items-center justify-center text-xl font-black shadow-inner">
-                        {myRank.rank ? (myRank.isTie ? `=${myRank.rank}` : `#${myRank.rank}`) : '—'}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-base sm:text-lg">
-                            {myRank.rank ? `Thứ hạng của bạn: #${myRank.rank}` : 'Bạn chưa có thành tích kỳ này'}
-                          </p>
-                          {myRank.isTie && (
-                            <span className="text-[10px] uppercase font-bold bg-amber-400 text-slate-900 px-2 py-0.5 rounded-full">
-                              Đồng hạng
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-emerald-100 text-xs sm:text-sm mt-0.5">
-                          {myRank.totalParticipants} học viên đang có thành tích kỳ này
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-5 text-sm">
-                      <div className="text-center sm:text-right">
-                        <p className="text-2xl font-black text-amber-300">{myRank.points}</p>
-                        <p className="text-emerald-100 text-xs font-medium">Điểm thành tích</p>
-                      </div>
-                      <div className="text-center sm:text-right">
-                        <p className="text-2xl font-black">{myRank.completedCourses}</p>
-                        <p className="text-emerald-100 text-xs font-medium">Khóa học</p>
-                      </div>
-                      {myPoints && (
-                        <div className="text-center sm:text-right border-l border-white/20 pl-4">
-                          <p className="text-2xl font-black text-yellow-300">💎 {myPoints.balance}</p>
-                          <p className="text-emerald-100 text-xs font-medium">Ví điểm thưởng</p>
-                        </div>
-                      )}
-                      {myPoints && (
-                        <button
-                          onClick={openRedeemModal}
-                          className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 text-slate-900 rounded-xl text-xs font-extrabold shadow transition-all hover:scale-105 flex items-center gap-1.5"
-                        >
-                          <span>🎁</span> Đổi khóa học
-                        </button>
-                      )}
-                      {myRank.completedCourses > 0 && (
-                        <button
-                          onClick={() =>
-                            setSelectedBreakdown({
-                              userName: 'Bạn',
-                              points: myRank.points,
-                              items: myRank.scoreBreakdown,
-                            })
-                          }
-                          className="px-3.5 py-2 bg-white text-emerald-800 hover:bg-emerald-50 rounded-xl text-xs font-bold shadow transition-all hover:scale-105"
-                        >
-                          Xem chi tiết điểm
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Full Ranking Table */}
-            {leaderboard && leaderboard.entries.length > 0 && (
-              <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
-                <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                  <h2 className="font-bold text-slate-800 text-base sm:text-lg">
-                    Bảng xếp hạng chi tiết ({leaderboard.entries.length} học viên)
-                  </h2>
-                  <span className="text-xs text-slate-400">
-                    Sắp xếp: Điểm thành tích ↓ · Số khóa ↓ · Điểm quiz ↓
-                  </span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-slate-50/80 text-slate-500 text-xs uppercase tracking-wider">
-                        <th className="text-center px-4 py-3 font-semibold w-16">Hạng</th>
-                        <th className="text-left px-4 py-3 font-semibold">Học viên</th>
-                        <th className="text-center px-4 py-3 font-semibold">Điểm thành tích</th>
-                        <th className="text-center px-4 py-3 font-semibold">Khóa học</th>
-                        <th className="text-center px-4 py-3 font-semibold">Điểm Quiz TB</th>
-                        <th className="text-center px-4 py-3 font-semibold hidden sm:table-cell">Phần thưởng</th>
-                        <th className="text-center px-4 py-3 font-semibold w-24">Chi tiết</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {leaderboard.entries.map((entry) => (
-                        <RankRow
-                          key={entry.userId}
-                          entry={entry}
-                          onViewBreakdown={() =>
-                            setSelectedBreakdown({
-                              userName: entry.fullName,
-                              points: entry.points,
-                              items: entry.scoreBreakdown || [],
-                            })
-                          }
-                        />
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+            <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                <h2 className="font-bold text-slate-800 text-base sm:text-lg">
+                  Bảng xếp hạng chi tiết ({leaderboard.entries.length} học viên)
+                </h2>
+                <span className="text-xs text-slate-400">
+                  Sắp xếp: Điểm thành tích ↓ · Số khóa ↓ · Điểm quiz ↓ · Hoàn thành sớm hơn ↑
+                </span>
               </div>
-            )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50/80 text-slate-500 text-xs uppercase tracking-wider">
+                      <th className="text-center px-4 py-3 font-semibold w-16">Hạng</th>
+                      <th className="text-left px-4 py-3 font-semibold">Học viên</th>
+                      <th className="text-center px-4 py-3 font-semibold">Điểm thành tích</th>
+                      <th className="text-center px-4 py-3 font-semibold">Khóa học</th>
+                      <th className="text-center px-4 py-3 font-semibold">Điểm Quiz TB</th>
+                      <th className="text-center px-4 py-3 font-semibold hidden sm:table-cell">
+                        {rewardMode === 'AWARDED' ? 'Thưởng đã trao' : 'Thưởng dự kiến'}
+                      </th>
+                      <th className="text-center px-4 py-3 font-semibold w-24">Chi tiết</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50">
+                    {leaderboard.entries.map((entry) => (
+                      <RankRow
+                        key={entry.userId}
+                        entry={entry}
+                        rewardMode={rewardMode}
+                        onViewBreakdown={() =>
+                          setSelectedBreakdown({
+                            userName: entry.fullName,
+                            points: entry.points,
+                            items: entry.scoreBreakdown || [],
+                          })
+                        }
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="px-5 py-3 border-t border-slate-100 text-xs text-slate-500">
+                {rewardMode === 'AWARDED'
+                  ? 'Kỳ đã chốt: phần thưởng đã được ghi nhận vào ví học viên khi chốt kỳ.'
+                  : 'Kỳ đang diễn ra: phần thưởng là mức dự kiến theo thứ hạng hiện tại, chỉ được cộng vào ví sau khi kỳ được chốt.'}
+              </p>
+            </div>
           </>
         )}
 
@@ -497,82 +523,8 @@ export default function Leaderboard() {
                 </button>
               </div>
 
-              <div className="p-6 overflow-y-auto space-y-6 text-sm text-slate-600">
-                <div>
-                  <h4 className="font-bold text-slate-900 text-base mb-2">1. Điểm cơ sở theo thời lượng khóa học</h4>
-                  <p className="text-xs text-slate-500 mb-3">Tính bằng tổng thời lượng các bài học hợp lệ trong khóa:</p>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
-                    <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 text-center">
-                      <p className="text-slate-500">Dưới 30 phút</p>
-                      <p className="text-base font-bold text-emerald-600">2 điểm</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 text-center">
-                      <p className="text-slate-500">30p đến dưới 2h</p>
-                      <p className="text-base font-bold text-emerald-600">5 điểm</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 text-center">
-                      <p className="text-slate-500">2h đến dưới 5h</p>
-                      <p className="text-base font-bold text-emerald-600">10 điểm</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 text-center">
-                      <p className="text-slate-500">5h đến dưới 10h</p>
-                      <p className="text-base font-bold text-emerald-600">20 điểm</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 text-center">
-                      <p className="text-slate-500">10h đến dưới 20h</p>
-                      <p className="text-base font-bold text-emerald-600">30 điểm</p>
-                    </div>
-                    <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50 text-center">
-                      <p className="text-slate-500">Từ 20h trở lên</p>
-                      <p className="text-base font-bold text-emerald-600">40 điểm</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-slate-900 text-base mb-2">2. Hệ số cấp độ khóa học (Level Multiplier)</h4>
-                  <p className="text-xs text-slate-500 mb-2">
-                    <code>Điểm khóa học = Điểm cơ sở × Hệ số cấp độ</code>
-                  </p>
-                  <ul className="list-disc pl-5 space-y-1 text-xs">
-                    <li><strong className="text-slate-800">Cơ bản (BEGINNER):</strong> Hệ số 1.0</li>
-                    <li><strong className="text-slate-800">Trung cấp (INTERMEDIATE):</strong> Hệ số 1.1</li>
-                    <li><strong className="text-slate-800">Nâng cao (ADVANCED):</strong> Hệ số 1.2</li>
-                  </ul>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-slate-900 text-base mb-2">3. Tiêu chí phân định thứ hạng</h4>
-                  <ol className="list-decimal pl-5 space-y-1.5 text-xs">
-                    <li><strong>Tổng điểm thành tích tháng:</strong> Giảm dần (tiêu chí ưu tiên số 1).</li>
-                    <li><strong>Số khóa học hoàn thành:</strong> Giảm dần nếu bằng điểm.</li>
-                    <li><strong>Điểm Quiz trung bình:</strong> Giảm dần đối với các khóa có bài thi (không tính khóa không có quiz).</li>
-                    <li><strong>Thời gian hoàn thành:</strong> Người hoàn thành khóa cuối sớm hơn xếp trên.</li>
-                    <li><strong>Đồng hạng:</strong> Nếu cả 4 tiêu chí bằng nhau, áp dụng chia sẻ thứ hạng và cùng nhận phần thưởng đầy đủ.</li>
-                  </ol>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-slate-900 text-base mb-2">4. Cơ cấu phần thưởng tháng</h4>
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-50 border border-amber-200">
-                      <span className="font-bold text-amber-900">🥇 Hạng 1: Nhà vô địch tháng</span>
-                      <span className="font-extrabold text-amber-700">+1.000 điểm thưởng + Huy hiệu vàng</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100 border border-slate-200">
-                      <span className="font-bold text-slate-800">🥈 Hạng 2: Á quân tháng</span>
-                      <span className="font-extrabold text-slate-700">+700 điểm thưởng + Huy hiệu bạc</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-orange-50 border border-orange-200">
-                      <span className="font-bold text-orange-900">🥉 Hạng 3: Top 3 tháng</span>
-                      <span className="font-extrabold text-orange-700">+500 điểm thưởng + Huy hiệu đồng</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50 border border-emerald-200">
-                      <span className="font-bold text-emerald-900">🎖️ Hạng 4 - 10: Top 10 tháng</span>
-                      <span className="font-extrabold text-emerald-700">+200 điểm thưởng/người + Huy hiệu Top 10</span>
-                    </div>
-                  </div>
-                </div>
+              <div className="p-6 overflow-y-auto">
+                <ScoringPolicyContent serverPolicyVersion={leaderboard?.policyVersion} />
               </div>
 
               <div className="p-4 border-t border-slate-100 bg-slate-50/50 flex justify-end">
@@ -582,6 +534,34 @@ export default function Leaderboard() {
                 >
                   Đã hiểu
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Reward point history */}
+        {showHistory && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+            <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl border border-slate-100 overflow-hidden">
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                <h3 className="font-extrabold text-slate-900 text-lg">💎 Lịch sử điểm thưởng</h3>
+                <button
+                  onClick={() => setShowHistory(false)}
+                  className="w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 text-slate-600 flex items-center justify-center text-sm font-bold transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-5 overflow-y-auto">
+                <RewardHistoryPanel
+                  items={historyItems}
+                  summary={historySummary}
+                  loading={historyLoading}
+                  error={historyError}
+                  canLoadMore={historyPage.totalPages !== null && historyPage.page < historyPage.totalPages}
+                  onRetry={() => loadHistory(historyItems === null ? 1 : historyPage.page + 1)}
+                  onLoadMore={() => loadHistory(historyPage.page + 1)}
+                />
               </div>
             </div>
           </div>
@@ -629,7 +609,7 @@ export default function Leaderboard() {
 
                 <div className="flex items-center justify-between text-xs p-3 bg-slate-50 rounded-xl border border-slate-100">
                   <span className="text-slate-500 font-medium">Chi phí đổi:</span>
-                  <span className="font-black text-amber-600 text-sm">{redeemPoints} điểm thưởng</span>
+                  <span className="font-black text-amber-600 text-sm">{myPoints?.courseRedemptionPoints ?? '---'} điểm thưởng</span>
                 </div>
 
                 {/* Idempotency Key Status Display */}
@@ -795,9 +775,11 @@ function PodiumCard({
 
 function RankRow({
   entry,
+  rewardMode,
   onViewBreakdown,
 }: {
   entry: LeaderboardEntry;
+  rewardMode: RewardColumnMode;
   onViewBreakdown: () => void;
 }) {
   const isTop3 = entry.rank <= 3
@@ -850,9 +832,18 @@ function RankRow({
       </td>
       <td className="text-center px-4 py-3.5 hidden sm:table-cell">
         {entry.rewardPoints && entry.rewardPoints > 0 ? (
-          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 text-amber-800 rounded-full text-xs font-bold border border-amber-200">
-            +{entry.rewardPoints} điểm
-          </span>
+          rewardMode === 'AWARDED' ? (
+            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-amber-50 text-amber-800 rounded-full text-xs font-bold border border-amber-200">
+              +{entry.rewardPoints} điểm
+            </span>
+          ) : (
+            <span
+              className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-white text-slate-500 rounded-full text-xs font-semibold border border-dashed border-slate-300"
+              title="Dự kiến theo thứ hạng hiện tại; chỉ cộng vào ví sau khi chốt kỳ"
+            >
+              ~{entry.rewardPoints} điểm
+            </span>
+          )
         ) : (
           <span className="text-slate-300 text-xs">—</span>
         )}

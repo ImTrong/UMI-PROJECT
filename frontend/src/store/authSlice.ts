@@ -122,7 +122,20 @@ const authSlice = createSlice({
       })
       .addCase(logout.rejected, () => {
         toast.success('Logged out');
-      });
+      })
+      // IMPLEMENT-01: the role stored at login can become stale (an ADMIN approves an instructor application, or changes a role).
+      // App.tsx fetches the profile on every load (user/fetchProfile); the server's role then replaces the stored one.
+      // Matched by type to avoid importing userSlice here.
+      .addMatcher(
+        (action): action is PayloadAction<{ role?: string }> => action.type === 'user/fetchProfile/fulfilled',
+        (state, action) => {
+          const role = action.payload?.role;
+          if (state.user && (role === 'STUDENT' || role === 'INSTRUCTOR' || role === 'ADMIN') && (state.user as any).role !== role) {
+            state.user = { ...state.user, role } as any;
+            localStorage.setItem('user', JSON.stringify(state.user));
+          }
+        }
+      );
   },
 });
 

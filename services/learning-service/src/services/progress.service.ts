@@ -3,6 +3,7 @@ import axios, { AxiosResponse } from 'axios';
 import { ERROR_MESSAGES, HTTP_STATUS } from '../utils/constants';
 import { ActivityService } from './activity.service';
 import { BadgeService } from './badge.service';
+import { UserNotificationClient } from './user-notification.client';
 import { ActivityAction, CourseDetails, LessonDetails } from '../types';
 import logger from '../utils/logger';
 import {
@@ -11,6 +12,7 @@ import {
   CourseAccessService,
   isVerifiedFreeCourse,
 } from './course-access.service';
+import { courseInternalHeaders } from './course-internal.client';
 
 const prisma = new PrismaClient();
 
@@ -26,7 +28,8 @@ export class ProgressService {
     const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://localhost:3003';
     try {
       const lessonsResponse: AxiosResponse<{ data: LessonDetails[] }> = await axios.get(
-        `${courseServiceUrl}/api/courses/internal/${courseId}/lessons`
+        `${courseServiceUrl}/api/courses/internal/${courseId}/lessons`,
+        { headers: courseInternalHeaders() }
       );
       return lessonsResponse.data.data.length;
     } catch {
@@ -455,12 +458,11 @@ export class ProgressService {
 
     // Send real-time course completion notification
     try {
-      const userServiceUrl = process.env.USER_SERVICE_URL || 'http://localhost:3002';
       if (isPassed) {
         const scoreText = latestProgress?.averageQuizScore != null
           ? ` với điểm ${latestProgress.averageQuizScore.toFixed(1)}%`
           : '';
-        await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+        await UserNotificationClient.send({
           userId,
           title: '🎉 Khóa học hoàn thành!',
           message: `Chúc mừng bạn đã hoàn thành xuất sắc khóa học "${courseTitle}"${scoreText}. Bạn có thể nhận chứng nhận ngay!`,
@@ -468,7 +470,7 @@ export class ProgressService {
           link: `/course-exam/${courseId}`,
         });
       } else {
-        await axios.post(`${userServiceUrl}/api/users/internal/notifications`, {
+        await UserNotificationClient.send({
           userId,
           title: '📝 Khóa học hoàn thành - Chưa đạt điểm',
           message: `Bạn đã hoàn thành khóa học "${courseTitle}" nhưng điểm trung bình quiz (${latestProgress?.averageQuizScore?.toFixed(1)}%) chưa đạt ngưỡng. Bạn có thể học lại miễn phí!`,

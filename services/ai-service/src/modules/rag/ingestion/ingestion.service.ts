@@ -7,13 +7,24 @@ import { IEmbeddingService, IVectorStore, EmbeddedChunk, SourceType, DocumentMet
 import { RAGConfig } from '../rag.config';
 import logger from '../../../utils/logger';
 
-const prisma = new PrismaClient();
+/** The KnowledgeDocument / DocumentChunk operations this service uses (the Prisma client in production). */
+export type IngestionStore = Pick<PrismaClient, 'knowledgeDocument' | 'documentChunk'>;
+
+/**
+ * RAG-PDF-01: a part of a document with its own location (PDF page, DOCX paragraph range). Each segment is cleaned and
+ * chunked on its own, and its metadata is added to every chunk it produces.
+ */
+export interface IngestSegment {
+  text: string;
+  metadata: Record<string, unknown>;
+}
 
 /**
  * IngestionService — orchestrates the full ingestion pipeline.
  *
  * Flow:
  *   Content → Clean → Chunk → Embed → Validate → Store in Qdrant → Persist in MongoDB
+ *   (with segments: each segment → Clean → Chunk, chunk indexes numbered across the whole document)
  *
  * Safety guarantees:
  * 1. Idempotency via contentHash — same content = no-op
@@ -26,16 +37,19 @@ export class IngestionService {
   private chunker: RecursiveChunker;
   private embeddingService: IEmbeddingService;
   private vectorStore: IVectorStore;
+  private db: IngestionStore;
 
   constructor(
     config: RAGConfig,
     embeddingService: IEmbeddingService,
     vectorStore: IVectorStore,
+    db?: IngestionStore,
   ) {
     this.loader = new DocumentLoader(config);
     this.chunker = new RecursiveChunker(config.chunkSize, config.chunkOverlap);
     this.embeddingService = embeddingService;
     this.vectorStore = vectorStore;
+    this.db = db ?? new PrismaClient();
   }
 
   /**
@@ -49,14 +63,23 @@ export class IngestionService {
     providedContent?: string,
     providedTitle?: string,
     metadata?: DocumentMetadata,
+    segments?: IngestSegment[],
   ): Promise<any> {
     logger.info(`[Ingestion] Starting ingestion: sourceType=${sourceType}, sourceId=${sourceId}`);
+
+    // RAG-PDF-01: cleaned segments (empty ones dropped) - the document content is their concatenation
+    const cleanedSegments = segments
+      ?.map((s) => ({ text: DocumentCleaner.clean(s.text), metadata: s.metadata }))
+      .filter((s) => s.text.trim().length > 0);
+    if (segments && (!cleanedSegments || cleanedSegments.length === 0)) {
+      throw new Error('Document content is empty after cleaning');
+    }
 
     // 1. Load content
     const rawDoc = await this.loader.load(
       sourceType,
       sourceId,
-      providedContent,
+      cleanedSegments ? cleanedSegments.map((s) => s.text).join('\n\n') : providedContent,
       providedTitle,
       metadata,
     );
@@ -67,14 +90,14 @@ export class IngestionService {
       throw new Error('Document content is empty after cleaning');
     }
 
-    // 3. Compute content hash for idempotency
+    // 3. Compute content hash for idempotency (with segments: their locations too, so a page change is a new version)
     const contentHash = crypto
       .createHash('sha256')
-      .update(cleanedContent)
+      .update(cleanedSegments ? JSON.stringify(cleanedSegments.map((s) => [s.text, s.metadata])) : cleanedContent)
       .digest('hex');
 
     // 4. Check for existing document with same source
-    const existing = await prisma.knowledgeDocument.findFirst({
+    const existing = await this.db.knowledgeDocument.findFirst({
       where: {
         sourceType,
         sourceId,
@@ -93,7 +116,7 @@ export class IngestionService {
     const newVersion = existing ? existing.version + 1 : 1;
 
     // 6. Create new KnowledgeDocument in INDEXING status
-    const doc = await prisma.knowledgeDocument.create({
+    const doc = await this.db.knowledgeDocument.create({
       data: {
         sourceType,
         sourceId,
@@ -110,15 +133,19 @@ export class IngestionService {
     logger.info(`[Ingestion] Created document: id=${doc.id}, version=${newVersion}`);
 
     try {
-      // 7. Chunk
-      const chunks = this.chunker.chunk(
-        cleanedContent,
-        doc.id,
-        rawDoc.title,
-        sourceType,
-        newVersion,
-        rawDoc.metadata,
-      );
+      // 7. Chunk (per segment when the document has segments; chunk indexes numbered across the document)
+      const chunks = cleanedSegments
+        ? cleanedSegments
+          .flatMap((s) => this.chunker.chunk(s.text, doc.id, rawDoc.title, sourceType, newVersion, { ...rawDoc.metadata, ...s.metadata }))
+          .map((chunk, i) => ({ ...chunk, chunkIndex: i }))
+        : this.chunker.chunk(
+          cleanedContent,
+          doc.id,
+          rawDoc.title,
+          sourceType,
+          newVersion,
+          rawDoc.metadata,
+        );
 
       if (chunks.length === 0) {
         throw new Error('Chunking produced 0 chunks');
@@ -154,7 +181,7 @@ export class IngestionService {
       // 12. Persist chunks in MongoDB
       await Promise.all(
         chunks.map((chunk, i) =>
-          prisma.documentChunk.create({
+          this.db.documentChunk.create({
             data: {
               documentId: doc.id,
               chunkIndex: chunk.chunkIndex,
@@ -167,7 +194,7 @@ export class IngestionService {
       );
 
       // 13. Update document status to ACTIVE
-      await prisma.knowledgeDocument.update({
+      await this.db.knowledgeDocument.update({
         where: { id: doc.id },
         data: {
           status: 'ACTIVE',
@@ -182,9 +209,9 @@ export class IngestionService {
         // Delete old vectors from Qdrant
         await this.vectorStore.deleteByDocument(existing.id);
         // Delete old chunks from MongoDB
-        await prisma.documentChunk.deleteMany({ where: { documentId: existing.id } });
+        await this.db.documentChunk.deleteMany({ where: { documentId: existing.id } });
         // Archive old document
-        await prisma.knowledgeDocument.update({
+        await this.db.knowledgeDocument.update({
           where: { id: existing.id },
           data: { status: 'ARCHIVED' },
         });
@@ -195,12 +222,12 @@ export class IngestionService {
         `[Ingestion] Successfully indexed: docId=${doc.id}, chunks=${chunks.length}, version=${newVersion}`,
       );
 
-      return await prisma.knowledgeDocument.findUnique({ where: { id: doc.id } });
+      return await this.db.knowledgeDocument.findUnique({ where: { id: doc.id } });
     } catch (error: any) {
       // Safe failure: mark new doc as ERROR, old ACTIVE data remains untouched
       logger.error(`[Ingestion] Failed for docId=${doc.id}: ${error.message}`);
 
-      await prisma.knowledgeDocument.update({
+      await this.db.knowledgeDocument.update({
         where: { id: doc.id },
         data: {
           status: 'ERROR',
@@ -215,7 +242,7 @@ export class IngestionService {
 
       // Clean up any partial MongoDB chunks
       try {
-        await prisma.documentChunk.deleteMany({ where: { documentId: doc.id } });
+        await this.db.documentChunk.deleteMany({ where: { documentId: doc.id } });
       } catch { /* best effort cleanup */ }
 
       throw error;
@@ -232,10 +259,10 @@ export class IngestionService {
     await this.vectorStore.deleteByDocument(documentId);
 
     // Delete chunks from MongoDB
-    await prisma.documentChunk.deleteMany({ where: { documentId } });
+    await this.db.documentChunk.deleteMany({ where: { documentId } });
 
     // Delete document from MongoDB
-    await prisma.knowledgeDocument.delete({ where: { id: documentId } });
+    await this.db.knowledgeDocument.delete({ where: { id: documentId } });
 
     logger.info(`[Ingestion] Deleted document ${documentId} (MongoDB + Qdrant)`);
   }

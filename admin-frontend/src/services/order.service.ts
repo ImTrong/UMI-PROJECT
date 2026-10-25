@@ -95,6 +95,60 @@ export interface CreateOrderResponse {
   } | null;
 }
 
+/** GET /api/orders/analytics/sales-performance (ADMIN): sales counted only from orders with a confirmed successful payment. */
+export interface CourseSalesRow {
+  rank: number;
+  courseId: string;
+  courseTitle: string;
+  instructorId: string | null;
+  instructorName: string | null;
+  salesCount: number;
+  salesAmount: number;
+  /** null = unknown or no review yet; see ratingCount (null = unknown, 0 = no review) */
+  rating: number | null;
+  ratingCount: number | null;
+  ratingReliable: boolean;
+}
+
+export interface InstructorSalesRow {
+  rank: number;
+  instructorId: string;
+  instructorName: string | null;
+  soldCourseCount: number;
+  salesCount: number;
+  salesAmount: number;
+  rating: number | null;
+  ratingCount: number | null;
+  ratingReliable: boolean;
+}
+
+export interface SalesPerformance {
+  kpis: {
+    paidOrderAmount: number;
+    paidOrderCount: number;
+    soldCourseLineCount: number;
+    distinctSoldCourseCount: number;
+  };
+  topCourses: CourseSalesRow[];
+  topInstructors: InstructorSalesRow[];
+  totalCoursesWithSales: number;
+  totalInstructorsWithSales: number;
+  dataQuality: {
+    ordersExamined: number;
+    ordersWithoutPaymentEvidence: number;
+    ordersPaymentNotRecordedByOrder: number;
+    fullyRefundedOrders: { count: number; amount: number };
+    partiallyRefundedOrders: { count: number; refundedAmount: number };
+    duplicateLines: { count: number; amount: number };
+    refundedLines: { count: number; amount: number };
+    unclassifiedLines: { count: number; amount: number };
+    soldLinesWithoutInstructor: number;
+    courseInfoAvailable: boolean;
+    instructorInfoAvailable: boolean;
+    minReliableReviews: number;
+  };
+}
+
 export const orderService = {
   // Cart
   async getCart(): Promise<Cart> {
@@ -197,6 +251,11 @@ export const orderService = {
 
   async getAnalytics(): Promise<any> {
     const response = await orderApi.get('/api/orders/analytics');
+    return response.data.data;
+  },
+
+  async getSalesPerformance(): Promise<SalesPerformance> {
+    const response = await orderApi.get('/api/orders/analytics/sales-performance');
     return response.data.data;
   },
 };

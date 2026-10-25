@@ -5,7 +5,7 @@ import rateLimit from 'express-rate-limit';
 import { OrderController } from './controllers/order.controller';
 import { CartController } from './controllers/cart.controller';
 import { authenticateToken, requireRole } from './middleware/auth.middleware';
-import { verifyInternalService } from './middleware/internal-auth.middleware';
+import { requireServiceToken } from './middleware/service-token.middleware';
 import {
   validateAddToCart,
   validateCreateOrder,
@@ -42,7 +42,9 @@ const limiter = rateLimit({
   message: { error: 'Too many requests, please try again later.' },
   skip: (req) => {
     const path = req.originalUrl || req.path;
-    return path.includes('/health');
+    // service-to-service entitlement checks (FIX-INS-04) come from ONE learning-service IP and are token-protected; limiting them
+    // per IP would refuse enrollments during a burst of purchases (same rule as the other services' /internal routes)
+    return path.includes('/health') || path.startsWith('/api/orders/internal/');
   }
 });
 app.use('/api/orders', limiter);
@@ -102,11 +104,23 @@ app.get(
   OrderController.getUserOrders
 );
 
-// Internal webhook endpoint (service-to-service, requires internal token)
+// Internal webhook endpoint, called ONLY by the payment-service (notifyOrderService + its outbox job). It accepts only the
+// Order <-> Payment credential ORDER_PAYMENT_TOKEN (FIX 07B-2A) - never INTERNAL_SERVICE_TOKEN or a public default; fail-closed.
 app.post(
   '/api/orders/webhook/payment',
-  verifyInternalService,
+  requireServiceToken('ORDER_PAYMENT_TOKEN'),
   OrderController.handlePaymentWebhook
+);
+
+// Internal, READ-ONLY (FIX-INS-04): the learning-service asks whether an order entitles a learner to a course before it writes
+// the enrollment. It accepts only the Order <-> Learning credential ORDER_LEARNING_TOKEN - never INTERNAL_SERVICE_TOKEN or a
+// default; fail-closed. It answers yes/no from this service's records and can neither enroll nor change an order.
+app.get(
+  '/api/orders/internal/:orderId/entitlement',
+  requireServiceToken('ORDER_LEARNING_TOKEN'),
+  validateOrderId,
+  handleValidationErrors,
+  OrderController.getEnrollmentEntitlement
 );
 
 app.get(
@@ -187,6 +201,13 @@ app.get(
   authenticateToken,
   requireRole(['ADMIN']),
   OrderController.getAnalytics
+);
+
+app.get(
+  '/api/orders/analytics/sales-performance',
+  authenticateToken,
+  requireRole(['ADMIN']),
+  OrderController.getSalesPerformance
 );
 
 app.get(

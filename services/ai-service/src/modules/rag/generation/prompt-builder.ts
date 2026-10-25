@@ -7,20 +7,21 @@ import logger from '../../../utils/logger';
  *
  * Input:
  *   - question: user's current message
- *   - groundedContext: retrieved chunks from Qdrant
+ *   - groundedContext: retrieved chunks that passed the RelevanceGate
  *   - conversationHistory: previous messages in the conversation
  *   - learnerSummary: minimal relevant learner context (name, current courses)
  *
  * Output:
- *   - A system prompt with embedded knowledge context
+ *   - A system prompt with the numbered sources embedded ([Nguồn 1], [Nguồn 2], ...)
  *   - Conversation history (unchanged)
  *   - The user's question (unchanged)
+ *   - usedChunks: EXACTLY the chunks embedded in the prompt, in source order — the only valid citations
  *
- * Design principles:
- *   1. Retrieved UMI content is the PRIMARY knowledge source
- *   2. If no context retrieved → model must say "không đủ thông tin"
- *   3. Only include minimal learner context (name, course enrollment) — NOT full data dump
- *   4. LLM should NOT pretend it has read the entire UMI knowledge base
+ * Design principles (RAG-P0):
+ *   1. The retrieved UMI course content is the ONLY knowledge source of the answer
+ *   2. Not enough information in the sources -> the fixed "not found" sentence, no general knowledge
+ *   3. Only minimal learner context (name, course enrollment) — NOT a full data dump
+ *   4. The generation layer never calls the LLM without sources (see RAGGenerationService)
  */
 
 export interface RAGPromptInput {
@@ -31,11 +32,19 @@ export interface RAGPromptInput {
   learnerSummary?: string; // Minimal learner context (e.g., courses enrolled)
 }
 
+export type PromptChunk = GroundedContext['chunks'][number];
+
 export interface RAGPromptOutput {
   systemPrompt: string;
   history: ChatMessage[];
   userMessage: string;
+  usedChunks: PromptChunk[];
 }
+
+/** The answer when the course documents do not contain the information (also returned without any LLM call). */
+export const NOT_FOUND_IN_COURSE_MESSAGE =
+  'Mình chưa tìm thấy thông tin liên quan trong tài liệu của khóa học này để trả lời câu hỏi của bạn. ' +
+  'Bạn có thể diễn đạt lại câu hỏi, hỏi về một nội dung khác của khóa học hoặc liên hệ giảng viên.';
 
 /**
  * Build a structured prompt that grounds the LLM response
@@ -44,17 +53,19 @@ export interface RAGPromptOutput {
 export function buildRAGPrompt(input: RAGPromptInput): RAGPromptOutput {
   const { question, groundedContext, conversationHistory, learnerName, learnerSummary } = input;
 
+  const usedChunks: PromptChunk[] = [...groundedContext.chunks];
+
   // Build knowledge context section from retrieved chunks
   let knowledgeSection: string;
 
-  if (groundedContext.chunks.length > 0) {
-    const chunkTexts = groundedContext.chunks.map((chunk, i) => {
-      const source = chunk.title || 'Unknown Source';
-      return `--- Nguồn ${i + 1}: ${source} (score: ${chunk.score}) ---\n${chunk.content}`;
+  if (usedChunks.length > 0) {
+    const chunkTexts = usedChunks.map((chunk, i) => {
+      const source = chunk.title || 'Tài liệu khóa học';
+      return `--- [Nguồn ${i + 1}] ${source} ---\n${chunk.content}`;
     });
     knowledgeSection = chunkTexts.join('\n\n');
   } else {
-    knowledgeSection = '(Không tìm thấy kiến thức liên quan trong cơ sở dữ liệu UMI)';
+    knowledgeSection = '(Không có tài liệu khóa học nào liên quan)';
   }
 
   // Build minimal learner context
@@ -73,29 +84,29 @@ export function buildRAGPrompt(input: RAGPromptInput): RAGPromptOutput {
   const systemPrompt = `Bạn là AI Learning Coach của nền tảng E-Learning UMI.
 
 ## Vai trò
-Bạn là trợ lý học tập thông minh. Bạn trả lời câu hỏi dựa trên **kiến thức được truy xuất từ cơ sở dữ liệu UMI** bên dưới.
+Bạn trả lời câu hỏi của học viên **chỉ dựa trên tài liệu của khóa học** được cung cấp bên dưới.
 ${learnerSection}
-## Kiến thức UMI được truy xuất
+## Tài liệu khóa học được truy xuất
 ${knowledgeSection}
 
 ## Quy tắc bắt buộc
-1. **Trả lời dựa trên kiến thức được truy xuất**: Chỉ sử dụng nội dung trong phần "Kiến thức UMI được truy xuất" để trả lời. Đây là nguồn kiến thức chính.
-2. **Không bịa thông tin UMI**: Nếu kiến thức truy xuất không đủ để trả lời, hãy nói rõ: "Dựa trên kiến thức hiện có trong UMI, tôi không tìm thấy đủ thông tin để trả lời câu hỏi này."
-3. **Kiến thức chung**: Bạn có thể bổ sung kiến thức lập trình chung NHƯNG phải ghi rõ phần nào từ UMI, phần nào là kiến thức chung.
-4. **Ngôn ngữ**: Trả lời bằng tiếng Việt (trừ thuật ngữ chuyên ngành và code).
-5. **Format**: Sử dụng Markdown (headings, bold, lists, code blocks).
-6. **Ngắn gọn, chính xác**: Đủ chi tiết nhưng không lan man.
-7. **Trích dẫn nguồn**: Khi dùng thông tin từ kiến thức UMI, ghi rõ nguồn (ví dụ: "Theo bài học X...").`;
+1. **Chỉ dùng tài liệu khóa học**: Mọi thông tin trong câu trả lời phải có trong phần "Tài liệu khóa học được truy xuất". Không dùng kiến thức bên ngoài, không suy đoán, không bịa thêm chi tiết.
+2. **Khi tài liệu không đủ**: Nếu tài liệu không chứa thông tin để trả lời, chỉ trả lời đúng câu sau và không thêm gì khác: "${NOT_FOUND_IN_COURSE_MESSAGE}"
+3. **Trích dẫn nguồn**: Ghi rõ nguồn cho từng ý theo dạng [Nguồn 1], [Nguồn 2] tương ứng với các nguồn ở trên. Chỉ trích dẫn những nguồn có trong danh sách.
+4. **Không mạo danh nguồn**: Không trình bày kiến thức chung như thể lấy từ tài liệu UMI.
+5. **Ngôn ngữ**: Trả lời bằng tiếng Việt (trừ thuật ngữ chuyên ngành và code).
+6. **Format**: Sử dụng Markdown (headings, bold, lists, code blocks).
+7. **Ngắn gọn, chính xác**: Đủ chi tiết nhưng không lan man.`;
 
   logger.info(
-    `[RAGPrompt] Built prompt: ${groundedContext.chunks.length} knowledge chunks, ` +
-    `${conversationHistory.length} history messages` +
-    (learnerName ? `, learner: ${learnerName}` : ''),
+    `[RAGPrompt] Built prompt: ${usedChunks.length} knowledge chunks, ` +
+    `${conversationHistory.length} history messages`,
   );
 
   return {
     systemPrompt,
     history: conversationHistory,
     userMessage: question,
+    usedChunks,
   };
 }

@@ -1,23 +1,34 @@
 import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
-import { FinalProjectService } from '../services/final-project.service';
+import { FinalProjectService, pickFinalProjectFields, FINAL_PROJECT_MOVE_REFUSED, FinalProjectUploadError } from '../services/final-project.service';
+import { SubmissionAccessService, SubmissionAccessError } from '../services/submission-access.service';
 import { SkillProfileService } from '../services/skill-profile.service';
+import { PathAccessService, PATH_NOT_FOUND } from '../services/path-access.service';
 import { HTTP_STATUS, ERROR_MESSAGES, SUCCESS_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
 
 export class FinalProjectController {
   /**
    * POST /api/learning/final-project/:pathId
-   * Create a final project for a learning path (Admin/Instructor)
+   * Create a final project for a learning path (ADMIN only, FIX-INS-10)
    */
   static async createFinalProject(req: AuthRequest, res: Response) {
     try {
       if (!req.user) {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
+      // FIX-INS-10: a final project belongs to a learning path, which only ADMIN manages (no instructor scope exists on paths) -
+      // creating one also makes its author a grader (SubmissionAccessService.canGradeFinalProject), so nobody else may create it.
+      if (req.user.role !== 'ADMIN') {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
+      }
       const { pathId } = req.params;
+      const body = req.body || {};
+      if (body.learningPathId !== undefined && body.learningPathId !== pathId) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'learningPathId does not match the route' });
+      }
       const project = await FinalProjectService.createFinalProject(
-        { ...req.body, learningPathId: pathId },
+        { ...pickFinalProjectFields(body), learningPathId: pathId } as any,
         req.user.userId
       );
       res.status(HTTP_STATUS.CREATED).json({
@@ -28,6 +39,9 @@ export class FinalProjectController {
       logger.error('Create final project error:', error);
       if (error.message === ERROR_MESSAGES.FINAL_PROJECT_EXISTS) {
         return res.status(HTTP_STATUS.CONFLICT).json({ error: error.message });
+      }
+      if (error.message === 'Learning path not found') {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
       }
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: error.message || 'Failed to create final project' });
     }
@@ -43,6 +57,14 @@ export class FinalProjectController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { pathId } = req.params;
+      // FIX-INS-12: a learner reads the final project of a path they may see; ADMIN (the path editor) reads any
+      if (req.user.role !== 'ADMIN') {
+        try {
+          await PathAccessService.requireViewable(pathId, req.user.userId);
+        } catch {
+          return res.status(HTTP_STATUS.NOT_FOUND).json({ error: ERROR_MESSAGES.FINAL_PROJECT_NOT_FOUND });
+        }
+      }
       const project = await FinalProjectService.getFinalProject(pathId);
       res.status(HTTP_STATUS.OK).json({ data: project });
     } catch (error: any) {
@@ -56,20 +78,32 @@ export class FinalProjectController {
 
   /**
    * PUT /api/learning/final-project/:projectId
-   * Update a final project (Admin/Instructor)
+   * Update a final project (ADMIN only, FIX-INS-10)
    */
   static async updateFinalProject(req: AuthRequest, res: Response) {
     try {
       if (!req.user) {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
+      // FIX-INS-10: same rule as create - ADMIN only, before anything is read or written
+      if (req.user.role !== 'ADMIN') {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
+      }
       const { projectId } = req.params;
-      const updated = await FinalProjectService.updateFinalProject(projectId, req.body, req.user.userId);
+      const body = req.body || {};
+      const updated = await FinalProjectService.updateFinalProject(
+        projectId,
+        { ...pickFinalProjectFields(body), learningPathId: body.learningPathId } as any,
+        req.user.userId
+      );
       res.status(HTTP_STATUS.OK).json({ data: updated });
     } catch (error: any) {
       logger.error('Update final project error:', error);
       if (error.message === ERROR_MESSAGES.FINAL_PROJECT_NOT_FOUND) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      if (error.message === FINAL_PROJECT_MOVE_REFUSED) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message });
       }
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to update final project' });
     }
@@ -105,10 +139,17 @@ export class FinalProjectController {
       if (!req.user) {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
-      const { fileName, contentType } = req.body;
+      const { projectId } = req.params;
+      const { fileName, contentType } = req.body || {};
+      if (typeof fileName !== 'string' || !fileName.trim() || typeof contentType !== 'string' || !contentType.trim()) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'fileName and contentType are required' });
+      }
+      // FIX-INS-13: only a learner who may submit to THIS final project gets a URL - checked before storage is touched
+      await FinalProjectService.requireUploadPermission(projectId, req.user.userId);
       const result = await FinalProjectService.getUploadUrl(fileName, contentType);
       res.status(HTTP_STATUS.OK).json({ data: result });
     } catch (error: any) {
+      if (error instanceof FinalProjectUploadError) return res.status(error.statusCode).json({ error: error.message });
       logger.error('Get upload URL error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get upload URL' });
     }
@@ -124,11 +165,14 @@ export class FinalProjectController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { projectId } = req.params;
+      // FIX-INS-09: only this final project's grader (its author / an ADMIN); learners use /submission(s)/me
+      await SubmissionAccessService.requireFinalProjectGrader(projectId, { userId: req.user.userId, role: req.user.role });
       const page = parseInt(req.query.page as string) || 1;
       const limit = parseInt(req.query.limit as string) || 20;
       const result = await FinalProjectService.getSubmissions(projectId, page, limit);
       res.status(HTTP_STATUS.OK).json(result);
     } catch (error: any) {
+      if (error instanceof SubmissionAccessError) return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
       logger.error('Get submissions error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to get submissions' });
     }
@@ -180,12 +224,17 @@ export class FinalProjectController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { submissionId } = req.params;
-      const result = await FinalProjectService.gradeSubmission(submissionId, req.user.userId, req.body);
+      // FIX-INS-09: the grader of THIS submission's final project (its author / an ADMIN), checked before anything is written;
+      // the grader recorded is the authenticated caller and only score / feedback / status are read from the body
+      await SubmissionAccessService.requireFinalProjectSubmission(submissionId, { userId: req.user.userId, role: req.user.role }, false);
+      const { score, feedback, status } = req.body || {};
+      const result = await FinalProjectService.gradeSubmission(submissionId, req.user.userId, { score, feedback, status });
       res.status(HTTP_STATUS.OK).json({
         message: SUCCESS_MESSAGES.FINAL_PROJECT_GRADED,
         data: result,
       });
     } catch (error: any) {
+      if (error instanceof SubmissionAccessError) return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
       logger.error('Grade submission error:', error);
       if (error.message === ERROR_MESSAGES.SUBMISSION_NOT_FOUND) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
@@ -204,6 +253,8 @@ export class FinalProjectController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { submissionId } = req.params;
+      // FIX-INS-09: it writes the result, so only the submitter (own work) or this project's grader may trigger it
+      await SubmissionAccessService.requireFinalProjectSubmission(submissionId, { userId: req.user.userId, role: req.user.role }, true);
       const token = req.headers.authorization;
       const result = await FinalProjectService.evaluateSubmission(submissionId, token);
       res.status(HTTP_STATUS.OK).json({
@@ -211,6 +262,7 @@ export class FinalProjectController {
         data: result,
       });
     } catch (error: any) {
+      if (error instanceof SubmissionAccessError) return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
       logger.error('Evaluate submission error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: error.message || 'Failed to evaluate submission' });
     }
@@ -229,6 +281,7 @@ export class FinalProjectController {
       const status = await FinalProjectService.checkUnlockCondition(req.user.userId, pathId);
       res.status(HTTP_STATUS.OK).json({ data: status });
     } catch (error: any) {
+      if (error?.message === PATH_NOT_FOUND) return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
       logger.error('Get unlock status error:', error);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to check unlock status' });
     }
@@ -311,9 +364,11 @@ export class FinalProjectController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { submissionId } = req.params;
+      await SubmissionAccessService.requireFinalProjectSubmission(submissionId, { userId: req.user.userId, role: req.user.role }, true); // FIX-INS-09
       const result = await FinalProjectService.getSubmissionStatus(submissionId);
       res.status(HTTP_STATUS.OK).json({ data: result });
     } catch (error: any) {
+      if (error instanceof SubmissionAccessError) return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
       logger.error('Get processing status error:', error);
       if (error.message === ERROR_MESSAGES.SUBMISSION_NOT_FOUND) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
@@ -332,9 +387,11 @@ export class FinalProjectController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { submissionId } = req.params;
+      await SubmissionAccessService.requireFinalProjectSubmission(submissionId, { userId: req.user.userId, role: req.user.role }, true); // FIX-INS-09
       const result = await FinalProjectService.getProjectContext(submissionId);
       res.status(HTTP_STATUS.OK).json({ data: result });
     } catch (error: any) {
+      if (error instanceof SubmissionAccessError) return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
       logger.error('Get project context error:', error);
       if (error.message === ERROR_MESSAGES.SUBMISSION_NOT_FOUND) {
         return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
@@ -353,12 +410,14 @@ export class FinalProjectController {
         return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
       }
       const { submissionId } = req.params;
+      await SubmissionAccessService.requireFinalProjectSubmission(submissionId, { userId: req.user.userId, role: req.user.role }, true); // FIX-INS-09
       const result = await FinalProjectService.retryAnalysis(submissionId);
       res.status(HTTP_STATUS.OK).json({
         message: 'Đang phân tích lại project...',
         data: result,
       });
     } catch (error: any) {
+      if (error instanceof SubmissionAccessError) return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
       logger.error('Retry analysis error:', error);
       res.status(HTTP_STATUS.BAD_REQUEST).json({ error: error.message || 'Failed to retry analysis' });
     }

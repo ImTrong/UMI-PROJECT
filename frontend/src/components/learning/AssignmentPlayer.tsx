@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { learningService, Assignment, AssignmentSubmission } from '../../services/learning.service';
 import { FiUploadCloud, FiFileText, FiClock, FiCheckCircle, FiInfo, FiTrash2, FiFile } from 'react-icons/fi';
 import axios from 'axios';
+import { withAccessToken } from '../../utils/protected-file-url';
 
 export const AssignmentPlayer = ({
   lessonId,
@@ -219,7 +220,7 @@ export const AssignmentPlayer = ({
               <div className="space-y-2">
                 <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl">
                   <FiFile className="text-slate-400" size={20} />
-                  <a href={submission.fileUrl} target="_blank" rel="noreferrer" className="flex-1 text-primary-600 hover:underline truncate">
+                  <a href={withAccessToken(submission.fileUrl)} target="_blank" rel="noreferrer" className="flex-1 text-primary-600 hover:underline truncate">
                     {submission.fileName || submission.fileUrl.split('/').pop()}
                   </a>
                 </div>

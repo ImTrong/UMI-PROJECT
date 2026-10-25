@@ -43,3 +43,33 @@
     @apply bg-white rounded-2xl border border-slate-100 p-6 hover:border-slate-200 hover:shadow-sm transition-all duration-300;
   }
 }
+
+/* RAG-MVP-05D: passage of the lesson text opened from a lesson-assistant citation (CSS Custom Highlight API, no DOM change) */
+::highlight(rag-source) {
+  background-color: #fef08a;
+  color: inherit;
+}
+
+/* RAG-PDF-05: the cited PDF page gets a text layer only to locate the passage - not selectable (secure viewer); its
+   highlight is translucent because the transparent text lies over the page canvas */
+.secure-pdf-viewer .textLayer {
+  -webkit-user-select: none;
+  user-select: none;
+}
+.secure-pdf-viewer .textLayer span::highlight(rag-source) {
+  background-color: rgba(250, 204, 21, 0.45);
+  color: transparent;
+}
+
+/* RAG-MVP-05D: while the lesson assistant is open, the floating messaging button must not cover its composer */
+@media (min-width: 1024px) {
+  body[data-lesson-chat='open'] #chat-widget-btn {
+    right: calc(24rem + 1.5rem);
+  }
+}
+@media (max-width: 1023px) {
+  body[data-lesson-chat='open'] #chat-widget-btn {
+    top: 5rem;
+    bottom: auto;
+  }
+}

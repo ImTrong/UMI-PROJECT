@@ -2,8 +2,10 @@ import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { OrderService } from '../services/order.service';
 import { PaymentClient } from '../services/payment.client';
+import { SalesPerformanceService } from '../services/sales-performance.service';
 import { HTTP_STATUS, SUCCESS_MESSAGES, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+import { describePaymentStatus } from '../utils/payment-status';
 
 export class OrderController {
   static async createOrder(req: AuthRequest, res: Response) {
@@ -70,14 +72,26 @@ export class OrderController {
       const { orderId } = req.params;
       const { paymentMethodId } = req.body;
 
-      const result = await OrderService.processPayment(orderId, paymentMethodId);
+      const result = await OrderService.processPayment(orderId, req.user.userId, paymentMethodId);
 
+      const messages = {
+        SUCCEEDED: 'Payment processed successfully',
+        PENDING: 'Payment is still being processed',
+        FAILED: 'Payment failed',
+        UNKNOWN: 'Payment status could not be verified',
+      };
       res.status(HTTP_STATUS.OK).json({
-        message: result.success ? 'Payment processed successfully' : 'Payment failed',
+        message: messages[result.status],
         data: result,
       });
     } catch (error: any) {
       logger.error('Process payment error:', error);
+      if (error.message === ERROR_MESSAGES.ORDER_NOT_FOUND) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({ error: error.message });
+      }
+      if (error.message === ERROR_MESSAGES.FORBIDDEN) {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: error.message });
+      }
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to process payment',
       });
@@ -131,10 +145,16 @@ export class OrderController {
         });
       }
 
-      const payment = await PaymentClient.getPaymentStatus(order.paymentId);
+      // internal call with ORDER_PAYMENT_TOKEN (FIX 07B-2A.1); the owner check above (getOrderById with the user's id) stays here
+      const payment = await PaymentClient.getPaymentStatus(order.paymentId, order.id);
+      if (!payment) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json({
+          error: 'No payment found for this order',
+        });
+      }
 
       res.status(HTTP_STATUS.OK).json({
-        data: payment,
+        data: { ...payment, outcome: describePaymentStatus(payment.status) },
       });
     } catch (error: any) {
       logger.error('Get payment status error:', error);
@@ -399,6 +419,26 @@ export class OrderController {
     }
   }
 
+  /**
+   * GET /api/orders/analytics/sales-performance (ADMIN) - ADMIN-DASHBOARD-01. 502 PAYMENT_EVIDENCE_UNAVAILABLE when the payments
+   * could not be checked: no sales figure is given without that check.
+   */
+  static async getSalesPerformance(req: AuthRequest, res: Response) {
+    try {
+      if (!req.user || req.user.role !== 'ADMIN') {
+        return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
+      }
+      const data = await SalesPerformanceService.getSalesPerformance(req.headers.authorization);
+      res.status(HTTP_STATUS.OK).json({ data });
+    } catch (error: any) {
+      logger.error('Get sales performance error:', error?.message || error);
+      if (error?.message === 'Payment evidence check failed' || /Payment service call not sent/.test(error?.message || '')) {
+        return res.status(502).json({ error: 'Payments could not be verified', code: 'PAYMENT_EVIDENCE_UNAVAILABLE' });
+      }
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to retrieve sales performance' });
+    }
+  }
+
   // ==================== Payment Webhook ====================
 
   static async handlePaymentWebhook(req: Request, res: Response) {
@@ -422,6 +462,26 @@ export class OrderController {
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({
         error: 'Failed to process payment webhook',
       });
+    }
+  }
+
+  /**
+   * GET /api/orders/internal/:orderId/entitlement?userId=&courseId= (learning-service only, ORDER_LEARNING_TOKEN) - FIX-INS-04.
+   * 200 { data: { entitled, reason } }; it never writes anything.
+   */
+  static async getEnrollmentEntitlement(req: Request, res: Response) {
+    try {
+      const { orderId } = req.params;
+      const { userId, courseId } = req.query;
+      const isId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-fA-F]{24}$/.test(v);
+      if (!isId(userId) || !isId(courseId)) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'userId and courseId are required' });
+      }
+      const result = await OrderService.getEnrollmentEntitlement(orderId, userId, courseId);
+      res.status(HTTP_STATUS.OK).json({ data: result });
+    } catch (error: any) {
+      logger.error(`Enrollment entitlement check error: ${error?.message || 'unknown error'}`);
+      res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to check entitlement' });
     }
   }
 

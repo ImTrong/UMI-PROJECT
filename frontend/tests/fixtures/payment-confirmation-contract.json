@@ -1,0 +1,25 @@
+{
+  "_about": "Real answers of the payment confirmation endpoints (FIX 07B-1.3). The frontend tests read them through the shared reader; payment-service test/confirm-response-contract.test.ts and order-service test/payment-status-contract.mongo.test.ts check that the services still answer exactly these shapes (every key/value listed here must be present).",
+  "confirm": {
+    "succeeded": { "http": 200, "body": { "message": "Payment confirmed successfully", "data": { "id": "d4d4d4d4d4d4d4d4d4d4d4d4", "status": "SUCCEEDED" } } },
+    "pending": { "http": 200, "body": { "message": "Payment confirmed successfully", "data": { "id": "d4d4d4d4d4d4d4d4d4d4d4d4", "status": "PENDING" } } },
+    "failed": { "http": 200, "body": { "message": "Payment confirmed successfully", "data": { "id": "d4d4d4d4d4d4d4d4d4d4d4d4", "status": "FAILED" } } },
+    "cancelled": { "http": 200, "body": { "message": "Payment confirmed successfully", "data": { "id": "d4d4d4d4d4d4d4d4d4d4d4d4", "status": "CANCELLED" } } },
+    "providerMismatch": { "http": 409, "body": { "error": "Payment cannot be confirmed through this endpoint", "code": "PAYMENT_PROVIDER_MISMATCH" } },
+    "notOwner": { "http": 404, "body": { "error": "Payment not found" } },
+    "mockBlocked": { "http": 403, "body": { "error": "Mock payment completion is disabled in this environment" } },
+    "providerError": { "http": 500, "body": { "error": "connect ETIMEDOUT" } }
+  },
+  "mockComplete": {
+    "succeeded": { "http": 200, "body": { "success": true, "message": "Payment completed successfully (Demo Mode)", "payment": { "id": "d4d4d4d4d4d4d4d4d4d4d4d4", "status": "SUCCEEDED" } } },
+    "alreadyCompleted": { "http": 200, "body": { "success": true, "message": "Payment already completed", "payment": { "id": "d4d4d4d4d4d4d4d4d4d4d4d4", "status": "SUCCEEDED" } } },
+    "disabled": { "http": 404, "body": { "error": "Route not found" } }
+  },
+  "orderPayment": {
+    "succeeded": { "http": 200, "body": { "message": "Payment processed successfully", "data": { "success": true, "status": "SUCCEEDED", "payment": { "status": "SUCCEEDED" } } } },
+    "pending": { "http": 200, "body": { "message": "Payment is still being processed", "data": { "success": false, "status": "PENDING", "payment": { "status": "PENDING" } } } },
+    "failed": { "http": 200, "body": { "message": "Payment failed", "data": { "success": false, "status": "FAILED", "payment": { "status": "FAILED" } } } },
+    "forbidden": { "http": 403, "body": { "error": "Access forbidden" } },
+    "serverError": { "http": 500, "body": { "error": "Failed to process payment" } }
+  }
+}

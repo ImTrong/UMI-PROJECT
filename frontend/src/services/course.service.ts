@@ -40,6 +40,24 @@ export interface Course {
   lessons?: Lesson[];
   reviews?: Review[];
   certificateConfig?: CertificateConfig;
+  /** Present on the instructor's own list (GET /api/courses/me): counts computed by the course-service. */
+  _count?: { lessons: number; reviews: number };
+}
+
+/**
+ * GET /api/courses/instructor/dashboard -> { data } (CourseService.getInstructorDashboard). averageRating is weighted by each
+ * course's totalReviews on the server. totalEnrolled is the sum of Course.enrolledCount (paid enrollments counted by the order
+ * flow) - NOT unique learners, so the dashboard does not show it as a learner count.
+ */
+export interface InstructorDashboardStats {
+  totalCourses: number;
+  publishedCourses: number;
+  pendingCourses: number;
+  rejectedCourses: number;
+  totalEnrolled: number;
+  totalReviews: number;
+  averageRating: number;
+  courses: Array<Pick<Course, 'id' | 'title' | 'published' | 'approvalStatus' | 'enrolledCount' | 'rating' | 'totalReviews' | 'createdAt'>>;
 }
 
 export interface Lesson {
@@ -211,6 +229,12 @@ export const courseService = {
   async getMyCourses(page: number = 1, limit: number = 10): Promise<PaginatedCourses> {
     const response = await courseApi.get(`/api/courses/me?page=${page}&limit=${limit}`);
     return response.data;
+  },
+
+  // IMPLEMENT-02: the instructor's KPIs, computed by the course-service (INSTRUCTOR / ADMIN only)
+  async getInstructorDashboard(): Promise<InstructorDashboardStats> {
+    const response = await courseApi.get('/api/courses/instructor/dashboard');
+    return response.data.data;
   },
 
   async getBatchCourses(ids: string[]): Promise<Course[]> {

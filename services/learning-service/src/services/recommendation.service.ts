@@ -1,4 +1,6 @@
 import { PrismaClient } from '@prisma/client';
+import { PathAccessService } from './path-access.service';
+import { PathImageService } from './path-image.service';
 import axios from 'axios';
 import logger from '../utils/logger';
 
@@ -495,7 +497,7 @@ export class RecommendationService {
 
       for (const enrollment of pathEnrollments) {
         const path = enrollment.learningPath;
-        if (!path.courseIds.length) continue;
+        if (!PathAccessService.isVisibleToEnrolled(path) || !path.courseIds.length) continue;   // FIX-INS-12
 
         const pathProgresses = await prisma.courseProgress.findMany({
           where: { userId, courseId: { in: path.courseIds } },
@@ -601,6 +603,8 @@ export class RecommendationService {
 
       for (const enrollment of enrollments) {
         const path = enrollment.learningPath;
+        // FIX-INS-12: a path taken back to DRAFT is not shown to learners (ARCHIVED stays for those enrolled)
+        if (!PathAccessService.isVisibleToEnrolled(path)) continue;
 
         // Get progress for each course in the path
         const courseProgresses = await prisma.courseProgress.findMany({
@@ -648,7 +652,7 @@ export class RecommendationService {
           pathDescription: path.description,
           pathCategory: path.category,
           pathDifficulty: path.difficulty,
-          pathImageUrl: path.imageUrl,
+          pathImageUrl: PathImageService.presentUrl(path.imageUrl, path.status),   // FIX-INS-14
           enrolledAt: enrollment.enrolledAt.toISOString(),
           status: enrollment.status,
           completedCourses,

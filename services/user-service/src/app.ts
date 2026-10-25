@@ -5,10 +5,14 @@ import rateLimit from 'express-rate-limit';
 import { UserController } from './controllers/user.controller';
 import { NotificationController } from './controllers/notification.controller';
 import { ChatController } from './controllers/chat.controller';
-import { authenticateToken, requireRole } from './middleware/auth.middleware';
+import { authenticateToken, requireRole, attachUserRole } from './middleware/auth.middleware';
+import { verifyInternalService } from './middleware/internal-auth.middleware';
+import { requireServiceToken } from './middleware/service-token.middleware';
 import {
   validateCreateUser,
-  validateUpdateUser,
+  validateUpdateMyProfile,
+  validateAdminUpdateUser,
+  allowOnlyFields,
   validateEducation,
   validateWorkExperience,
   validateUserId,
@@ -18,6 +22,7 @@ import {
 import logger from './utils/logger';
 import { UserService } from './services/user.service';
 import { ERROR_MESSAGES } from './utils/constants';
+import { SELF_PROFILE_FIELDS, ADMIN_PROFILE_FIELDS } from './utils/profile-fields';
 
 const app = express();
 app.set('trust proxy', 1);
@@ -64,11 +69,18 @@ app.get('/api/users/health', UserController.healthCheck);
 app.get('/api/users/public/:userId', UserController.getPublicProfile);
 
 // Public routes (with authentication)
+// No credentials: the course / learning / review code calls it for display names. Returns only userId, fullName, avatar.
 app.post('/api/users/batch', UserController.getBatchUsers);
 
+// Internal (service-to-service, blocked from outside by the gateway): learner eligibility for the leaderboard.
+// Returns only userId / role / isActive. Protected by the shared X-Internal-Service-Token.
+app.post('/api/users/internal/eligibility', verifyInternalService, UserController.getEligibilityBatch);
+
+// ADMIN: full user list. Anyone else signed in: only the instructor directory (public fields) - see UserController.getAllUsers.
 app.get(
   '/api/users',
   authenticateToken,
+  attachUserRole,
   UserController.getAllUsers
 );
 
@@ -84,10 +96,12 @@ app.get(
   UserController.getAvatarUploadUrl
 );
 
+// Profile fields only (allowlist): a body carrying role, isActive, email, userId... is refused with 400 and nothing is written.
 app.put(
   '/api/users/me',
   authenticateToken,
-  validateUpdateUser,
+  allowOnlyFields(SELF_PROFILE_FIELDS),
+  validateUpdateMyProfile,
   handleValidationErrors,
   UserController.updateMyProfile
 );
@@ -114,9 +128,11 @@ app.post(
   UserController.createUserProfile
 );
 
+// Full profile for the owner and ADMIN, public subset for everyone else - see UserController.getUserProfile.
 app.get(
   '/api/users/:userId',
   authenticateToken,
+  attachUserRole,
   validateUserId,
   handleValidationErrors,
   UserController.getUserProfile
@@ -202,9 +218,13 @@ app.delete(
   NotificationController.deleteNotification
 );
 
+// Internal (service-to-service, blocked from outside by the gateway): creates a notification for a learner.
+// Protected by the shared X-Internal-Service-Token like /internal/eligibility: a request without the right token is refused
+// BEFORE the controller runs, so nothing is stored and nothing is pushed over the socket. Without INTERNAL_SERVICE_TOKEN
+// configured every call is refused (fail-closed).
 app.post(
   '/api/users/internal/notifications',
-  // In a real microservices setup, you'd protect this with a special internal network token
+  verifyInternalService,
   NotificationController.createInternalNotification
 );
 
@@ -262,12 +282,13 @@ app.put(
   authenticateToken,
   requireRole(['ADMIN']),
   validateUserId,
-  validateUpdateUser,
+  allowOnlyFields(ADMIN_PROFILE_FIELDS),
+  validateAdminUpdateUser,
   handleValidationErrors,
   async (req: express.Request, res: express.Response) => {
     try {
       const { userId } = req.params;
-      const updatedProfile = await UserService.updateUserProfile(userId, req.body);
+      const updatedProfile = await UserService.adminUpdateUserProfile(userId, req.body);
       res.status(200).json({
         message: 'User updated successfully',
         data: updatedProfile,
@@ -305,8 +326,16 @@ app.delete(
   }
 );
 
+// IMPLEMENT-01: applying files a PENDING application (no role change); only an ADMIN approves (-> INSTRUCTOR) or rejects it.
 app.post('/api/users/become-instructor', authenticateToken, UserController.becomeInstructor);
-app.post('/api/users/become-instructor/confirm', UserController.confirmInstructor);
+app.get('/api/users/become-instructor/me', authenticateToken, UserController.getMyInstructorApplication);
+app.get('/api/users/admin/instructor-applications', authenticateToken, requireRole(['ADMIN']), UserController.listInstructorApplications);
+app.post('/api/users/admin/instructor-applications/:applicationId/approve', authenticateToken, requireRole(['ADMIN']), UserController.approveInstructorApplication);
+app.post('/api/users/admin/instructor-applications/:applicationId/reject', authenticateToken, requireRole(['ADMIN']), UserController.rejectInstructorApplication);
+// Called by the payment-service once an (old-flow) instructor registration fee is paid. Since IMPLEMENT-01 it no longer changes
+// the role - it only queues a PENDING application for an ADMIN - and still accepts only the Payment -> User credential
+// PAYMENT_USER_TOKEN (FIX 07B-1) - never INTERNAL_SERVICE_TOKEN or a public default; fail-closed.
+app.post('/api/users/become-instructor/confirm', requireServiceToken('PAYMENT_USER_TOKEN'), UserController.confirmInstructor);
 
 // 404 handler
 app.use((req, res) => {
@@ -315,6 +344,11 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // A body the JSON parser refuses (malformed JSON, a bare string / number, too large) is the client's fault, not a 500.
+  const clientStatus = err?.status ?? err?.statusCode;
+  if (clientStatus >= 400 && clientStatus < 500) {
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
   logger.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });

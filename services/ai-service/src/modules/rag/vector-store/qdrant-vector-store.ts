@@ -13,6 +13,17 @@ import logger from '../../../utils/logger';
 // Deterministic UUID namespace for generating point IDs
 const QDRANT_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
 
+/** RAG-PDF-01: file location fields carried from chunk metadata to the point payload and back (absent ones are omitted). */
+export const LOCATION_FIELDS = ['fileKey', 'fileName', 'fileType', 'page', 'paragraphStart', 'paragraphEnd', 'heading'] as const;
+
+export function pickLocation(source: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const field of LOCATION_FIELDS) {
+    if (source[field] !== undefined && source[field] !== null && source[field] !== '') out[field] = source[field];
+  }
+  return out;
+}
+
 /**
  * Qdrant Vector Store implementation.
  *
@@ -118,6 +129,8 @@ export class QdrantVectorStore implements IVectorStore {
         skills: chunk.metadata.skills || [],
         language: chunk.metadata.language || '',
         version: chunk.metadata.version || 1,
+        // RAG-PDF-01: where the chunk comes from in a lesson file (only present for file documents)
+        ...pickLocation(chunk.metadata),
       },
     }));
 
@@ -217,6 +230,7 @@ export class QdrantVectorStore implements IVectorStore {
         skills: payload.skills,
         language: payload.language,
         version: payload.version,
+        ...pickLocation(payload),
       },
     };
   }

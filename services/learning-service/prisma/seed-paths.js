@@ -3,6 +3,7 @@ const axios = require('axios');
 
 const prisma = new PrismaClient();
 
+// Legacy demo seed (the docker image runs dist-seed/prisma/seed-paths.js built from seed-paths.ts instead). Create-only.
 async function main() {
   const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://localhost:3003';
   
@@ -61,19 +62,8 @@ async function main() {
   // Create Web Developer Roadmap
   await prisma.learningPath.upsert({
     where: { slug: 'fullstack-web-developer' },
-    update: {
-      courseIds: finalWebIds,
-      category: 'Công nghệ thông tin',
-      difficulty: 'ALL',
-      certificateConfig: {
-        title: 'Chứng chỉ Fullstack Web Developer',
-        subtitle: 'Được cấp cho học viên hoàn thành xuất sắc lộ trình',
-        signer: 'Giám đốc Đào tạo UMI Academy',
-        org: 'UMI Academy',
-        template: 'modern',
-        themeColor: '#10b981'
-      },
-    },
+    // an existing path (same slug) is never overwritten - the seed only creates what is missing
+    update: {},
     create: {
       title: 'Lập trình viên Web Chuyên nghiệp (Fullstack Developer)',
       description: 'Lộ trình toàn diện đi từ cơ bản đến nâng cao. Học cách xây dựng giao diện người dùng đẹp mắt với HTML/CSS/JS, lập trình ứng dụng SPA hiện đại bằng React, xây dựng backend mạnh mẽ với Node.js/Express và kết nối cơ sở dữ liệu MongoDB.',
@@ -96,19 +86,8 @@ async function main() {
   // Create Data Science Roadmap
   await prisma.learningPath.upsert({
     where: { slug: 'data-science-expert' },
-    update: {
-      courseIds: finalDataIds,
-      category: 'Công nghệ thông tin',
-      difficulty: 'ALL',
-      certificateConfig: {
-        title: 'Chứng chỉ Chuyên gia Khoa học Dữ liệu',
-        subtitle: 'Được cấp cho học viên hoàn thành xuất sắc lộ trình',
-        signer: 'Giám đốc Đào tạo UMI Academy',
-        org: 'UMI Academy',
-        template: 'modern',
-        themeColor: '#10b981'
-      },
-    },
+    // an existing path (same slug) is never overwritten - the seed only creates what is missing
+    update: {},
     create: {
       title: 'Chuyên gia Khoa học Dữ liệu (Data Science Expert)',
       description: 'Chinh phục thế giới dữ liệu lớn và Trí tuệ Nhân tạo. Bắt đầu với ngôn ngữ Python, phân tích cơ sở dữ liệu nâng cao với SQL, học cách trực quan hóa thông tin và áp dụng các thuật toán Học máy (Machine Learning) để giải quyết bài toán thực tế.',

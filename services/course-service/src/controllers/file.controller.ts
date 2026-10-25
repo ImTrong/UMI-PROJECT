@@ -1,80 +1,74 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { FileStorageService } from '@umi/file-storage';
 import { HTTP_STATUS, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
-import prisma from '../utils/prisma';
+import { FileAccessService, DOWNLOAD_BUCKET } from '../services/file-access.service';
+
+// generic answers: never the bucket, the key or anything about the storage (FIX-INS-07)
+const NOT_FOUND = { error: 'File not found' };
 
 export class FileController {
+  /**
+   * GET /api/courses/files/download?bucket=courses&key=<key>[&courseId=<id>][&token=<jwt>]
+   * Streams a course file only after FileAccessService has resolved, from this service's own records, which course resource
+   * the file belongs to and that the caller may read it (FIX-INS-07). The query string only names the file.
+   */
   static async downloadFile(req: AuthRequest, res: Response) {
     try {
-      const { bucket, key, courseId } = req.query as { bucket: string; key: string; courseId?: string };
+      const { bucket, key, courseId } = req.query as Record<string, unknown>;
 
       if (!bucket || !key) {
         return res.status(HTTP_STATUS.BAD_REQUEST).json({ error: 'Bucket and key are required' });
       }
+      if (!FileAccessService.isValidRequest(bucket, key)) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json(NOT_FOUND);
+      }
+      if (courseId !== undefined && (typeof courseId !== 'string' || !/^[0-9a-fA-F]{24}$/.test(courseId))) {
+        return res.status(HTTP_STATUS.NOT_FOUND).json(NOT_FOUND);
+      }
 
-      // Check authorization (if courseId is provided, verify enrollment or instructor)
-      if (courseId && req.user) {
-        const isAdmin = req.user.role === 'ADMIN';
-        const course = await prisma.course.findUnique({ where: { id: courseId } });
-        
-        if (!course) {
-          return res.status(HTTP_STATUS.NOT_FOUND).json({ error: ERROR_MESSAGES.COURSE_NOT_FOUND });
-        }
-        
-        const isInstructor = course.instructorId === req.user.userId;
-        let isEnrolled = false;
-        
-        if (!isAdmin && !isInstructor) {
-          try {
-            const learningServiceUrl = process.env.LEARNING_SERVICE_URL || 'http://localhost:3006';
-            const response = await require('axios').get(
-              `${learningServiceUrl}/api/learning/progress/course/${courseId}`,
-              { headers: { Authorization: req.headers.authorization } }
-            );
-            if (response.data && response.data.data) {
-              isEnrolled = true;
-            }
-          } catch (error) {
-            logger.warn(`Failed to check enrollment for file download: ${(error as any).message}`);
-          }
-        }
-        
-        if (!isAdmin && !isInstructor && !isEnrolled) {
-          return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
-        }
+      // the caller's own token (header, or ?token= for <video>/<iframe> sources) is what the enrollment check forwards
+      const headerToken = req.headers.authorization?.split(' ')[1];
+      const token = headerToken || (typeof req.query.token === 'string' ? req.query.token : undefined);
+      const requester = req.user ? { userId: req.user.userId, role: req.user.role, token } : undefined;
+
+      const decision = await FileAccessService.decide(key, requester, courseId as string | undefined);
+      if (!decision.allowed) {
+        logger.warn(`File download refused (${decision.reason}) for ${requester ? `user ${requester.userId}` : 'an anonymous caller'}`);
+        if (decision.status === 401) return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+        if (decision.status === 403) return res.status(HTTP_STATUS.FORBIDDEN).json({ error: ERROR_MESSAGES.FORBIDDEN });
+        return res.status(HTTP_STATUS.NOT_FOUND).json(NOT_FOUND);
       }
 
       const fileStorage = new FileStorageService();
-      
-      // Instead of streaming which can block event loop for large files on heavy load,
-      // generate a short-lived presigned URL and redirect (since frontend often uses this in <a> tags or <iframe>).
-      // Or we can pipe the stream. Let's pipe the stream to completely hide MinIO.
-      
-      const stream = await fileStorage.getFileStream(bucket, key);
-      
+      let stream: NodeJS.ReadableStream;
+      try {
+        stream = await fileStorage.getFileStream(DOWNLOAD_BUCKET, key);
+      } catch (error: any) {
+        logger.warn(`File download: object missing in storage (${error?.code || 'error'})`);
+        return res.status(HTTP_STATUS.NOT_FOUND).json(NOT_FOUND);
+      }
+
       // Try to determine content type from extension
       let contentType = 'application/octet-stream';
       if (key.endsWith('.pdf')) contentType = 'application/pdf';
       else if (key.endsWith('.jpg') || key.endsWith('.jpeg')) contentType = 'image/jpeg';
       else if (key.endsWith('.png')) contentType = 'image/png';
-      
+
       res.setHeader('Content-Type', contentType);
-      // For images, allow caching. For documents, inline.
       res.setHeader('Content-Disposition', `inline; filename="${key.split('/').pop()}"`);
-      
+
       stream.pipe(res);
-      
-      stream.on('error', (err) => {
-        logger.error('Stream error:', err);
+
+      stream.on('error', (err: any) => {
+        logger.error(`Stream error: ${err?.code || err?.message || 'error'}`);
         if (!res.headersSent) {
           res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to stream file' });
         }
       });
-
     } catch (error: any) {
-      logger.error('Download file error:', error);
+      logger.error(`Download file error: ${error?.code || error?.message || 'error'}`);
       res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Failed to process file download' });
     }
   }

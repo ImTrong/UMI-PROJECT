@@ -18,6 +18,20 @@ export interface CreateAssignmentData {
   createdBy: string;
 }
 
+/** FIX-INS-10: the only fields a client may set on an assignment. courseId / lessonId / createdBy are decided by the server. */
+export const ASSIGNMENT_WRITABLE_FIELDS = [
+  'title', 'description', 'instructions', 'maxScore', 'dueDate', 'allowLateSubmission', 'allowedFileTypes', 'maxFileSizeMB',
+] as const;
+
+export function pickAssignmentFields(body: any): Partial<CreateAssignmentData> {
+  const picked: Record<string, unknown> = {};
+  if (!body || typeof body !== 'object') return picked;
+  for (const key of ASSIGNMENT_WRITABLE_FIELDS) {
+    if (Object.prototype.hasOwnProperty.call(body, key)) picked[key] = body[key];
+  }
+  return picked as Partial<CreateAssignmentData>;
+}
+
 export interface SubmitAssignmentData {
   assignmentId: string;
   userId: string;
@@ -69,13 +83,10 @@ export class AssignmentService {
   }
 
   /**
-   * Update an assignment
+   * Update an assignment. The caller must already be authorized (SubmissionAccessService.requireAssignmentEditor, FIX-INS-10);
+   * courseId / lessonId / createdBy are never written here.
    */
-  static async updateAssignment(assignmentId: string, data: Partial<CreateAssignmentData>, userId: string) {
-    const assignment = await prisma.assignment.findUnique({ where: { id: assignmentId } });
-    if (!assignment) throw new Error('Assignment not found');
-    if (assignment.createdBy !== userId) throw new Error(ERROR_MESSAGES.FORBIDDEN);
-
+  static async updateAssignment(assignmentId: string, data: Partial<CreateAssignmentData>) {
     return prisma.assignment.update({
       where: { id: assignmentId },
       data: {

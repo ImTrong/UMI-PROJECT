@@ -1,5 +1,6 @@
 import { IEmbeddingService, IVectorStore, MetadataFilter, RetrievedChunk, SearchOptions } from '../types';
 import { RAGConfig } from '../rag.config';
+import { RAGError, describeError } from '../errors';
 import logger from '../../../utils/logger';
 
 /**
@@ -53,15 +54,27 @@ export class RetrievalService {
 
     logger.info(`[Retrieval] Query: "${query.substring(0, 100)}...", topK=${options.topK}, filter=${JSON.stringify(filter || {})}`);
 
-    // 1. Embed the query
-    const queryVector = await this.embeddingService.embedQuery(query);
+    // 1. Embed the query (a failure is EMBEDDING_FAILED, never an empty result)
+    let queryVector: number[];
+    try {
+      queryVector = await this.embeddingService.embedQuery(query);
+    } catch (error: any) {
+      if (error instanceof RAGError) throw error;
+      logger.error(`[Retrieval] Query embedding failed: ${describeError(error)}`);
+      throw new RAGError('EMBEDDING_FAILED');
+    }
 
-    // 2. Search vector store
+    // 2. Search vector store (a failure is VECTOR_STORE_FAILED, never "no relevant chunk")
     let results: RetrievedChunk[];
-    if (filter && Object.keys(filter).some(k => (filter as any)[k])) {
-      results = await this.vectorStore.searchByFilter(queryVector, filter, options);
-    } else {
-      results = await this.vectorStore.search(queryVector, options);
+    try {
+      if (filter && Object.keys(filter).some(k => (filter as any)[k])) {
+        results = await this.vectorStore.searchByFilter(queryVector, filter, options);
+      } else {
+        results = await this.vectorStore.search(queryVector, options);
+      }
+    } catch (error: any) {
+      logger.error(`[Retrieval] Vector search failed: ${describeError(error)}`);
+      throw new RAGError('VECTOR_STORE_FAILED');
     }
 
     logger.info(`[Retrieval] Found ${results.length} chunks (scores: ${results.map(r => r.score.toFixed(3)).join(', ')})`);

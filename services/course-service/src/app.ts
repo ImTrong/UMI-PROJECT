@@ -19,8 +19,14 @@ import {
   validateReviewId,
   validateCategoryId,
   validatePagination,
+  validateReorderLessons,
+  validateUploadUrl,
+  validateRecommendationBatch,
+  allowOnlyFields,
   handleValidationErrors,
 } from './middleware/validation.middleware';
+import { COURSE_WRITABLE_FIELDS, LESSON_WRITABLE_FIELDS, UPLOAD_URL_FIELDS } from './utils/course-fields';
+import { requireServiceToken } from './middleware/service-token.middleware';
 import logger from './utils/logger';
 
 const app = express();
@@ -139,10 +145,12 @@ app.get('/api/courses/instructor/:instructorId/public-courses', async (req, res)
 app.get('/api/courses/slug/:slug', authenticateOptional, CourseController.getCourseBySlug);
 
 // Protected routes - Instructor/Admin only
+// Content fields only (FIX-INS-02): instructorId / published / approvalStatus / rating / enrolledCount... are refused with 400.
 app.post(
   '/api/courses',
   authenticateToken,
   requireInstructorOrAdmin,
+  allowOnlyFields(COURSE_WRITABLE_FIELDS),
   validateCreateCourse,
   handleValidationErrors,
   CourseController.createCourse
@@ -162,24 +170,51 @@ app.post(
 );
 
 // Internal route for recommendation engine (service-to-service)
+// Called ONLY by the learning-service (home recommendations). FIX-INS-06: only the Course <-> Learning credential
+// COURSE_LEARNING_TOKEN in X-Internal-Service-Token (no INTERNAL_SERVICE_TOKEN, no default; fail-closed), and a bounded,
+// validated body - it can no longer be used to dump the catalogue or pass operators to the database.
 app.post(
   '/api/courses/recommendations/batch',
+  requireServiceToken('COURSE_LEARNING_TOKEN'),
+  allowOnlyFields(['categoryIds', 'excludeIds', 'levels', 'sortBy', 'limit']),
+  validateRecommendationBatch,
+  handleValidationErrors,
   CourseController.getRecommendationBatch
 );
 
 // Internal route for other services
+// Called ONLY by the order-service once an order is fulfilled. It accepts only the Order -> Course credential ORDER_COURSE_TOKEN
+// in X-Internal-Service-Token (FIX-INS-03): a browser cannot inflate enrolledCount. No INTERNAL_SERVICE_TOKEN or default; fail-closed.
 app.post(
   '/api/courses/:courseId/increment-enrollment',
+  requireServiceToken('ORDER_COURSE_TOKEN'),
+  validateCourseId,
+  handleValidationErrors,
   CourseController.incrementEnrollment
+);
+// Every lesson of a course WITH its videoUrl - paid content (FIX-INS-06). Called ONLY by the learning-service, which applies the
+// learner rules itself (enrolled / owner / preview) before it streams or counts anything. Only COURSE_LEARNING_TOKEN is accepted:
+// a browser - or anyone reaching port 3003 directly - gets nothing. Users read lessons through /api/courses/:courseId/lessons*.
+// Who owns a lesson (FIX-INS-10): { lessonId, courseId, instructorId } and nothing else, whatever the course status (draft,
+// pending, unpublished...). The learning-service uses it to decide who may create / edit / grade an assignment, instead of the
+// public course GET that hides unpublished courses. Only COURSE_LEARNING_TOKEN is accepted; fail-closed, no other token.
+app.get(
+  '/api/courses/internal/lessons/:lessonId/owner',
+  requireServiceToken('COURSE_LEARNING_TOKEN'),
+  validateLessonId,
+  handleValidationErrors,
+  LessonController.getLessonOwnerInternal
 );
 app.get(
   '/api/courses/internal/:courseId/lessons',
+  requireServiceToken('COURSE_LEARNING_TOKEN'),
   validateCourseId,
   handleValidationErrors,
   LessonController.getCourseLessonsInternal
 );
 app.get(
   '/api/courses/internal/:courseId/lessons/:lessonId',
+  requireServiceToken('COURSE_LEARNING_TOKEN'),
   validateCourseId,
   validateLessonId,
   handleValidationErrors,
@@ -203,6 +238,7 @@ app.put(
   authenticateToken,
   requireInstructorOrAdmin,
   validateCourseId,
+  allowOnlyFields(COURSE_WRITABLE_FIELDS),
   validateUpdateCourse,
   handleValidationErrors,
   CourseController.updateCourse
@@ -229,10 +265,14 @@ app.post(
 
 // ==================== Lesson Routes ====================
 
+// Owner of the course only - checked in the controller before any upload URL is created (FIX-INS-02).
 app.post(
   '/api/courses/:courseId/upload-url',
   authenticateToken,
   requireInstructorOrAdmin,
+  validateCourseId,
+  allowOnlyFields(UPLOAD_URL_FIELDS),
+  validateUploadUrl,
   handleValidationErrors,
   LessonController.getUploadUrl
 );
@@ -254,12 +294,13 @@ app.get(
   LessonController.getLessonById
 );
 
-// Protected lesson routes - Instructor/Admin only
+// Protected lesson routes - the course's instructor only (ownership checked in LessonService, FIX-INS-02)
 app.post(
   '/api/courses/:courseId/lessons',
   authenticateToken,
   requireInstructorOrAdmin,
   validateCourseId,
+  allowOnlyFields(LESSON_WRITABLE_FIELDS),
   validateCreateLesson,
   handleValidationErrors,
   LessonController.createLesson
@@ -271,6 +312,7 @@ app.put(
   requireInstructorOrAdmin,
   validateCourseId,
   validateLessonId,
+  allowOnlyFields(LESSON_WRITABLE_FIELDS),
   validateCreateLesson,
   handleValidationErrors,
   LessonController.updateLesson
@@ -291,6 +333,7 @@ app.post(
   authenticateToken,
   requireInstructorOrAdmin,
   validateCourseId,
+  validateReorderLessons,
   handleValidationErrors,
   LessonController.reorderLessons
 );
@@ -372,6 +415,11 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  // A body the JSON parser refuses (malformed JSON, a bare string / number, too large) is the client's fault, not a 500.
+  const clientStatus = err?.status ?? err?.statusCode;
+  if (clientStatus >= 400 && clientStatus < 500) {
+    return res.status(400).json({ error: 'Invalid request body' });
+  }
   logger.error('Unhandled error:', err);
   res.status(500).json({ error: 'Internal server error' });
 });

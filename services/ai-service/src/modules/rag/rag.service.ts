@@ -2,7 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import { RAGConfig, loadRAGConfig } from './rag.config';
 import { GeminiEmbeddingService } from './embeddings/gemini-embedding.service';
 import { QdrantVectorStore } from './vector-store/qdrant-vector-store';
-import { IngestionService } from './ingestion/ingestion.service';
+import { IngestionService, IngestSegment } from './ingestion/ingestion.service';
 import { RetrievalService } from './retrieval/retrieval.service';
 import { ContextBuilder } from './retrieval/context-builder';
 import { LexicalRetrievalService } from './retrieval/lexical-retrieval.service';
@@ -15,6 +15,7 @@ import {
   SourceType,
   DocumentMetadata,
 } from './types';
+import { RAGError } from './errors';
 import logger from '../../utils/logger';
 
 const prisma = new PrismaClient();
@@ -125,7 +126,7 @@ export class RAGService {
     title?: string,
     metadata?: DocumentMetadata,
   ): Promise<any> {
-    this.ensureInitialized();
+    await this.ensureReady();
     const result = await this.ingestionService.ingestDocument(sourceType, sourceId, content, title, metadata);
 
     // Sync BM25 index after ingestion
@@ -133,6 +134,25 @@ export class RAGService {
       await this.syncBM25AfterIngest(result.id);
     }
 
+    return result;
+  }
+
+  /**
+   * RAG-PDF-01: ingest a lesson file already extracted into located segments (PDF pages / DOCX paragraph ranges).
+   * Same pipeline as ingest() (cleaner, chunker, embeddings, versioning, Qdrant), one chunking pass per segment.
+   */
+  async ingestFile(
+    sourceType: SourceType,
+    sourceId: string,
+    title: string,
+    metadata: DocumentMetadata,
+    segments: IngestSegment[],
+  ): Promise<any> {
+    await this.ensureReady();
+    const result = await this.ingestionService.ingestDocument(sourceType, sourceId, undefined, title, metadata, segments);
+    if (this.lexicalRetrieval && result?.id) {
+      await this.syncBM25AfterIngest(result.id);
+    }
     return result;
   }
 
@@ -146,17 +166,49 @@ export class RAGService {
     topK?: number,
     scoreThreshold?: number,
   ): Promise<GroundedContext> {
-    this.ensureInitialized();
+    await this.ensureReady();
 
-    // Advanced RAG path
+    let context: GroundedContext;
     if (this.config.retrievalMode === 'advanced' && this.advancedRetrieval) {
-      const { context } = await this.advancedRetrieval.retrieve(query, filter);
-      return context;
+      // Advanced RAG path
+      ({ context } = await this.advancedRetrieval.retrieve(query, filter));
+    } else {
+      // Baseline path
+      const chunks = await this.retrievalService.retrieve(query, filter, topK, scoreThreshold);
+      context = this.contextBuilder.build(query, chunks);
     }
 
-    // Baseline path — completely unchanged
-    const chunks = await this.retrievalService.retrieve(query, filter, topK, scoreThreshold);
-    return this.contextBuilder.build(query, chunks);
+    return RAGService.enforceScope(context, filter);
+  }
+
+  /**
+   * RAG-P0 defense in depth: the vector store already filters on courseId / lessonId, but a chunk whose payload does not
+   * match the requested scope never leaves this service (a store bug, a missing payload index or the BM25 branch cannot
+   * leak another course's content).
+   */
+  static enforceScope(context: GroundedContext, filter?: MetadataFilter): GroundedContext {
+    if (!filter?.courseId && !filter?.lessonId) return context;
+    const inScope = context.chunks.filter((chunk) =>
+      (!filter.courseId || chunk.metadata?.courseId === filter.courseId) &&
+      (!filter.lessonId || chunk.metadata?.lessonId === filter.lessonId));
+    if (inScope.length !== context.chunks.length) {
+      logger.warn(`[RAG] Dropped ${context.chunks.length - inScope.length} out-of-scope chunk(s) returned by the vector store`);
+    }
+    return { ...context, chunks: inScope, totalChunks: inScope.length };
+  }
+
+  /** A knowledge document by id (null when absent / not an ObjectId). */
+  async getDocument(documentId: string): Promise<any | null> {
+    if (!/^[a-f0-9]{24}$/i.test(documentId)) return null;
+    return prisma.knowledgeDocument.findUnique({ where: { id: documentId } });
+  }
+
+  /** The current (ACTIVE / INDEXING) document for a source, the one a re-index would replace. */
+  async findActiveDocumentBySource(sourceType: SourceType, sourceId: string): Promise<any | null> {
+    return prisma.knowledgeDocument.findFirst({
+      where: { sourceType, sourceId, status: { in: ['ACTIVE', 'INDEXING'] } },
+      orderBy: { version: 'desc' },
+    });
   }
 
   /**
@@ -164,7 +216,7 @@ export class RAGService {
    * Also removes from BM25 index if Advanced RAG is enabled.
    */
   async deleteDocument(documentId: string): Promise<void> {
-    this.ensureInitialized();
+    await this.ensureReady();
 
     // Remove from BM25 index BEFORE deleting from Qdrant
     if (this.lexicalRetrieval) {
@@ -175,14 +227,14 @@ export class RAGService {
   }
 
   /**
-   * List all indexed knowledge documents.
+   * List indexed knowledge documents, optionally only those of one course (metadata.courseId).
    */
-  async listDocuments(status?: string): Promise<any[]> {
+  async listDocuments(status?: string, courseId?: string): Promise<any[]> {
     const where: any = {};
     if (status) {
       where.status = status;
     }
-    return prisma.knowledgeDocument.findMany({
+    const documents = await prisma.knowledgeDocument.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
       select: {
@@ -194,12 +246,17 @@ export class RAGService {
         status: true,
         chunkCount: true,
         contentHash: true,
+        metadata: true,
         lastIndexedAt: true,
         errorMessage: true,
         createdAt: true,
         updatedAt: true,
       },
     });
+    // Json path filters are not available on MongoDB with Prisma: filter the (small) list here
+    return courseId
+      ? documents.filter((d: any) => (d.metadata as any)?.courseId === courseId)
+      : documents;
   }
 
   /**
@@ -292,9 +349,16 @@ export class RAGService {
     }
   }
 
-  private ensureInitialized(): void {
+  /**
+   * RAG-P0: the startup initialization may have failed (Qdrant not up yet). Try again on use instead of failing forever;
+   * still not ready -> RAG_UNAVAILABLE (503), never an empty "successful" answer.
+   */
+  private async ensureReady(): Promise<void> {
     if (!this.initialized) {
-      throw new Error('RAG service not initialized. Call initialize() first.');
+      await this.initialize();
+    }
+    if (!this.initialized) {
+      throw new RAGError('RAG_UNAVAILABLE', 'vector store not initialized');
     }
   }
 }

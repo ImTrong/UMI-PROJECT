@@ -7,6 +7,7 @@
     "dev": "nodemon --exec ts-node src/index.ts",
     "build": "tsc && tsc prisma/seed.ts --outDir dist-seed --rootDir . --esModuleInterop --module CommonJS --target ES2020 --moduleResolution node",
     "start": "node dist/src/index.js",
+    "test": "node -r ts-node/register/transpile-only --test \"tests/**/*.test.ts\"",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:studio": "prisma studio",

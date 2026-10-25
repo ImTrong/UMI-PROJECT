@@ -883,7 +883,31 @@ const pipelineByCategory: Record<string, (topic: string) => any[]> = {
 
 // ==================== Main Seed Function ====================
 
-async function main() {
+/**
+ * Demo learning paths + final projects, for an EMPTY database only (run by hand: npm run prisma:seed - it is no longer started by
+ * docker-compose).
+ *   - Before anything else it counts the existing learning paths AND final projects. If that check fails the seed stops with
+ *     exit code 2 and writes nothing - a failed query is never read as "empty".
+ *   - If either collection holds anything, nothing is written (exit 0): existing paths / projects are never deleted, overwritten
+ *     or replaced to recreate demo data. There is no destructive mode - to reseed, empty the collections yourself first.
+ */
+export type SeedOutcome = { status: 'SEEDED'; paths: number; projects: number } | { status: 'SKIPPED_EXISTING'; paths: number; projects: number } | { status: 'CHECK_FAILED'; error: string };
+
+export async function seedLearningPaths(client: any = prisma, http: { get: (url: string) => Promise<any> } = axios): Promise<SeedOutcome> {
+  let existingPaths: number;
+  let existingProjects: number;
+  try {
+    [existingPaths, existingProjects] = await Promise.all([client.learningPath.count(), client.finalProject.count()]);
+    if (!Number.isInteger(existingPaths) || !Number.isInteger(existingProjects)) throw new Error('unexpected count result');
+  } catch (error: any) {
+    console.error(`Could not check the existing learning paths / final projects (${error?.message || 'error'}). Nothing was seeded.`);
+    return { status: 'CHECK_FAILED', error: String(error?.message || error) };
+  }
+  if (existingPaths > 0 || existingProjects > 0) {
+    console.log(`${existingPaths} learning paths and ${existingProjects} final projects already exist - nothing changed.`);
+    return { status: 'SKIPPED_EXISTING', paths: existingPaths, projects: existingProjects };
+  }
+
   const courseServiceUrl = process.env.COURSE_SERVICE_URL || 'http://course-service:3003';
 
   console.log('Fetching available courses from course-service...');
@@ -892,7 +916,7 @@ async function main() {
 
   while (retries > 0) {
     try {
-      const response = await axios.get(`${courseServiceUrl}/api/courses?limit=100`);
+      const response = await http.get(`${courseServiceUrl}/api/courses?limit=100`);
       courses = response.data.courses || [];
       if (courses.length > 0) {
         console.log(`Found ${courses.length} courses in course-service.`);
@@ -913,10 +937,6 @@ async function main() {
 
   const fallbackIds = ['65f1234567890abcdef00001', '65f1234567890abcdef00002'];
   const defaultCreatorId = '65abcdef1234567890abcde1';
-
-  console.log('Clearing existing paths and final projects...');
-  await prisma.finalProject.deleteMany({});
-  await prisma.learningPath.deleteMany({});
 
   console.log('Seeding 60 enriched learning paths with final projects...');
 
@@ -966,7 +986,7 @@ async function main() {
       const slug = createSlug(`${def.title}-${Math.random().toString(36).substring(2, 6)}`);
 
       // --- Create LearningPath ---
-      const learningPath = await prisma.learningPath.create({
+      const learningPath = await client.learningPath.create({
         data: {
           title: def.title,
           description: def.desc,
@@ -997,7 +1017,7 @@ async function main() {
 
       // --- Create FinalProject for this path ---
       const pipeline = pipelineFactory(def.title);
-      await prisma.finalProject.create({
+      await client.finalProject.create({
         data: {
           learningPathId: learningPath.id,
           title: def.projectTitle,
@@ -1016,13 +1036,20 @@ async function main() {
   }
 
   console.log(`Successfully seeded ${pathCount} learning paths and ${projectCount} final projects!`);
+  return { status: 'SEEDED', paths: pathCount, projects: projectCount };
 }
 
-main()
-  .catch((e) => {
-    console.error(e);
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+// Run only when executed directly (npm run prisma:seed), never on import.
+if (require.main === module) {
+  seedLearningPaths()
+    .then((outcome) => {
+      process.exitCode = outcome.status === 'CHECK_FAILED' ? 2 : 0;
+    })
+    .catch((e) => {
+      console.error(e);
+      process.exitCode = 1;
+    })
+    .finally(async () => {
+      await prisma.$disconnect();
+    });
+}

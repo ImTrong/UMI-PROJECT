@@ -1,53 +1,58 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { courseService, Course } from '../services/course.service';
-import { FiBookOpen, FiUsers, FiDollarSign, FiTrendingUp, FiEdit2, FiEye, FiEyeOff, FiTrash2, FiPlus, FiBarChart2, FiBook, FiFileText } from 'react-icons/fi';
+import { courseService, Course, InstructorDashboardStats } from '../services/course.service';
+import { FiUsers, FiEdit2, FiEye, FiEyeOff, FiTrash2, FiPlus, FiBarChart2, FiBook, FiFileText } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { formatVND } from '../utils/currency';
+import { DashboardKpis, CourseStatusBadge, CourseTodoNotes, formatRating } from '../components/instructor/DashboardPanels';
 
 export default function InstructorDashboard() {
   const { user } = useAuth();
+  // IMPLEMENT-02: KPIs come from GET /api/courses/instructor/dashboard; the course list (GET /api/courses/me) only feeds the
+  // management table. Each is loaded on its own, so one failing does not take the other down.
+  const [stats, setStats] = useState<InstructorDashboardStats | null>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [statsError, setStatsError] = useState<string | null>(null);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [stats, setStats] = useState({
-    totalCourses: 0,
-    totalStudents: 0,
-    totalRevenue: 0,
-    averageRating: 0,
-    monthlyEnrollments: 0,
-  });
-  const [loading, setLoading] = useState(true);
+  const [coursesLoading, setCoursesLoading] = useState(true);
+  const [coursesError, setCoursesError] = useState<string | null>(null);
+
+  const loadStats = useCallback(async () => {
+    setStatsLoading(true);
+    setStatsError(null);
+    try {
+      setStats(await courseService.getInstructorDashboard());
+    } catch (error: any) {
+      setStats(null);
+      setStatsError(error?.response?.data?.error || 'Không tải được số liệu tổng quan.');
+    } finally {
+      setStatsLoading(false);
+    }
+  }, []);
+
+  const loadCourses = useCallback(async () => {
+    setCoursesLoading(true);
+    setCoursesError(null);
+    try {
+      const myCourses = await courseService.getMyCourses(1, 100);
+      setCourses(myCourses.courses);
+    } catch (error: any) {
+      setCoursesError(error?.response?.data?.error || 'Không tải được danh sách khóa học.');
+    } finally {
+      setCoursesLoading(false);
+    }
+  }, []);
+
+  const loadDashboardData = useCallback(() => {
+    loadStats();
+    loadCourses();
+  }, [loadStats, loadCourses]);
 
   useEffect(() => {
     if (user?.role !== 'INSTRUCTOR' && user?.role !== 'ADMIN') return;
     loadDashboardData();
-  }, [user]);
-
-  const loadDashboardData = async () => {
-    setLoading(true);
-    try {
-      const myCourses = await courseService.getMyCourses(1, 100);
-      setCourses(myCourses.courses);
-      
-      // Calculate stats
-      const totalStudents = myCourses.courses.reduce((sum, c) => sum + c.enrolledCount, 0);
-      const totalRevenue = myCourses.courses.reduce((sum, c) => sum + (c.price * c.enrolledCount), 0);
-      const avgRating = myCourses.courses.reduce((sum, c) => sum + c.rating, 0) / (myCourses.courses.length || 1);
-      
-      setStats({
-        totalCourses: myCourses.pagination.total,
-        totalStudents,
-        totalRevenue,
-        averageRating: avgRating,
-        monthlyEnrollments: myCourses.courses.reduce((sum, c) => sum + (c.enrolledCount > 0 ? 1 : 0), 0),
-      });
-      
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [user, loadDashboardData]);
 
   const handlePublish = async (courseId: string, isPublished: boolean) => {
     try {
@@ -67,20 +72,14 @@ export default function InstructorDashboard() {
     if (confirm(`Bạn có chắc chắn muốn xóa khóa học "${courseTitle}"?`)) {
       try {
         await courseService.deleteCourse(courseId);
+        toast.success('Xóa khóa học thành công');
         loadDashboardData();
-      } catch (error) {
-        console.error('Failed to delete course:', error);
+      } catch (error: any) {
+        // e.g. 409 COURSE_HAS_LEARNERS: the server explains why (FIX-INS-02)
+        toast.error(error.response?.data?.error || 'Không thể xóa khóa học');
       }
     }
   };
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -92,55 +91,23 @@ export default function InstructorDashboard() {
         </Link>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Tổng số Khóa học</p>
-              <p className="text-2xl font-bold">{stats.totalCourses}</p>
-            </div>
-            <FiBookOpen className="text-3xl text-primary-500" />
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Tổng số Học viên</p>
-              <p className="text-2xl font-bold">{stats.totalStudents}</p>
-            </div>
-            <FiUsers className="text-3xl text-primary-500" />
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Giá trị niêm yết ước tính</p>
-              <p className="text-2xl font-bold">{formatVND(stats.totalRevenue)}</p>
-              <span className="text-xs text-slate-400 block mt-1">Thù lao GV theo hợp đồng riêng</span>
-            </div>
-            <FiDollarSign className="text-3xl text-primary-500" />
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-500">Đánh giá trung bình</p>
-              <p className="text-2xl font-bold">{stats.averageRating.toFixed(1)}</p>
-            </div>
-            <FiTrendingUp className="text-3xl text-primary-500" />
-          </div>
-        </div>
-      </div>
+      {/* KPIs (course-service dashboard API) - no revenue / earnings / learner count: no reliable data for them yet */}
+      <DashboardKpis stats={stats} loading={statsLoading} error={statsError} onRetry={loadStats} />
 
       {/* My Courses */}
       <div className="card">
         <h2 className="text-xl font-semibold mb-4">Khóa học của tôi</h2>
-        
-        {courses.length === 0 ? (
+
+        {coursesLoading ? (
+          <div className="flex justify-center py-12" data-testid="courses-loading">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+          </div>
+        ) : coursesError ? (
+          <div className="text-center py-12" data-testid="courses-error">
+            <p className="text-red-600 mb-4">{coursesError}</p>
+            <button onClick={loadCourses} className="btn-secondary">Thử lại</button>
+          </div>
+        ) : courses.length === 0 ? (
           <div className="text-center py-12">
             <p className="text-slate-500 mb-4">Bạn chưa tạo khóa học nào.</p>
             <Link to="/courses/create" className="btn-primary">
@@ -153,7 +120,7 @@ export default function InstructorDashboard() {
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left py-3 px-4">Khóa học</th>
-                  <th className="text-left py-3 px-4">Học viên</th>
+                  <th className="text-left py-3 px-4" title="Số lượt ghi danh qua đơn hàng đã thanh toán - không phải số người học duy nhất">Lượt ghi danh</th>
                   <th className="text-left py-3 px-4">Giá tiền</th>
                   <th className="text-left py-3 px-4">Đánh giá</th>
                   <th className="text-left py-3 px-4">Trạng thái</th>
@@ -167,29 +134,20 @@ export default function InstructorDashboard() {
                       <div>
                         <p className="font-medium">{course.title}</p>
                         <p className="text-xs text-slate-500">{course.slug}</p>
+                        <CourseTodoNotes course={course} />
                       </div>
                     </td>
                     <td className="py-3 px-4">{course.enrolledCount}</td>
                     <td className="py-3 px-4">{formatVND(course.price)}</td>
                     <td className="py-3 px-4">
                       <div className="flex items-center">
-                        <span className="mr-1">{course.rating.toFixed(1)}</span>
+                        <span className="mr-1">{formatRating(course.rating)}</span>
                         <span className="text-yellow-400">★</span>
                         <span className="text-xs text-slate-500 ml-1">({course.totalReviews})</span>
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        course.published ? 'bg-green-100 text-green-700' :
-                        (course as any).approvalStatus === 'PENDING_REVIEW' ? 'bg-cyan-100 text-cyan-700' :
-                        (course as any).approvalStatus === 'REJECTED' ? 'bg-red-100 text-red-700' :
-                        'bg-yellow-100 text-yellow-700'
-                      }`}>
-                        {course.published ? 'Đã xuất bản' :
-                         (course as any).approvalStatus === 'PENDING_REVIEW' ? 'Chờ duyệt' :
-                         (course as any).approvalStatus === 'REJECTED' ? 'Bị từ chối' :
-                         'Bản nháp'}
-                      </span>
+                      <CourseStatusBadge course={course} />
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex space-x-2">
@@ -207,7 +165,7 @@ export default function InstructorDashboard() {
                         >
                           <FiEye size={16} />
                         </Link>
-                        {(course as any).approvalStatus !== 'PENDING_REVIEW' && (
+                        {course.approvalStatus !== 'PENDING_REVIEW' && (
                           <button
                             onClick={() => handlePublish(course.id, course.published)}
                             className="p-1 text-slate-500 hover:text-green-600"

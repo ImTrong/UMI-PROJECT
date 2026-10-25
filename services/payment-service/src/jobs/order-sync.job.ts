@@ -1,6 +1,7 @@
 import { PrismaClient, PaymentStatus } from '@prisma/client';
 import axios from 'axios';
 import logger from '../utils/logger';
+import { checkServiceToken, readServiceToken, SERVICE_TOKEN_HEADER } from '../utils/service-token';
 
 const defaultPrisma = new PrismaClient();
 
@@ -56,6 +57,16 @@ export function isBackoffActive(meta: any, now: number = Date.now()): boolean {
  * cursor pagination, progressive backoff và cảnh báo đa cấp.
  */
 export async function syncPendingOrders(options: OrderSyncOptions = {}): Promise<SyncResult> {
+  // The order webhook accepts only the Order <-> Payment credential (FIX 07B-2A). Without a usable one nothing is sent and nothing
+  // is counted as an attempt: the payments stay orderSynced=false and the next run delivers them once the token is configured.
+  const token = options.internalToken !== undefined
+    ? checkServiceToken('ORDER_PAYMENT_TOKEN', options.internalToken)
+    : readServiceToken('ORDER_PAYMENT_TOKEN');
+  if (!token.ok) {
+    logger.error(`[OutboxJob] Order sync not run: ${token.reason}`);
+    return { processed: 0, succeeded: 0, failed: 0, skippedBackoff: 0, skippedLocked: 0 };
+  }
+
   if (isJobRunning && !options.ignoreConcurrencyLock) {
     logger.info('[OutboxJob] Previous sync job still in progress, skipping overlapping execution.');
     return {
@@ -74,7 +85,6 @@ export async function syncPendingOrders(options: OrderSyncOptions = {}): Promise
   const pageSize = options.pageSize || 50;
   const maxPages = options.maxPages || 20; // Tối đa 1,000 bản ghi mỗi lượt quét
   const orderServiceUrl = options.orderServiceUrl || process.env.ORDER_SERVICE_URL || 'http://localhost:3004';
-  const internalToken = options.internalToken || process.env.INTERNAL_SERVICE_TOKEN || '';
 
   let totalProcessed = 0;
   let totalSucceeded = 0;
@@ -164,7 +174,7 @@ export async function syncPendingOrders(options: OrderSyncOptions = {}): Promise
           await clientAxios.post(
             `${orderServiceUrl}/api/orders/webhook/payment`,
             { orderId: payment.orderId, status: 'PAID' },
-            { headers: { 'X-Internal-Service-Token': internalToken }, timeout: 5000 }
+            { headers: { [SERVICE_TOKEN_HEADER]: token.value }, timeout: 5000 }
           );
 
           const syncedAt = new Date();

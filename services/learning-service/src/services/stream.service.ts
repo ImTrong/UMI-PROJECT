@@ -20,6 +20,7 @@ import {
 } from '../types/stream.types';
 import { STREAM_ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+import { courseInternalHeaders } from './course-internal.client';
 
 const prisma = new PrismaClient();
 
@@ -158,7 +159,8 @@ export class StreamService {
     try {
       // Try to get lesson directly via internal endpoint
       const response = await axios.get<{ data: LessonFromService }>(
-        `${courseServiceUrl}/api/courses/internal/lessons/${lessonId}`
+        `${courseServiceUrl}/api/courses/internal/lessons/${lessonId}`,
+        { headers: courseInternalHeaders() }
       );
 
       if (response.data?.data) {
@@ -182,7 +184,8 @@ export class StreamService {
     if (lessonProgress) {
       try {
         const response = await axios.get<{ data: LessonFromService[] }>(
-          `${courseServiceUrl}/api/courses/internal/${lessonProgress.courseId}/lessons`
+          `${courseServiceUrl}/api/courses/internal/${lessonProgress.courseId}/lessons`,
+          { headers: courseInternalHeaders() }
         );
         const lessons = response.data?.data || [];
         const lesson = lessons.find((l) => l.id === lessonId);

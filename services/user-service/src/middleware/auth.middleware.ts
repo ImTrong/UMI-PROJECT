@@ -3,6 +3,7 @@ import axios from 'axios';
 import { PrismaClient } from '@prisma/client';
 import { HTTP_STATUS, ERROR_MESSAGES } from '../utils/constants';
 import logger from '../utils/logger';
+import { describeHttpError } from '../utils/log-redaction';
 
 const prisma = new PrismaClient();
 
@@ -50,11 +51,38 @@ export const authenticateToken = async (
     };
 
     next();
-  } catch (error) {
-    logger.error('Authentication error:', error);
+  } catch (error: any) {
+    // RAG-SEC-LOG-01: never the axios error itself - its config carries the token (request body) being verified
+    const status = error?.response?.status;
+    if (status === 401 || status === 403) {
+      logger.info(`Authentication refused by auth-service (HTTP ${status})`);
+    } else {
+      logger.error(`Authentication error: ${describeHttpError(error)}`);
+    }
     return res.status(HTTP_STATUS.UNAUTHORIZED).json({
       error: ERROR_MESSAGES.UNAUTHORIZED,
     });
+  }
+};
+
+/**
+ * Sets req.user.role from the user's own profile row (a user without a profile is a STUDENT). It never rejects by role: the
+ * handler decides what each role may see. The database is authoritative - a role value coming with the token is overwritten.
+ */
+export const attachUserRole = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!req.user) {
+    return res.status(HTTP_STATUS.UNAUTHORIZED).json({ error: ERROR_MESSAGES.UNAUTHORIZED });
+  }
+  try {
+    const profile = await prisma.userProfile.findUnique({
+      where: { userId: req.user.userId },
+      select: { role: true },
+    });
+    req.user.role = profile?.role || 'STUDENT';
+    next();
+  } catch (error) {
+    logger.error('Role lookup error:', error);
+    return res.status(HTTP_STATUS.INTERNAL_SERVER_ERROR).json({ error: 'Role verification failed' });
   }
 };
 
@@ -67,17 +95,13 @@ export const requireRole = (roles: string[]) => {
     }
 
     try {
-      let userRole = req.user.role;
-
-      // If role is not in the token, fetch from user profile DB
-      if (!userRole) {
-        const profile = await prisma.userProfile.findUnique({
-          where: { userId: req.user.userId },
-          select: { role: true },
-        });
-        userRole = profile?.role || 'STUDENT';
-        req.user.role = userRole;
-      }
+      // The database is authoritative: a role value that came with the token is never trusted (FIX-INS-01).
+      const profile = await prisma.userProfile.findUnique({
+        where: { userId: req.user.userId },
+        select: { role: true },
+      });
+      const userRole = profile?.role || 'STUDENT';
+      req.user.role = userRole;
       
       if (!roles.includes(userRole)) {
         return res.status(HTTP_STATUS.FORBIDDEN).json({

@@ -1,4 +1,5 @@
 import { orderApi } from './api';
+import { PaymentConfirmationResult, readOrderPaymentAnswer, resultFromError } from './payment-confirmation';
 
 export interface CartItem {
   courseId: string;
@@ -161,9 +162,17 @@ export const orderService = {
     return response.data.data;
   },
 
-  async processPayment(orderId: string, paymentMethodId?: string): Promise<{ success: boolean; payment: any }> {
-    const response = await orderApi.post(`/api/orders/${orderId}/payment`, { paymentMethodId });
-    return response.data;
+  /**
+   * Asks the backend to sync a card payment. The answer is { message, data: { success, status, payment } } - read through the one
+   * shared reader (FIX 07B-1.3); it never throws for an HTTP / network error. It does NOT mark the order paid: the payment webhook does.
+   */
+  async processPayment(orderId: string, paymentMethodId?: string): Promise<PaymentConfirmationResult> {
+    try {
+      const response = await orderApi.post(`/api/orders/${orderId}/payment`, { paymentMethodId });
+      return readOrderPaymentAnswer(response.data, response.status);
+    } catch (error) {
+      return resultFromError(error);
+    }
   },
 
   // Admin endpoints
